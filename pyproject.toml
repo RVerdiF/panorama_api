@@ -1,0 +1,12 @@
+[project]
+name = "panorama-api"
+version = "0.1.0"
+description = "API do Panorama Escola"
+requires-python = ">=3.11"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
