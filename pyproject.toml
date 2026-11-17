@@ -4,12 +4,17 @@ version = "0.1.0"
 description = "API do Panorama Escola"
 requires-python = ">=3.11"
 dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.4",
     "google-cloud-bigquery>=3.27,<4",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8,<9",
+    "httpx>=0.27",
 ]
 
 [build-system]
@@ -21,8 +26,9 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
-testpaths = ["tests/unit"]
+testpaths = ["tests"]
 addopts = "-ra"
 markers = [
     "integration: exige credencial/rede do BigQuery; não roda por padrão",
+    "dataset: testes que exigem dataset local (não rodam na camada hermética)",
 ]
