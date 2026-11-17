@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 import yaml
 
+from panorama_api.config import Settings
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SERVICE_YAML = REPO_ROOT / "infra" / "cloud-run" / "service.yaml"
 DEPLOY_SH = REPO_ROOT / "infra" / "cloud-run" / "deploy.sh"
@@ -76,14 +78,33 @@ def test_imagem_vem_do_artifact_registry_de_us_central1(template_spec):
     )
 
 
-def test_env_do_servico_alimenta_etag_e_teto_de_bytes(template_spec):
+def _manifest_env(template_spec) -> dict[str, str]:
     (container,) = template_spec["containers"]
-    env = {item["name"]: item["value"] for item in container["env"]}
+    return {item["name"]: item["value"] for item in container["env"]}
 
-    assert env["BQ_LOCATION"] == "us-central1"
-    assert env["BQ_MAX_BYTES_BILLED"] == "268435456"
-    assert env["DATA_VERSION"] == "${DATA_VERSION}"  # preenchido no deploy
-    assert env["BQ_SERVING_DATASET"] == "panorama_serving"
+
+def test_env_do_manifesto_usa_os_aliases_do_settings(template_spec):
+    env = _manifest_env(template_spec)
+    aliases = {field.alias for field in Settings.model_fields.values() if field.alias}
+
+    # Um `env` que não é alias do `Settings` é descartado por `extra="ignore"`,
+    # calado: o valor do manifesto deixaria de valer (revisão 1 do card).
+    assert set(env) <= aliases
+
+
+def test_settings_carrega_os_valores_do_manifesto(template_spec, monkeypatch):
+    env = _manifest_env(template_spec)
+    for name, value in env.items():
+        monkeypatch.setenv(name, "2026.11.17" if value == "${DATA_VERSION}" else value)
+
+    settings = Settings()
+
+    assert settings.bq_project == "panorama-escola-staging"
+    assert settings.bq_dataset == "panorama_serving"
+    assert settings.bq_location == "us-central1"
+    assert settings.max_bytes_billed == 268435456
+    # DATA_VERSION do deploy é o que invalida ETag/LRU.
+    assert settings.data_version == "2026.11.17"
 
 
 # -- script de deploy ------------------------------------------------------

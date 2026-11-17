@@ -29,12 +29,15 @@ ETag: "<32 hex>"
 - `ETag = sha256(DATA_VERSION + caminho + query canônica)` truncado em 32 hex.
   A query é ordenada por chave/valor, então `?a=1&b=2` e `?b=2&a=1` produzem o
   mesmo `ETag`.
-- `If-None-Match` igual (aceita `W/"..."`, listas e `*`) devolve **304** sem
+- `If-None-Match` igual (aceita `W/"..."` e listas) devolve **304** sem
   corpo, com o mesmo `ETag`/`Cache-Control`. O 304 é decidido pelo hash, não
   pela presença no LRU — vale inclusive numa instância fria (scale-to-zero),
   que é onde ele mais economiza consulta. Premissa: dentro de uma
   `DATA_VERSION` a representação é imutável — publicar dados exige subir a
   versão (ver abaixo).
+- `If-None-Match: *` só devolve 304 quando a representação **existe**
+  (RFC 9110): o middleware não responde 304 antes de o handler confirmar o
+  recurso, então um caminho que daria 404 continua 404.
 - **Erros não são cacheados**: 4xx/5xx não recebem `ETag` nem `Cache-Control`,
   não entram no LRU e a próxima requisição consulta o BigQuery de novo.
 - `GET /health`, `/docs` e `/openapi.json` ficam fora do cache (só `/v1/*`).
@@ -85,7 +88,7 @@ requests/mês; acima disso o custo é Tier 1 (`us-central1`).
 | controle | valor | comportamento |
 |---|---|---|
 | cota diária do BigQuery | **50 GB/dia** | corte duro: jobs recusados acima disso (503 na API), custo zero |
-| teto por consulta | 256 MB (`BQ_MAX_BYTES_BILLED`) | provisório até a clusterização (`t_cfe70dd5`) |
+| teto por consulta | 256 MB (`API_BQ_MAX_BYTES_BILLED`) | provisório até a clusterização (`t_cfe70dd5`) |
 | budget mensal | **US$ 20** | aviso por e-mail em 50%, 90% e 100%; não corta o serviço |
 
 O budget não desliga nada: ele existe para avisar antes de o cartão ser
@@ -106,7 +109,14 @@ A descrição canônica fica em `infra/gcp/cost-controls.yaml`:
 
 ## Logs estruturados
 
-Duas linhas de log por requisição, ambas com campos consultáveis:
+`panorama_api.core.logging_config.configure_logging()` (chamado no
+`create_app`) deixa o logger `panorama_api` em **INFO** e emite **uma linha
+JSON por registro no stdout** — o formato que o Cloud Logging lê como
+`jsonPayload`, tornando os campos consultáveis (base dos alertas abaixo).
+O root e os loggers `uvicorn.*` não são tocados.
+
+Campos comuns: `severity`, `message`, `logger`, `timestamp` (UTC). Duas linhas
+por requisição, ambas com campos consultáveis:
 
 - `http_cache` — campos `cache` (`hit`/`miss`), `status`, `path`,
   `data_version`. `hit` = servido do LRU ou 304; `miss` = foi ao BigQuery.
@@ -117,13 +127,19 @@ Duas linhas de log por requisição, ambas com campos consultáveis:
 (`BigQueryServingRepository._run`), então o alerta de p95 consegue separar
 latência de consulta de latência de rede/serialização.
 
-Exemplo:
+Exemplo (uma linha por registro):
 
-```text
-http_cache cache=miss status=200 path=/v1/markets/3106200 data_version=2026.11.17
-bq_query bq_ms=412.7 endpoint=market status=ok
-http_cache cache=hit status=200 path=/v1/markets/3106200 data_version=2026.11.17
+```json
+{"severity": "INFO", "message": "http_cache", "logger": "panorama_api.core.http_cache", "timestamp": "2026-11-17T16:40:38.508Z", "cache": "miss", "status": 200, "path": "/v1/markets/3106200", "data_version": "2026.11.17"}
+{"severity": "INFO", "message": "bq_query", "logger": "panorama_api.repositories.bigquery_repo", "timestamp": "2026-11-17T16:40:38.901Z", "bq_ms": 412.7, "endpoint": "market", "status": "ok"}
+{"severity": "INFO", "message": "http_cache", "logger": "panorama_api.core.http_cache", "timestamp": "2026-11-17T16:40:39.002Z", "cache": "hit", "status": 200, "path": "/v1/markets/3106200", "data_version": "2026.11.17"}
 ```
+
+O nome de cada `env` do manifesto precisa ser **exatamente** o alias do
+`Settings` (`BQ_PROJECT`, `BQ_DATASET`, `BQ_LOCATION`,
+`API_BQ_MAX_BYTES_BILLED`, `DATA_VERSION`). Um nome divergente é descartado em
+silêncio por `extra="ignore"` — `tests/unit/test_infra_config.py` amarra o
+manifesto aos aliases e carrega o `Settings` a partir do `env` do manifesto.
 
 ## O que ainda não está implantado
 

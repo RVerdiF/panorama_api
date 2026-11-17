@@ -33,13 +33,16 @@ spec:
               cpu: "1"
               memory: 512Mi
           env:
-            - name: GCP_PROJECT
+            # Nomes EXATOS dos aliases de `panorama_api.config.Settings`:
+            # qualquer divergência é descartada por `extra="ignore"` e o valor
+            # do manifesto deixa de valer (ver tests/unit/test_infra_config.py).
+            - name: BQ_PROJECT
               value: panorama-escola-staging
-            - name: BQ_SERVING_DATASET
+            - name: BQ_DATASET
               value: panorama_serving
             - name: BQ_LOCATION
               value: us-central1
-            - name: BQ_MAX_BYTES_BILLED
+            - name: API_BQ_MAX_BYTES_BILLED
               value: "268435456"
             # Invalida o cache HTTP (ETag/LRU) a cada publicação nova.
             - name: DATA_VERSION
