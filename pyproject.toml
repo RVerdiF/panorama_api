@@ -15,6 +15,9 @@ dependencies = [
 dev = [
     "pytest>=8,<9",
     "httpx>=0.27",
+    # parse dos manifestos IaC nos testes (infra/); já vem via uvicorn[standard],
+    # declarado aqui para o teste não depender de dependência transitiva.
+    "PyYAML>=6,<7",
 ]
 
 [build-system]

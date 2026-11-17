@@ -1,0 +1,46 @@
+# Serviço Cloud Run da API (`gcloud run services replace infra/cloud-run/service.yaml`).
+#
+# REGRAS DO DONO (2026-11-17) — não alterar sem autorização explícita:
+#   * minScale = "0": scale-to-zero; o serviço nunca fica quente fora de uso;
+#   * maxScale = "3": teto de instâncias;
+#   * CPU só durante a requisição (cpu-throttling), 1 vCPU / 512 MiB.
+# Região: `us-central1`, fixada em `deploy.sh` — o manifesto não carrega região.
+# É a mesma região do dataset `panorama_serving` e do Artifact Registry.
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: panorama-api
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+        run.googleapis.com/cpu-throttling: "true"
+    spec:
+      containerConcurrency: 20
+      timeoutSeconds: 15
+      containers:
+        - name: api
+          image: ${IMAGE}
+          ports:
+            - name: http1
+              containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: GCP_PROJECT
+              value: panorama-escola-staging
+            - name: BQ_SERVING_DATASET
+              value: panorama_serving
+            - name: BQ_LOCATION
+              value: us-central1
+            - name: BQ_MAX_BYTES_BILLED
+              value: "268435456"
+            # Invalida o cache HTTP (ETag/LRU) a cada publicação nova.
+            - name: DATA_VERSION
+              value: "${DATA_VERSION}"

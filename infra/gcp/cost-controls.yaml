@@ -1,0 +1,58 @@
+# Controles de custo do projeto (fonte única dos números do card 2d.3).
+#
+# Nada aqui corta tráfego por conta própria: cota e budget AVISAM. O corte duro
+# é a cota diária do BigQuery — acima dela o serviço falha fechado (503), nunca
+# gera cobrança surpresa. O budget é teto de aviso, não de gasto.
+project: panorama-escola-staging
+region: us-central1
+
+bigquery:
+  # Cota diária do projeto: 50 GB/dia. Estourar = jobs recusados, custo zero.
+  daily_query_limit_gb: 50
+  # Teto por consulta (256 MB provisório; volta a 100 MB após t_cfe70dd5).
+  maximum_bytes_billed_per_query: 268435456
+  free_tier_reference:
+    measured_on: "2026-11-17"
+    requests_per_month: 2000000
+    vcpu_seconds_per_month: 180000
+    gib_seconds_per_month: 360000
+    requests_at_300ms_1vcpu: 600000
+
+cloud_run:
+  service: panorama-api
+  region: us-central1
+  # REGRA DO DONO: estes dois valores não sobem sem autorização explícita.
+  min_instances: 0
+  max_instances: 3
+  concurrency: 20
+  request_timeout_s: 15
+  cpu: "1"
+  memory: "512Mi"
+
+budget:
+  amount_usd: 20
+  period: monthly
+  # Alertas de 50/90/100% são aviso por e-mail; não desligam o serviço.
+  alerts_percent: [50, 90, 100]
+
+alerts:
+  - name: bigquery_bytes_acima_10gb_dia
+    condition: bytes faturados pelo projeto acima de 10 GB no dia
+    threshold: 10 GiB/dia
+    window: 1 dia
+  - name: bigquery_bytes_billed_limit_exceeded
+    condition: pelo menos um job recusado por bytesBilledLimitExceeded
+    threshold: ">= 1 ocorrência"
+    window: 5 min
+  - name: latencia_p95_acima_2s
+    condition: p95 da latência de requisição do Cloud Run acima de 2 s
+    threshold: 2 s
+    window: 5 min
+  - name: erros_5xx_acima_1pct
+    condition: respostas 5xx acima de 1% das requisições
+    threshold: 1%
+    window: 5 min
+  - name: instancias_no_teto_por_10min
+    condition: instâncias ativas iguais a max_instances por 10 min sem parar
+    threshold: 3 instâncias
+    window: 10 min
