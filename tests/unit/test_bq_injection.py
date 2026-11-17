@@ -11,7 +11,7 @@ from panorama_api.repositories.bigquery import (
     QueryExecutor,
 )
 
-from conftest import FakeQueryClient
+from tests.unit.conftest import FakeQueryClient
 
 MUNICIPIO = {"co_municipio": "3106200"}
 PAYLOADS = [
