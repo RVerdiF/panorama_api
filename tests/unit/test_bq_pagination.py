@@ -20,7 +20,7 @@ from panorama_api.repositories.bigquery.pagination import (
 )
 from panorama_api.repositories.bigquery.templates import TEMPLATES
 
-from conftest import FakeQueryClient
+from tests.unit.conftest import FakeQueryClient
 
 MUNICIPIO = {"co_municipio": "3106200"}
 SHARE = {"co_municipio": "3106200", "nu_ano_censo": 2024, "etapa": "fund_ai"}

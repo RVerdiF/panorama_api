@@ -77,7 +77,7 @@ def test_configuracao_invalida() -> None:
 def test_executor_aplica_rate_limit_antes_do_bigquery() -> None:
     from panorama_api.repositories.bigquery import BigQuerySettings, QueryExecutor
 
-    from conftest import FakeQueryClient
+    from tests.unit.conftest import FakeQueryClient
 
     client = FakeQueryClient()
     executor = QueryExecutor(

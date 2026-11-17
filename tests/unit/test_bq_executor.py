@@ -14,7 +14,7 @@ from panorama_api.repositories.bigquery import (
     QueryTimeout,
 )
 
-from conftest import FakeQueryClient
+from tests.unit.conftest import FakeQueryClient
 
 SHARE = {"co_municipio": "3106200", "nu_ano_censo": 2024, "etapa": "fund_ai"}
 
