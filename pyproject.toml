@@ -3,6 +3,14 @@ name = "panorama-api"
 version = "0.1.0"
 description = "API do Panorama Escola"
 requires-python = ">=3.11"
+dependencies = [
+    "google-cloud-bigquery>=3.27,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+]
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -10,3 +18,11 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests/unit"]
+addopts = "-ra"
+markers = [
+    "integration: exige credencial/rede do BigQuery; não roda por padrão",
+]
