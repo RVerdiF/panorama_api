@@ -114,15 +114,20 @@ def etag_for(key: str) -> str:
     return f'"{digest}"'
 
 
-def etag_matches(header: str | None, etag: str) -> bool:
-    """Compara ``If-None-Match`` (lista, tags fracas ``W/`` e ``*``)."""
+def etag_matches(header: str | None, etag: str, *, allow_star: bool = True) -> bool:
+    """Compara ``If-None-Match`` (lista, tags fracas ``W/`` e ``*``).
+
+    ``allow_star=False`` trata ``*`` como não-casado: pela RFC 9110 o ``*`` só
+    casa quando existe representação atual, e o *short-circuit* do middleware
+    não sabe se o recurso existe (quem sabe é o handler).
+    """
     if not header:
         return False
     wanted = _opaque(etag)
     for candidate in header.split(","):
         item = candidate.strip()
         if item == "*":
-            return True
+            return allow_star
         if _opaque(item) == wanted:
             return True
     return False
@@ -158,12 +163,21 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         )
         etag = etag_for(key)
 
-        if etag_matches(request.headers.get("if-none-match"), etag):
+        if etag_matches(
+            request.headers.get("if-none-match"), etag, allow_star=False
+        ):
             _log_access(request, cache="hit", status=304, data_version=data_version)
             return _not_modified(self._headers(etag))
 
         cached = self.cache.get(key)
         if cached is not None:
+            # `If-None-Match: *` casa aqui porque o recurso já está cacheado
+            # (logo, existe) — RFC 9110.
+            if etag_matches(request.headers.get("if-none-match"), etag):
+                _log_access(
+                    request, cache="hit", status=304, data_version=data_version
+                )
+                return _not_modified(self._headers(etag))
             _log_access(request, cache="hit", status=200, data_version=data_version)
             return Response(
                 content=cached.body,
@@ -190,6 +204,12 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         headers.pop("content-length", None)
 
         self.cache.put(key, CachedResponse(body=body, media_type=media_type))
+        # `If-None-Match: *` só casa quando existe representação atual
+        # (RFC 9110). Aqui o handler respondeu 200, então 304 é o correto —
+        # ao contrário do short-circuit acima, que não sabe se o recurso existe.
+        if etag_matches(request.headers.get("if-none-match"), etag):
+            _log_access(request, cache="hit", status=304, data_version=data_version)
+            return _not_modified(self._headers(etag))
         _log_access(request, cache="miss", status=200, data_version=data_version)
         headers.update(self._headers(etag))
         return Response(

@@ -111,6 +111,28 @@ def test_304_aceita_tag_fraca_e_lista(client, repository):
     assert fraco.status_code == lista.status_code == curinga.status_code == 304
 
 
+def test_curinga_nao_esconde_recurso_inexistente(client, repository):
+    # RFC 9110: `If-None-Match: *` só casa quando existe representação atual.
+    _abastece_mercado(repository)
+
+    resposta = client.get("/v1/markets/3106200?ano=2024", headers={"If-None-Match": "*"})
+
+    assert resposta.status_code == 404
+    assert "etag" not in resposta.headers
+
+
+def test_curinga_so_responde_304_depois_de_confirmar_que_o_recurso_existe(
+    client, repository
+):
+    _abastece_mercado(repository)
+
+    resposta = _get_mercado(client, headers={"If-None-Match": "*"})
+
+    assert resposta.status_code == 304
+    assert resposta.content == b""
+    assert _chamadas(repository) > 0  # o handler confirmou a existência
+
+
 def test_etag_diferente_devolve_200_com_corpo(client, repository):
     _abastece_mercado(repository)
 

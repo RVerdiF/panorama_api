@@ -24,6 +24,7 @@ from panorama_api.core.errors import (
     validation_errors,
 )
 from panorama_api.core.http_cache import HttpCacheMiddleware
+from panorama_api.core.logging_config import configure_logging
 from panorama_api.core.startup import validate_schema
 from panorama_api.repositories.bigquery_repo import BigQueryServingRepository
 from panorama_api.repositories.serving import ServingRepository
@@ -45,6 +46,9 @@ def create_app(
     settings: Settings | None = None, repository: ServingRepository | None = None
 ) -> FastAPI:
     """Monta o app. `repository` é injetável para testes herméticos (BQ fake)."""
+    # Log estruturado (JSON no stdout) em INFO: `bq_ms` e `cache` são campos
+    # consumidos pelos alertas de custo. Idempotente.
+    configure_logging()
     settings = settings or get_settings()
     repository = repository or BigQueryServingRepository(settings)
 
