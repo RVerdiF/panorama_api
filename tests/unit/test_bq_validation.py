@@ -97,6 +97,9 @@ PAGE_CASES = [
     ("market", {"co_municipio": "3106200", "nu_ano_censo": 2024}, PageRequest(offset=10)),
     # cursor inválido
     ("schools", {"co_municipio": "3106200"}, PageRequest(cursor="não-é-base64")),
+    # dígitos Unicode não decimais ("²") não são inteiros: 400, nunca 500
+    ("market_share", SHARE_OK, PageRequest(page_size="²")),
+    ("market_share", SHARE_OK, PageRequest(offset="²")),
 ]
 
 

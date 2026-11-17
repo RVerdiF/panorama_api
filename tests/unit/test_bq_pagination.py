@@ -213,3 +213,34 @@ def test_cursor_de_aridade_errada_e_400() -> None:
             encode_cursor(["apenas-um"]),
             (KeysetColumn("no_entidade", nullable=True), KeysetColumn("co_entidade")),
         )
+
+
+#: Strings que ``str.isdigit()`` aceita mas ``int()`` recusa (ou que não são
+#: decimais ASCII). Nenhuma pode escapar como ``ValueError``/500.
+NAO_DECIMAIS = ["²", "³", "１２", "٣", "1_000", "1e3", "0x10", "1.0", "--1", "-"]
+
+
+@pytest.mark.parametrize("valor", NAO_DECIMAIS)
+def test_page_size_nao_decimal_nunca_escapa_como_valueerror(valor: str) -> None:
+    with pytest.raises(InvalidQueryRequest):
+        plan_page(
+            mode=PaginationMode.OFFSET,
+            request=PageRequest(page_size=valor),
+            page_size_default=50,
+            page_size_max=200,
+            offset_max=1000,
+            row_cap=1000,
+        )
+
+
+@pytest.mark.parametrize("valor", NAO_DECIMAIS)
+def test_offset_nao_decimal_nunca_escapa_como_valueerror(valor: str) -> None:
+    with pytest.raises(InvalidQueryRequest):
+        plan_page(
+            mode=PaginationMode.OFFSET,
+            request=PageRequest(offset=valor),
+            page_size_default=50,
+            page_size_max=200,
+            offset_max=1000,
+            row_cap=1000,
+        )

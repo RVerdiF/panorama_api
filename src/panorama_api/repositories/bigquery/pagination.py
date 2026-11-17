@@ -14,12 +14,18 @@ from __future__ import annotations
 import base64
 import binascii
 import json
+import re
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Iterable, Mapping, Sequence
 
 from .errors import InvalidQueryRequest
 from .parameters import ParamType
+
+#: Aceita apenas decimais ASCII com sinal opcional. ``\d`` casaria dígitos
+#: Unicode não decimais (``"²"``) que ``int()`` recusa, deixando escapar um
+#: ``ValueError`` cru (500) no lugar do 400 do contrato.
+_INT_ASCII_RE = re.compile(r"^-?[0-9]{1,9}$")
 
 
 class PaginationMode(str, Enum):
@@ -39,10 +45,15 @@ class KeysetColumn:
 
 @dataclass(frozen=True, slots=True)
 class PageRequest:
-    """Pedido de página; valores crus, normalizados em ``plan_page``."""
+    """Pedido de página; valores crus, normalizados em ``plan_page``.
 
-    page_size: int | None = None
-    offset: int | None = None
+    ``page_size``/``offset`` chegam como ``str`` da query string e como ``int``
+    de chamadas internas: a normalização (e a recusa de qualquer formato que
+    não seja decimal ASCII) acontece em ``_as_int``, nunca por ``int()`` cru.
+    """
+
+    page_size: int | str | None = None
+    offset: int | str | None = None
     cursor: str | None = None
 
 
@@ -196,12 +207,19 @@ def _page_size(requested: Any, default: int, maximum: int) -> int:
 
 
 def _as_int(value: Any, field: str) -> int:
+    """Converte um valor cru de paginação; qualquer não decimal ASCII é 400.
+
+    Só strings que casam ``_INT_ASCII_RE`` chegam a ``int()``, então nenhum
+    ``ValueError`` escapa desta função (falha fechada: 400, nunca 500).
+    """
     if isinstance(value, bool):
         raise InvalidQueryRequest(f"{field} deve ser inteiro", field=field)
     if isinstance(value, int):
         return value
-    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
-        return int(value.strip())
+    if isinstance(value, str):
+        text = value.strip()
+        if _INT_ASCII_RE.match(text):
+            return int(text)
     raise InvalidQueryRequest(f"{field} deve ser inteiro", field=field)
 
 
