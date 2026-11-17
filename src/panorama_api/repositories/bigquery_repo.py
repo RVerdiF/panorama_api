@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from panorama_api.config import Settings
@@ -26,6 +27,18 @@ def normalize_type(data_type: str) -> str:
     return _TYPE_ALIASES.get(data_type.upper(), data_type.upper())
 
 
+def _log_query(endpoint: str, started: float, *, status: str) -> None:
+    """Log estruturado da consulta: `bq_ms` é o que os alertas de p95 consomem."""
+    logger.info(
+        "bq_query",
+        extra={
+            "bq_ms": round((time.perf_counter() - started) * 1000, 1),
+            "endpoint": endpoint,
+            "status": status,
+        },
+    )
+
+
 class BigQueryServingRepository:
     """Consultas parametrizadas de allowlist contra `${BQ_PROJECT}.${BQ_DATASET}`."""
 
@@ -46,10 +59,11 @@ class BigQueryServingRepository:
     def _fq(self, table: str) -> str:
         return f"`{self._settings.bq_project}.{self._settings.bq_dataset}.{table}`"
 
-    def _run(self, sql: str, params: Params) -> list[dict[str, Any]]:
+    def _run(self, sql: str, params: Params, *, endpoint: str) -> list[dict[str, Any]]:
         from google.api_core import exceptions as gexc
         from google.cloud import bigquery
 
+        started = time.perf_counter()
         job_config = bigquery.QueryJobConfig(
             maximum_bytes_billed=self._settings.max_bytes_billed,
             query_parameters=[
@@ -62,14 +76,17 @@ class BigQueryServingRepository:
                 sql, job_config=job_config, location=self._settings.bq_location
             )
             result = job.result()
-            return [dict(row.items()) for row in result]
+            rows = [dict(row.items()) for row in result]
         except (
             gexc.GoogleAPIError,
             TimeoutError,
             OSError,
         ) as exc:  # falha/timeout/teto de bytes: 503, sem SQL no corpo
+            _log_query(endpoint, started, status="error")
             logger.warning("bigquery indisponível: %s", type(exc).__name__)
             raise UpstreamUnavailable("fonte de dados indisponível") from exc
+        _log_query(endpoint, started, status="ok")
+        return rows
 
     # -- leituras -------------------------------------------------------
     def search_schools(
@@ -93,7 +110,7 @@ class BigQueryServingRepository:
             limit=limit,
             offset=offset,
         )
-        return self._run(sql, params)
+        return self._run(sql, params, endpoint="schools")
 
     def get_school(self, co_entidade: str) -> dict[str, Any] | None:
         rows = self.search_schools(
@@ -113,21 +130,21 @@ class BigQueryServingRepository:
         sql, params = queries.school_history(
             self._fq, co_entidade=co_entidade, ano_inicio=ano_inicio, ano_fim=ano_fim
         )
-        return self._run(sql, params)
+        return self._run(sql, params, endpoint="school_history")
 
     def get_school_indicators(
         self, *, co_entidade: str, ano: int | None
     ) -> list[dict[str, Any]]:
         sql, params = queries.school_indicators(self._fq, co_entidade=co_entidade, ano=ano)
-        return self._run(sql, params)
+        return self._run(sql, params, endpoint="school_indicators")
 
     def get_school_competidores(self, *, co_entidade: str) -> list[dict[str, Any]]:
         sql, params = queries.school_competidores(self._fq, co_entidade=co_entidade)
-        return self._run(sql, params)
+        return self._run(sql, params, endpoint="school_competidores")
 
     def get_municipio(self, co_municipio: str) -> dict[str, Any] | None:
         sql, params = queries.municipio(self._fq, co_municipio=co_municipio)
-        rows = self._run(sql, params)
+        rows = self._run(sql, params, endpoint="municipio")
         return rows[0] if rows else None
 
     def get_market(
@@ -136,7 +153,7 @@ class BigQueryServingRepository:
         sql, params = queries.market(
             self._fq, co_municipio=co_municipio, ano=ano, etapa=etapa
         )
-        return self._run(sql, params)
+        return self._run(sql, params, endpoint="market")
 
     def get_concentracao(
         self, *, co_municipio: str, ano: int, etapa: str | None
@@ -144,7 +161,7 @@ class BigQueryServingRepository:
         sql, params = queries.concentracao(
             self._fq, co_municipio=co_municipio, ano=ano, etapa=etapa
         )
-        return self._run(sql, params)
+        return self._run(sql, params, endpoint="concentracao")
 
     def get_market_share(
         self,
@@ -165,7 +182,7 @@ class BigQueryServingRepository:
             limit=limit,
             offset=offset,
         )
-        return self._run(sql, params)
+        return self._run(sql, params, endpoint="market_share")
 
     def get_table_columns(self) -> dict[str, dict[str, str]]:
         tables = ", ".join(f"'{name}'" for name in EXPECTED_COLUMNS)
@@ -175,7 +192,7 @@ class BigQueryServingRepository:
             tables=tables,
         )
         columns: dict[str, dict[str, str]] = {}
-        for row in self._run(sql, []):
+        for row in self._run(sql, [], endpoint="table_columns"):
             columns.setdefault(row["table_name"], {})[row["column_name"]] = normalize_type(
                 row["data_type"]
             )

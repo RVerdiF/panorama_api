@@ -23,6 +23,7 @@ from panorama_api.core.errors import (
     problem_response,
     validation_errors,
 )
+from panorama_api.core.http_cache import HttpCacheMiddleware
 from panorama_api.core.startup import validate_schema
 from panorama_api.repositories.bigquery_repo import BigQueryServingRepository
 from panorama_api.repositories.serving import ServingRepository
@@ -62,6 +63,9 @@ def create_app(
     )
     app.state.settings = settings
     app.state.repo = repository
+    # Cache HTTP das respostas GET /v1/*: ETag por DATA_VERSION + params,
+    # `Cache-Control` de 1 dia e LRU em memória (card t_817a670c).
+    app.add_middleware(HttpCacheMiddleware)
 
     app.add_exception_handler(ProblemError, _handle_problem)
     app.add_exception_handler(RequestValidationError, _handle_validation)

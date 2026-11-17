@@ -11,6 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from panorama_api.contract import CONTRACT_VERSION_DEFAULT
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9_-]+$")
+_DATA_VERSION = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 #: Teto provisório por consulta (decisão do gateway 2026-11-17: medição real de
 #: até 86 MB; volta a 100 MB quando a clusterização entrar).
@@ -35,6 +36,9 @@ class Settings(BaseSettings):
     contract_version: str = Field(
         default=CONTRACT_VERSION_DEFAULT, alias="API_CONTRACT_VERSION"
     )
+    #: Versão dos dados publicados (run de publicação). Entra no ETag e na chave
+    #: do LRU: trocar o valor no deploy invalida o cache HTTP sem varrer nada.
+    data_version: str = Field(default="dev", alias="DATA_VERSION")
 
     @field_validator("bq_project", "bq_dataset")
     @classmethod
@@ -50,6 +54,17 @@ class Settings(BaseSettings):
     def _positive(cls, value: int) -> int:
         if value <= 0:
             raise ValueError("API_BQ_MAX_BYTES_BILLED deve ser positivo")
+        return value
+
+    @field_validator("data_version")
+    @classmethod
+    def _version(cls, value: str) -> str:
+        # Entra no ETag: precisa ser estável e sem caracteres de controle.
+        value = value.strip()
+        if not _DATA_VERSION.match(value):
+            raise ValueError(
+                f"DATA_VERSION inválido: {value!r} (use letras, números, '.', '_' ou '-')"
+            )
         return value
 
 
