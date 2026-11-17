@@ -25,6 +25,11 @@ Card `t_51cb08b2`. Spec canônica: `api-v1-contrato.md` §10 + regras comuns do 
    `offset ≤ 1000`.
 7. **Teto de bytes por consulta** via `API_BQ_MAX_BYTES_BILLED` (256 MB provisório).
    Excesso/timeout/erro do BigQuery → **503** `FONTE_INDISPONIVEL` (sem SQL no corpo).
+8. **Cache HTTP.** Resposta `200` de `GET /v1/*` leva
+   `Cache-Control: public, max-age=86400, stale-while-revalidate=604800` e
+   `ETag = sha256(DATA_VERSION + caminho + query canônica)`. `If-None-Match`
+   igual → **304** sem corpo. Erro nunca é cacheado nem recebe esses
+   cabeçalhos. Detalhes em `docs/operacao-custo.md`.
 
 ## Envelope
 
