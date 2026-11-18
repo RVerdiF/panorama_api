@@ -11,6 +11,7 @@ API read-only do Panorama Escola (FastAPI) sobre as views do contrato de serving
 | GET | `/v1/schools` | `dim_escola` (MG) |
 | GET | `/v1/schools/{co_entidade}/history` | `mart_escola` |
 | GET | `/v1/schools/{co_entidade}/indicators` | `mart_escola_indicadores` + `mart_competidores` |
+| GET | `/v1/schools/{co_entidade}/competitors` | `mart_competidores` (comparação municipal) |
 | GET | `/v1/markets/{co_municipio}` | `mart_mercado` + `mart_concentracao` + `dim_geografia` |
 | GET | `/v1/markets/{co_municipio}/share` | `mart_market_share` + `dim_mantenedora` |
 
