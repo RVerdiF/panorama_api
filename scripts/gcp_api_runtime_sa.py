@@ -212,6 +212,25 @@ def http(method: str, url: str, token: str, body: dict | None = None) -> dict:
         raise ApiError(f"{method} {url} -> HTTP {exc.code}: {detail}") from exc
 
 
+def http_status(method: str, url: str, token: str, body: dict | None = None) -> tuple[int, str]:
+    """Como `http`, mas devolve (status, corpo) em vez de levantar em erro.
+
+    Sondas que esperam negação precisam do código HTTP: 403 é o resultado
+    desejado, não uma falha do script.
+    """
+    data = None
+    headers = {"Authorization": f"Bearer {token}"}
+    if body is not None:
+        data = json.dumps(body).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.status, response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        return exc.code, exc.read().decode("utf-8", errors="replace")
+
+
 # -- leitura do estado real ------------------------------------------------
 
 
@@ -286,42 +305,78 @@ def org_policy_state(spec: dict) -> str:
     return boolean_policy_state(json.loads(raw or "{}"))
 
 
-def probe_permissions(project: str, dataset_id: str, impersonate: str, expected: dict) -> list[str]:
-    """Roda `testIamPermissions` COMO a SA (impersonação, sem chave)."""
-    token = access_token(impersonate=impersonate)
-    findings: list[str] = []
+def classify_denial(permission: str, status: int, detail: str) -> tuple[str, str]:
+    """Classifica uma tentativa que DEVE ser negada.
 
-    project_probe = expected.get("project", {})
-    permissions = list(project_probe.get("positive", [])) + list(
-        project_probe.get("negative", [])
-    )
-    if permissions:
-        result = http(
-            "POST",
-            f"{CRM_BASE}/{project}:testIamPermissions",
-            token,
-            {"permissions": permissions},
+    Devolve `("ok", "")` quando a negação prova a ausência da permissão,
+    `("problem", ...)` quando a permissão foi concedida (privilégio a mais) e
+    `("warning", ...)` quando a sonda não decide nada — caso da API desabilitada
+    no projeto, que nega a qualquer identidade e portanto não distingue IAM.
+    """
+    if 200 <= status < 300:
+        return ("problem", f"permissão a mais: {permission}")
+    if "SERVICE_DISABLED" in detail or "has not been used in project" in detail:
+        return (
+            "warning",
+            f"sonda de {permission} inconclusiva: API desabilitada no projeto "
+            "(a ausência segue provada pela lista exata de papéis)",
         )
-        findings += [
-            f"projeto: {item}" for item in probe_findings(project_probe, result.get("permissions", []))
-        ]
+    if status == 403:
+        return ("ok", "")
+    return ("warning", f"sonda de {permission} inconclusiva (HTTP {status})")
 
-    dataset_probe = expected.get("dataset", {})
-    permissions = list(dataset_probe.get("positive", [])) + list(
-        dataset_probe.get("negative", [])
-    )
-    if permissions:
-        result = http(
-            "POST",
-            f"{BQ_BASE}/{project}/datasets/{dataset_id}:testIamPermissions",
-            token,
-            {"permissions": permissions},
+
+def probe_project(spec: dict) -> tuple[list[str], list[str]]:
+    """Sondas de escopo projeto, como a SA: job `dryRun` e `getIamPolicy` real."""
+    probe = spec.get("iam_probe", {}).get("project", {})
+    token = access_token(impersonate=sa_email(spec))
+    problems: list[str] = []
+    warnings: list[str] = []
+
+    if probe.get("positive"):
+        body = {
+            "configuration": {
+                "query": {"query": "SELECT 1", "useLegacySql": False, "dryRun": True}
+            }
+        }
+        status, detail = http_status(
+            "POST", f"{BQ_BASE}/{spec['project']}/jobs", token, body
         )
-        findings += [
-            f"dataset {dataset_id}: {item}"
-            for item in probe_findings(dataset_probe, result.get("permissions", []))
-        ]
-    return findings
+        if not 200 <= status < 300:
+            problems.append(
+                "projeto: falta permissão bigquery.jobs.create (job dryRun negado)"
+            )
+
+    if probe.get("negative"):
+        status, detail = http_status(
+            "POST", f"{CRM_BASE}/{spec['project']}:getIamPolicy", token, {}
+        )
+        for permission in probe["negative"]:
+            kind, message = classify_denial(permission, status, detail)
+            if kind == "problem":
+                problems.append(f"projeto: {message}")
+            elif kind == "warning":
+                warnings.append(f"projeto: {message}")
+    return problems, warnings
+
+
+def probe_dataset(spec: dict, dataset_id: str) -> list[str]:
+    """`testIamPermissions` do BigQuery, COMO a SA (impersonação, sem chave)."""
+    probe = spec.get("iam_probe", {}).get("dataset", {})
+    permissions = list(probe.get("positive", [])) + list(probe.get("negative", []))
+    if not permissions:
+        return []
+    token = access_token(impersonate=sa_email(spec))
+    result = http(
+        "POST",
+        f"{BQ_BASE}/{spec['project']}/datasets/{dataset_id}:testIamPermissions",
+        token,
+        {"permissions": permissions},
+    )
+    return [
+        f"dataset {dataset_id}: {item}"
+        for item in probe_findings(probe, result.get("permissions", []))
+    ]
 
 
 # -- comandos --------------------------------------------------------------
@@ -364,6 +419,7 @@ def cmd_plan(spec: dict) -> int:
 def cmd_verify(spec: dict) -> int:
     state = inspect(spec)
     problems: list[str] = []
+    warnings: list[str] = []
 
     if not state["sa_exists"]:
         problems.append(f"SA {sa_email(spec)} não existe")
@@ -374,12 +430,14 @@ def cmd_verify(spec: dict) -> int:
     problems += diff["missing"] + diff["extra"]
 
     if state["sa_exists"] and "iam_probe" in spec:
-        probes = spec["iam_probe"].get("dataset", {})
-        dataset_id = next(iter(expected_dataset_roles(spec)), None)
-        if dataset_id and probes:
-            problems += probe_permissions(
-                spec["project"], dataset_id, sa_email(spec), spec["iam_probe"]
-            )
+        project_problems, project_warnings = probe_project(spec)
+        problems += project_problems
+        warnings += project_warnings
+        for dataset_id in expected_dataset_roles(spec):
+            problems += probe_dataset(spec, dataset_id)
+
+    for item in warnings:
+        print(f"aviso: {item}")
 
     if problems:
         print("DIVERGÊNCIA:")

@@ -219,6 +219,43 @@ def test_probe_findings_acusa_permissao_negativa_concedida(spec):
     assert "permissão a mais: resourcemanager.projects.setIamPolicy" in achados
 
 
+def test_sonda_de_dataset_nao_inclui_permissao_de_escopo_projeto(spec):
+    # Regressão: `bigquery.datasets.create` não é válida no recurso dataset e o
+    # testIamPermissions devolve 400 ("not valid for this resource"), derrubando
+    # o `verify` mesmo com o IAM correto.
+    negativo = spec["iam_probe"]["dataset"]["negative"]
+
+    assert "bigquery.datasets.create" not in negativo
+    assert "bigquery.tables.create" in negativo
+
+
+def test_classify_denial_403_prova_ausencia_da_permissao():
+    assert gcp_sa.classify_denial("bigquery.tables.create", 403, "denied") == ("ok", "")
+
+
+def test_classify_denial_200_acusa_privilegio_a_mais():
+    tipo, mensagem = gcp_sa.classify_denial("resourcemanager.projects.setIamPolicy", 200, "{}")
+
+    assert tipo == "problem"
+    assert "permissão a mais" in mensagem
+
+
+def test_classify_denial_api_desabilitada_nao_conclui():
+    # API desabilitada nega a qualquer identidade: não distingue IAM.
+    tipo, mensagem = gcp_sa.classify_denial(
+        "resourcemanager.projects.getIamPolicy", 403, '{"error":{"details":[{"reason":"SERVICE_DISABLED"}]}}'
+    )
+
+    assert tipo == "warning"
+    assert "API desabilitada" in mensagem
+
+
+def test_classify_denial_erro_inesperado_nao_aprova():
+    tipo, _ = gcp_sa.classify_denial("bigquery.tables.getData", 500, "boom")
+
+    assert tipo == "warning"
+
+
 # -- guardas de execução ---------------------------------------------------
 
 

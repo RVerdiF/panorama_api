@@ -41,17 +41,17 @@ pessoal no código nem no spec (testado).
 `apply` sem `--yes` é recusado (exit 2) antes de qualquer chamada ao GCP.
 `apply` é idempotente: cria só o que falta e termina rodando `verify`.
 
-## Estado verificado (2026-11-19, read-only)
+## Estado verificado (2026-11-19, após `apply` autorizado)
 
 | item | estado |
 |---|---|
-| SA `panorama-api-runtime` | **não existe** ainda; nada foi alterado no GCP |
-| papéis no projeto para a SA | nenhum |
-| papéis em datasets para a SA | nenhum |
-| chaves `USER_MANAGED` | nenhuma |
+| SA `panorama-api-runtime` | **existe** (`Panorama API runtime`), criada em 2026-11-19 |
+| papéis no projeto para a SA | **só** `roles/bigquery.jobUser` |
+| papéis em datasets para a SA | **só** `READER` em `panorama_serving` |
+| chaves `USER_MANAGED` | nenhuma (só `SYSTEM_MANAGED`) |
 | `constraints/iam.disableServiceAccountKeyCreation` | **enforced** (efetiva no projeto) |
 | datasets no projeto | só `panorama_serving` (location `us-central1`) |
-| acesso atual do dataset | `projectOwners`/`projectWriters`/`projectReaders` + `rafaelverdifreitas@hotmail.com` (OWNER) |
+| `verify` | **exit 0** |
 
 O dono tem `roles/iam.serviceAccountTokenCreator` no projeto: dá para provar o
 que a SA pode fazer por impersonação, sem gerar chave.
@@ -59,62 +59,78 @@ que a SA pode fazer por impersonação, sem gerar chave.
 Correção em relação ao card: `panorama-escola-build@` não existe mais; a SA de
 build hoje é `panorama-data-build@`.
 
-```text
-$ .venv/bin/python scripts/gcp_api_runtime_sa.py plan
-SA: panorama-api-runtime@panorama-escola-staging.iam.gserviceaccount.com
-existe: não
-papéis no projeto: nenhum
-papéis em datasets: nenhum
-chaves de usuário: 0
-org policy: enforced
+## Sondas e limitação real da API do Cloud Resource Manager
 
-  aplicar: projeto: falta roles/bigquery.jobUser
-  aplicar: dataset panorama_serving: falta READER
+`cloudresourcemanager.googleapis.com` **não está habilitada** no projeto
+`panorama-escola-staging`. Consequências medidas:
+
+- com token de **usuário**, `getIamPolicy`/`testIamPermissions` funcionam;
+- com token da **SA**, a mesma chamada devolve `403 SERVICE_DISABLED`, porque o
+  projeto consumidor passa a ser o do próprio token.
+
+Por isso a sonda de escopo projeto **não** usa `testIamPermissions` do CRM:
+
+| escopo | prova | como |
+|---|---|---|
+| positivo `bigquery.jobs.create` | job `dryRun` real como a SA | HTTP 200 |
+| negativo `resourcemanager.projects.*` | papel concedido | tentativa real de `getIamPolicy` → 403 |
+| negativo de excesso de papel | lista exata de bindings | `compute_diff` acusa qualquer papel a mais |
+
+Se a tentativa devolver `SERVICE_DISABLED`, o `verify` emite **aviso** — não
+`ok`. API desabilitada nega a qualquer identidade e não distingue IAM; a
+ausência continua provada pela lista exata de papéis, que é o que o
+`compute_diff` garante.
+
+`bigquery.datasets.create` também saiu da sonda de dataset: é permissão de
+projeto e o `testIamPermissions` do dataset responde 400 (`not valid for this
+resource`). A negativa dela é provada pela tentativa real (403, check 3).
+
+```text
+$ .venv/bin/python scripts/gcp_api_runtime_sa.py verify
+aviso: projeto: sonda de resourcemanager.projects.getIamPolicy inconclusiva: API desabilitada no projeto (a ausência segue provada pela lista exata de papéis)
+aviso: projeto: sonda de resourcemanager.projects.setIamPolicy inconclusiva: API desabilitada no projeto (a ausência segue provada pela lista exata de papéis)
+ok: SA, IAM mínimo, ausência de chave e org policy conforme o spec.
 ```
 
 ## Checks negativos
 
-Executar **depois** de `apply --yes` autorizado, com impersonação — o token é da
-SA, não do dono:
+Executados em **2026-11-19** com impersonação — o token é da SA, não do dono:
 
 ```bash
 SA=panorama-api-runtime@panorama-escola-staging.iam.gserviceaccount.com
 ```
 
-| # | check | comando | esperado | automático |
-|---|---|---|---|---|
-| 1 | criar tabela | `bq --impersonate_service_account=$SA query --use_legacy_sql=false "CREATE TABLE panorama_serving.teste_sa_negativa AS SELECT 1 AS x"` | 403 — falta `bigquery.tables.create` | ✓ permissão |
-| 2 | ler dataset do pipeline | `bq --impersonate_service_account=$SA show <projeto>:<dataset-do-pipeline>` | 403 — sem papel fora de `panorama_serving` | ✓ permissão |
-| 3 | criar dataset | `bq --impersonate_service_account=$SA mk --dataset panorama-escola-staging:teste_sa_negativa` | 403 — falta `bigquery.datasets.create` | ✓ permissão |
-| 4 | criar chave | `gcloud iam service-accounts keys create /tmp/k.json --iam-account=$SA` | 403 — org policy `iam.disableServiceAccountKeyCreation` | ✓ org policy + keys list |
-| 5 | extract | `bq --impersonate_service_account=$SA extract --destination_format=CSV panorama_serving.<tabela> gs://<bucket-sem-acesso>/x.csv` | 403 — `storage.objects.create` negado no destino | manual |
+| # | check | esperado | medido |
+|---|---|---|---|
+| 1 | criar tabela (`CREATE TABLE`/`tables.insert`) | 403 | **403** — `Permission bigquery.tables.create denied on dataset panorama-escola-staging:panorama_serving` |
+| 2 | ler dataset fora de `panorama_serving` | 403 | **N/A** — staging só tem `panorama_serving` (ver nota) |
+| 3 | criar dataset (`bq mk`) | 403 | **403** — `User does not have bigquery.datasets.create permission in project` |
+| 4 | criar chave JSON | 403 | **403** — `Permission 'iam.serviceAccountKeys.create' denied` |
+| 5 | extract para GCS | 403 na escrita | **job aceito, escrita negada** — `does not have storage.objects.create access` |
 
-A coluna "automático" diz o que `verify` já prova a cada execução, por
-`testIamPermissions` **como a SA**: `bigquery.jobs.create` presente;
-`bigquery.datasets.create`/`update`, `bigquery.tables.create`,
-`bigquery.tables.updateData`, `resourcemanager.projects.getIamPolicy`/
-`setIamPolicy` ausentes; chave `USER_MANAGED` inexistente; org policy enforced.
+Controles positivos (têm de passar, senão o IAM mínimo quebrou):
 
-Controle positivo (tem que passar, senão o IAM mínimo quebrou):
+| controle | medido |
+|---|---|
+| job `dryRun` `SELECT 1` como a SA | **200** |
+| `tables.list` em `panorama_serving` | **200** |
+| `testIamPermissions` do dataset | concedidas: `datasets.get`, `tables.getData`, `tables.list`; ausentes: `datasets.update`, `tables.create`, `tables.updateData` |
 
-```bash
-bq --impersonate_service_account=$SA query --use_legacy_sql=false \
-  "SELECT 1" --dry_run
-bq --impersonate_service_account=$SA ls panorama-escola-staging:panorama_serving
-```
+Notas de correção (o que a observação real desmentiu):
 
-Notas:
-
-- O check 5 não depende de `bigquery.tables.export`: o job de extract pode até
-  ser aceito, mas a escrita no bucket é negada — a negativa observável é do
-  Cloud Storage. Validar o 403 no job inteiro, não na criação.
-- O check 2 precisa de um dataset de referência que **não** seja
-  `panorama_serving`. Em staging hoje só existe `panorama_serving`, então o
-  alvo tem de ser confirmado com o dono antes de rodar (pendência aberta).
-- `bq ls` no projeto (sem dataset) também deve falhar: `jobUser` não lista
-  datasets do projeto.
-- Registro de evidência: mensagem **real** de cada check (não a esperada) vai
-  para o card e para a seção abaixo.
+- **Check 2**: `bq ls`/`datasets.list` no projeto **não** falha. O BigQuery
+  devolve 200 com a lista **filtrada por acesso** — no caso, um único dataset,
+  `panorama_serving`. Não é privilégio a mais. A negativa que importa (não ler
+  outro dataset) não tem alvo em staging; fica registrada como pendência se
+  surgir um dataset de pipeline no projeto.
+- **Check 5**: o extract **não** é recusado na criação do job — `jobUser` +
+  `dataViewer` bastam para montar o job. A negativa observável é a do Cloud
+  Storage, no destino: `storage.objects.create` negado. Validar o 403 no
+  **status final do job**, não na inserção.
+- **Check 1**: a sonda de dataset não pode incluir `bigquery.datasets.create`
+  (400 `not valid for this resource`).
+- Registro de evidência: mensagem **real** de cada check está na seção
+  "Evidência de execução".
 
 ## Procedimento de execução (só com autorização do dono)
 
@@ -150,5 +166,51 @@ O serviço Cloud Run da API deve rodar com esta SA
 
 ## Evidência de execução
 
-Preenchida na janela autorizada (não antes): saída de `apply --yes`, dos cinco
-checks negativos com a mensagem real, do controle positivo e de `verify`.
+Execução autorizada pelo dono em 2026-11-19 (`"autorizo"`), projeto
+`panorama-escola-staging`.
+
+`apply --yes`:
+
+```text
+criando SA panorama-api-runtime@panorama-escola-staging.iam.gserviceaccount.com
+concedendo roles/bigquery.jobUser no projeto
+concedendo READER no dataset panorama_serving
+```
+
+IAM resultante (leitura independente, `gcloud projects get-iam-policy`):
+
+```text
+roles/bigquery.jobUser  serviceAccount:panorama-api-runtime@panorama-escola-staging.iam.gserviceaccount.com
+```
+
+Único binding da SA; nenhuma outra SA do pipeline foi tocada.
+
+Dataset `panorama_serving` (`access`, inalterado fora da nova entrada):
+
+```text
+READER  userByEmail  panorama-api-runtime@panorama-escola-staging.iam.gserviceaccount.com
+```
+
+Chaves da SA:
+
+```text
+e06cbfc1...  SYSTEM_MANAGED      # nenhuma USER_MANAGED
+```
+
+Mensagens reais dos checks (token impersonado da SA):
+
+```text
+P1  jobs.create dryRun ................ 200
+P2  tables.list panorama_serving ...... 200
+N1  datasets.list ..................... 200, lista filtrada = ["panorama_serving"]
+N2  datasets.create ................... 403  User does not have bigquery.datasets.create permission in project panorama-escola-staging.
+N3  tables.create ..................... 403  Permission bigquery.tables.create denied on dataset panorama-escola-staging:panorama_serving
+N4  keys.create ....................... 403  Permission 'iam.serviceAccountKeys.create' denied
+N5  extract (job aceito, destino negado)
+      Access Denied: does not have storage.objects.create access to the Google Cloud Storage object.
+      Permission 'storage.objects.create' denied on '//storage.googleapis.com/projects/_/buckets/panorama-escola-staging-admin/objects/neg-check.csv'
+N6  projects.getIamPolicy como a SA ... 403 SERVICE_DISABLED (API do CRM desabilitada no projeto)
+```
+
+Nenhum recurso foi criado pelos checks: `datasets.create` e `tables.create`
+retornaram 403, e o job de extract falhou na escrita do destino.
