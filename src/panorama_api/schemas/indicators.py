@@ -5,25 +5,12 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from panorama_api.schemas.common import Envelope
+# `Competicao` descreve a linha de `mart_competidores` e passou a ser compartilhada
+# com `/v1/schools/{co_entidade}/competitors`; o re-export mantém o nome antigo
+# importável daqui.
+from panorama_api.schemas.competitors import Competicao
 
-
-class Competicao(BaseModel):
-    """Linha de `mart_competidores` (mesmo grão da escola-ano)."""
-
-    no_entidade: str | None
-    co_municipio: str | None
-    qt_mat_bas: int | None
-    rank_mat_bas_municipio: int | None
-    n_concorrentes_privados_municipio: int | None
-    n_concorrentes_com_matricula_bas: int | None
-    n_concorrentes_creche_xself: int | None
-    n_concorrentes_pre_xself: int | None
-    n_concorrentes_fund_ai_xself: int | None
-    n_concorrentes_fund_af_xself: int | None
-    n_concorrentes_med_xself: int | None
-    lider_no_entidade: str | None
-    lider_qt_mat_bas: int | None
-    gap_mat_bas_para_lider: int | None
+__all__ = ["Competicao", "IndicatorItem", "Indicators", "IndicatorsResponse"]
 
 
 class IndicatorItem(BaseModel):

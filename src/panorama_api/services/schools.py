@@ -13,6 +13,11 @@ from panorama_api.contract import (
 from panorama_api.core.errors import ano_fora_do_contrato, not_found
 from panorama_api.repositories.serving import ServingRepository
 from panorama_api.schemas.common import avisos_metodologia, build_meta, page_from
+from panorama_api.schemas.competitors import (
+    Competitors,
+    CompetitorsResponse,
+    CompetitorItem,
+)
 from panorama_api.schemas.indicators import (
     Competicao,
     IndicatorItem,
@@ -31,6 +36,11 @@ from panorama_api.services.mappers import flags_abaixo_porte, oferta
 TABELA_ESCOLA = "dim_escola"
 TABELA_HISTORICO = "mart_escola"
 TABELA_INDICADORES = "mart_escola_indicadores"
+TABELA_COMPETIDORES = "mart_competidores"
+
+#: Descrição obrigatória da comparação servida por `/competitors` (card t_318e6f3e):
+#: a unidade de comparação é o município e o ano censitário.
+DESCRICAO_COMPETIDORES = "Escolas privadas ativas no mesmo município e ano censitário (MG)"
 
 
 def _school(row: Mapping[str, Any]) -> School:
@@ -188,25 +198,87 @@ def school_history(
     return HistoryResponse(data=data, meta=meta)
 
 
+def _competicao_fields(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Campos de `mart_competidores` comuns a `/indicators` e `/competitors`."""
+    return {
+        "no_entidade": row.get("no_entidade"),
+        "co_municipio": row.get("co_municipio"),
+        "qt_mat_bas": row.get("qt_mat_bas"),
+        "rank_mat_bas_municipio": row.get("rank_mat_bas_municipio"),
+        "n_concorrentes_privados_municipio": row.get("n_concorrentes_privados_municipio"),
+        "n_concorrentes_com_matricula_bas": row.get("n_concorrentes_com_matricula_bas"),
+        "n_concorrentes_creche_xself": row.get("n_concorrentes_creche_xself"),
+        "n_concorrentes_pre_xself": row.get("n_concorrentes_pre_xself"),
+        "n_concorrentes_fund_ai_xself": row.get("n_concorrentes_fund_ai_xself"),
+        "n_concorrentes_fund_af_xself": row.get("n_concorrentes_fund_af_xself"),
+        "n_concorrentes_med_xself": row.get("n_concorrentes_med_xself"),
+        "lider_no_entidade": row.get("lider_no_entidade"),
+        "lider_qt_mat_bas": row.get("lider_qt_mat_bas"),
+        "gap_mat_bas_para_lider": row.get("gap_mat_bas_para_lider"),
+    }
+
+
 def _competicao(row: Mapping[str, Any] | None) -> Competicao | None:
     if row is None:
         return None
-    return Competicao(
-        no_entidade=row.get("no_entidade"),
-        co_municipio=row.get("co_municipio"),
-        qt_mat_bas=row.get("qt_mat_bas"),
-        rank_mat_bas_municipio=row.get("rank_mat_bas_municipio"),
-        n_concorrentes_privados_municipio=row.get("n_concorrentes_privados_municipio"),
-        n_concorrentes_com_matricula_bas=row.get("n_concorrentes_com_matricula_bas"),
-        n_concorrentes_creche_xself=row.get("n_concorrentes_creche_xself"),
-        n_concorrentes_pre_xself=row.get("n_concorrentes_pre_xself"),
-        n_concorrentes_fund_ai_xself=row.get("n_concorrentes_fund_ai_xself"),
-        n_concorrentes_fund_af_xself=row.get("n_concorrentes_fund_af_xself"),
-        n_concorrentes_med_xself=row.get("n_concorrentes_med_xself"),
-        lider_no_entidade=row.get("lider_no_entidade"),
-        lider_qt_mat_bas=row.get("lider_qt_mat_bas"),
-        gap_mat_bas_para_lider=row.get("gap_mat_bas_para_lider"),
+    return Competicao(**_competicao_fields(row))
+
+
+def school_competitors(
+    repository: ServingRepository,
+    settings: Settings,
+    *,
+    co_entidade: str,
+) -> CompetitorsResponse:
+    """Comparação MUNICIPAL da escola (privadas ativas no mesmo município/ano).
+
+    Escola fora do recorte da mart — pública, inativa, fora de MG ou sem matrícula
+    BAS — não tem linha: 404, nunca 200 com zeros ou lista vazia. Pública/inativa
+    é distinguível em `dim_escola` e recebe detalhe explicando o universo.
+    """
+    rows = repository.get_school_competidores(co_entidade=co_entidade)
+    if not rows:
+        school = repository.get_school(co_entidade)
+        if school is None:
+            raise not_found(f"escola {co_entidade} não encontrada no recorte MG")
+        if school.get("tp_dependencia") != "4":
+            raise not_found(
+                f"escola {co_entidade} não pertence ao universo de competidores "
+                "(privadas ativas MG)"
+            )
+        if school.get("tp_situacao_funcionamento") != "1":
+            raise not_found(
+                f"escola {co_entidade} não pertence ao universo de competidores "
+                "(privadas ativas MG)"
+            )
+        # Privada ativa em MG sem linha na mart: sem matrícula BAS observada —
+        # ausência de dado nunca vira 0 concorrentes.
+        raise not_found(
+            f"escola {co_entidade} não tem matrícula BAS observada para comparar "
+            "no município"
+        )
+
+    mais_recente = rows[-1]  # ORDER BY nu_ano_censo ASC
+    meta = build_meta(
+        contract_version=settings.contract_version,
+        ano_referencia=mais_recente["nu_ano_censo"],
+        etapa="bas",
+        universo=UNIVERSO_PRIVADAS_ATIVAS_MG,
+        tabela=TABELA_COMPETIDORES,
+        definicoes={"competidores": DESCRICAO_COMPETIDORES},
     )
+    data = Competitors(
+        co_entidade=mais_recente["co_entidade"],
+        no_entidade=mais_recente.get("no_entidade"),
+        co_municipio=mais_recente.get("co_municipio"),
+        items=[
+            CompetitorItem(
+                nu_ano_censo=row["nu_ano_censo"], **_competicao_fields(row)
+            )
+            for row in rows
+        ],
+    )
+    return CompetitorsResponse(data=data, meta=meta)
 
 
 def _indicator(row: Mapping[str, Any], competidores: Mapping[int, Mapping[str, Any]]) -> IndicatorItem:

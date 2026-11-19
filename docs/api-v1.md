@@ -130,6 +130,28 @@ universo (pública/inativa) → 404 `NAO_ENCONTRADO` com detalhe do universo;
 de série): mat_t / mat_{t-1} × 100. **Não é taxa de evasão.**" (2b R4 — nenhum
 campo/rota/label chamado "evasão").
 
+### `GET /v1/schools/{co_entidade}/competitors`
+Comparação **municipal**: "Escolas privadas ativas no mesmo município e ano
+censitário (MG)". Fonte `mart_competidores` (grão `co_entidade × nu_ano_censo`,
+nível BAS); sem parâmetros de query (qualquer query string → 400), sem
+paginação e ordenado por `nu_ano_censo ASC`. Cabeçalho
+(`co_entidade`, `no_entidade`, `co_municipio`) vem do ano mais recente da
+resposta.
+
+Campos por ano: `qt_mat_bas`, `rank_mat_bas_municipio`,
+`n_concorrentes_privados_municipio`, `n_concorrentes_com_matricula_bas`,
+`n_concorrentes_{creche,pre,fund_ai,fund_af,med}_xself`, `lider_no_entidade`,
+`lider_qt_mat_bas`, `gap_mat_bas_para_lider`. A mart não fornece lista nominal
+de concorrentes, então a resposta **nunca** traz as escolas concorrentes por
+nome.
+
+Escola pública, inativa ou fora de MG → 404 `NAO_ENCONTRADO` com o universo no
+detalhe; privada ativa sem matrícula BAS observada (portanto sem linha na mart)
+→ 404 `NAO_ENCONTRADO` — ausência de dado nunca vira `0` concorrentes.
+`gap_mat_bas_para_lider = 0` é medição válida (a própria escola lidera).
+A unidade de comparação é o município e o ano censitário: não existe filtro
+geográfico além de `co_municipio` e a resposta não traz lista nominal de escolas.
+
 ### `GET /v1/markets/{co_municipio}`
 `ano` **obrigatório**, `etapa` opcional (sem ela, as 9 etapas do ano).
 Município ausente de `dim_geografia` com `is_mg` → 404 `NAO_ENCONTRADO`;
@@ -181,6 +203,13 @@ inexistente → 404.
    usadas pela API (colunas novas não derrubam o boot; coluna faltando ou tipo
    trocado derrubam — falha fechada). Tipos de `INFORMATION_SCHEMA` são
    normalizados (`INT64→INTEGER`, `FLOAT64→FLOAT`, `BOOL→BOOLEAN`).
+9. **`/competitors` reusa a linha de `mart_competidores` já usada por
+   `/indicators`.** O schema `Competicao` virou `schemas/competitors.py` e é
+   importado pelos dois endpoints (re-exportado de `schemas/indicators.py`), e o
+   mapeamento linha→campos é uma função só, em `services/schools.py`. Assim os
+   dois payloads não divergem quando a mart mudar. O endpoint é comparação
+   municipal: `meta.definicoes.competidores` carrega a definição obrigatória e
+   não há campo, filtro ou parâmetro de proximidade/raio.
 
 ## Custo por consulta (dry-run contra `panorama-escola-staging`, sem faturamento)
 

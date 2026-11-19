@@ -14,9 +14,11 @@ from panorama_api.config import Settings
 from panorama_api.core import validation
 from panorama_api.core.errors import bad_request, invalid
 from panorama_api.repositories.serving import ServingRepository
+from panorama_api.schemas.competitors import CompetitorsResponse
 from panorama_api.schemas.indicators import IndicatorsResponse
 from panorama_api.schemas.schools import HistoryResponse, SchoolsResponse
 from panorama_api.services import schools as service
+from panorama_api.services.schools import DESCRICAO_COMPETIDORES
 
 router = APIRouter(tags=["escolas"])
 
@@ -33,6 +35,7 @@ SCHOOLS_PARAMS = frozenset(
 )
 HISTORY_PARAMS = frozenset({"ano_inicio", "ano_fim"})
 INDICATORS_PARAMS = frozenset({"ano"})
+COMPETITORS_PARAMS = frozenset()
 
 
 @router.get(
@@ -131,3 +134,26 @@ def school_indicators(
     return service.school_indicators(
         repository, settings, co_entidade=entidade, ano=ano_ref
     )
+
+
+@router.get(
+    "/schools/{co_entidade}/competitors",
+    response_model=CompetitorsResponse,
+    responses=PROBLEM_RESPONSES,
+    summary=DESCRICAO_COMPETIDORES,
+    description=(
+        f"{DESCRICAO_COMPETIDORES}. Fonte: `mart_competidores`, grão "
+        "`co_entidade × nu_ano_censo`, nível BAS. Devolve contagens de concorrentes, "
+        "posição da escola no município e o líder local — nunca lista nominal de "
+        "escolas. Escola pública, inativa, fora de MG ou sem matrícula BAS "
+        "observada não tem linha na mart: 404, jamais zeros."
+    ),
+    dependencies=[Depends(unknown_params_guard(COMPETITORS_PARAMS))],
+)
+def school_competitors(
+    co_entidade: str,
+    repository: ServingRepository = Depends(get_repository),
+    settings: Settings = Depends(get_app_settings),
+) -> CompetitorsResponse:
+    entidade = validation.co_entidade(co_entidade)
+    return service.school_competitors(repository, settings, co_entidade=entidade)

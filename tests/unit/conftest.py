@@ -338,9 +338,8 @@ class FakeRepository:
 
     def get_school_competidores(self, **kwargs: Any) -> list[dict[str, Any]]:
         self._record("get_school_competidores", kwargs)
-        return [
-            r for r in self.competidores if r["co_entidade"] == kwargs["co_entidade"]
-        ]
+        rows = [r for r in self.competidores if r["co_entidade"] == kwargs["co_entidade"]]
+        return sorted(rows, key=lambda r: r["nu_ano_censo"])
 
     def get_municipio(self, co_municipio: str) -> dict[str, Any] | None:
         self._record("get_municipio", {"co_municipio": co_municipio})
