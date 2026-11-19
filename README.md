@@ -55,7 +55,7 @@ Variáveis de ambiente:
 
 A autenticação no BigQuery usa Application Default Credentials. A identidade
 dedicada da API (IAM mínimo, sem chave JSON) está em
-[`docs/iam-api-runtime.md`](docs/iam-api-runtime.md) — spec em
+[`docs/gcp-api-runtime-sa.md`](docs/gcp-api-runtime-sa.md) — spec em
 `infra/gcp/api-runtime-sa.yaml` e aplicação/verificação em
 `scripts/gcp_api_runtime_sa.py`.
 
