@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Panorama Escola{% endblock %}</title>
+  <meta name="description" content="Panorama Escola — matrículas, oferta e mercado da educação básica em Minas Gerais (Censo Escolar/INEP).">
+  <link rel="stylesheet" href="{{ css_url }}">
+</head>
+<body>
+  <a class="pular-para-conteudo" href="#conteudo">Pular para o conteúdo</a>
+  <header class="topo">
+    <div class="topo__interno">
+      <span class="topo__marca">Panorama Escola</span>
+      <nav class="topo__nav" aria-label="Navegação principal">
+        <a href="{{ href_metodologia }}">Metodologia</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="conteudo" class="conteudo">
+    {% block conteudo %}{% endblock %}
+  </main>
+
+  <footer class="rodape">
+    <div class="rodape__interno">
+      <p>
+        Fonte: Censo Escolar (INEP), recorte Minas Gerais.
+        Dados publicados: <code>{{ data_version }}</code>; contrato <code>{{ contract_version }}</code>.
+      </p>
+      <p>
+        Esta página nunca troca dado ausente por zero: campo sem valor aparece como
+        <strong>sem dado</strong>, com o motivo quando a base informa.
+      </p>
+    </div>
+  </footer>
+</body>
+</html>
