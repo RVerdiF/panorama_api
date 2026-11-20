@@ -1,0 +1,62 @@
+# Identidade da API (card `t_b44f8df1`): service account exclusiva, privilégio
+# mínimo, sem chave JSON. Este arquivo é a fonte única do que a SA PODE e do que
+# ela NÃO PODE fazer; `scripts/gcp_api_runtime_sa.py` lê daqui.
+#
+# Regras que não se alteram sem autorização explícita do dono:
+#   * a API não reutiliza `panorama-escola-runtime` (SA do pipeline, gerenciada
+#     por Terraform no repo `panorama_escola`; binding manual viraria drift);
+#   * nenhum papel além dos listados abaixo, em nenhum escopo;
+#   * nenhuma chave de usuário (`USER_MANAGED`) — a API usa ADC/impersonação.
+#
+# Execução em `panorama-escola-staging` só depois de o dono autorizar; o
+# `apply` do script exige confirmação explícita e é idempotente.
+
+project: panorama-escola-staging
+
+service_account:
+  account_id: panorama-api-runtime
+  display_name: Panorama API runtime
+
+# Papéis no projeto inteiro. A API só precisa criar jobs; ler dados é feito no
+# dataset de serving, não no projeto.
+project_roles:
+  - roles/bigquery.jobUser
+
+# Papéis por dataset: somente leitura no que é publicado para a API.
+dataset_roles:
+  - dataset_id: panorama_serving
+    role: READER
+
+# Nenhuma chave de usuário pode existir. A policy de organização é o cinto; o
+# script verifica o suspensório (lista de chaves vazia) a cada `verify`.
+key_policy:
+  allow_user_managed_keys: false
+  org_policy: constraints/iam.disableServiceAccountKeyCreation
+
+# Sondas de permissão, executadas como a própria SA (impersonação, sem chave).
+# `positive` ausente = o IAM mínimo quebrou; `negative` presente = privilégio a
+# mais.
+#
+# Escopo de cada sonda, ditado pela API que aceita a permissão:
+#   * projeto: `bigquery.jobs.create` é provado com um job `dryRun` real;
+#     `resourcemanager.projects.*` com uma chamada real de `getIamPolicy`;
+#   * dataset: `testIamPermissions` do BigQuery. Só entram permissões válidas
+#     para o RECURSO dataset — `bigquery.datasets.create` é de projeto e a API
+#     responde 400 ("not valid for this resource") se for incluída aqui.
+#     A negativa de criação de dataset é provada pela tentativa real (403).
+iam_probe:
+  project:
+    positive:
+      - bigquery.jobs.create
+    negative:
+      - resourcemanager.projects.getIamPolicy
+      - resourcemanager.projects.setIamPolicy
+  dataset:
+    positive:
+      - bigquery.datasets.get
+      - bigquery.tables.getData
+      - bigquery.tables.list
+    negative:
+      - bigquery.datasets.update
+      - bigquery.tables.create
+      - bigquery.tables.updateData

@@ -53,7 +53,11 @@ Variáveis de ambiente:
 | `API_VALIDATE_SCHEMA_ON_STARTUP` | `true` | validação nome+tipo das colunas no boot |
 | `API_CONTRACT_VERSION` | `mvp-1` | versão do contrato exposta em `meta` |
 
-A autenticação no BigQuery usa Application Default Credentials.
+A autenticação no BigQuery usa Application Default Credentials. A identidade
+dedicada da API (IAM mínimo, sem chave JSON) está em
+[`docs/gcp-api-runtime-sa.md`](docs/gcp-api-runtime-sa.md) — spec em
+`infra/gcp/api-runtime-sa.yaml` e aplicação/verificação em
+`scripts/gcp_api_runtime_sa.py`.
 
 ## Estrutura
 
