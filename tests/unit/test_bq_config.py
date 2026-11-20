@@ -13,8 +13,9 @@ from panorama_api.repositories.bigquery.config import (
 from panorama_api.repositories.bigquery.errors import ConfigurationError
 
 
-def test_teto_provisorio_de_256_mb() -> None:
-    # Decisão 2026-11-17: 256 MB provisório até a clusterização (t_cfe70dd5).
+def test_teto_canonico_de_256_mb() -> None:
+    # Decisão D2 (t_63f0a522): 256 MB canônico; revisão gatilhada pela
+    # clusterização (t_cfe70dd5).
     assert DEFAULT_MAX_BYTES_BILLED == 268_435_456
     settings = BigQuerySettings.from_env({"GCP_PROJECT": "p", "BQ_SERVING_DATASET": "d"})
     assert settings.max_bytes_billed == 268_435_456
@@ -35,7 +36,7 @@ def test_ambiente_sobrescreve_todos_os_campos() -> None:
             "GCP_PROJECT": "projeto",
             "BQ_SERVING_DATASET": "serving",
             "BQ_LOCATION": "southamerica-east1",
-            "BQ_MAX_BYTES_BILLED": "104857600",
+            "BQ_MAX_BYTES_BILLED": "134217728",
             "BQ_TIMEOUT_S": "5",
             "API_PAGE_DEFAULT": "20",
             "API_PAGE_MAX": "100",
@@ -47,7 +48,7 @@ def test_ambiente_sobrescreve_todos_os_campos() -> None:
     assert settings.project == "projeto"
     assert settings.dataset == "serving"
     assert settings.location == "southamerica-east1"
-    assert settings.max_bytes_billed == 104_857_600
+    assert settings.max_bytes_billed == 134_217_728
     assert settings.timeout_s == 5.0
     assert settings.page_size_default == 20
     assert settings.page_size_max == 100

@@ -1,10 +1,10 @@
 """Configuração da camada de consulta ao BigQuery (12-factor).
 
 Projeto, dataset, região, teto de bytes e limites de paginação vêm todos de
-ambiente. Os defaults refletem a decisão registrada no card ``t_ea2c4d84``
-(2026-11-17): teto **provisório** de 256 MB por consulta e dataset em
-``us-central1``. O teto volta a 100 MB quando a clusterização de
-``t_cfe70dd5`` entrar em produção.
+ambiente. Os defaults refletem a decisão D2 (card ``t_63f0a522``): teto
+**canônico** de 256 MB por consulta e dataset em ``us-central1``. A revisão é
+gatilhada pela clusterização de ``t_cfe70dd5``: remedir o pior caso por
+endpoint e fixar em max(10 MB, menor potência de 2 em MB >= 2x pior caso).
 """
 
 from __future__ import annotations
@@ -17,7 +17,9 @@ from typing import Mapping
 from .errors import ConfigurationError
 
 DEFAULT_LOCATION = "us-central1"
-#: 256 MB. Provisório: share (86 MB) e busca (74 MB) estouram 100 MB.
+#: 256 MB (teto canônico da decisão D2). O pior caso medido por endpoint está
+#: acima de 100 MB, então 100 MB não serve de teto; 10 MB é o mínimo faturado
+#: por tabela, não um teto.
 DEFAULT_MAX_BYTES_BILLED = 268_435_456
 DEFAULT_TIMEOUT_S = 10.0
 DEFAULT_PAGE_SIZE = 50

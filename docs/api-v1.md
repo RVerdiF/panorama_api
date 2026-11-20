@@ -23,7 +23,8 @@ Card `t_51cb08b2`. Spec canônica: `api-v1-contrato.md` §10 + regras comuns do 
    `etapa ∈ {bas, creche, pre, fund_ai, fund_af, med, prof, eja, esp}`,
    `entidade_tipo ∈ {escola, mantenedora}`, `limit`/`offset` com teto por endpoint,
    `offset ≤ 1000`.
-7. **Teto de bytes por consulta** via `API_BQ_MAX_BYTES_BILLED` (256 MB provisório).
+7. **Teto de bytes por consulta** via `API_BQ_MAX_BYTES_BILLED` (**256 MB**,
+   teto canônico da decisão D2 — ver "Custo por consulta").
    Excesso/timeout/erro do BigQuery → **503** `FONTE_INDISPONIVEL` (sem SQL no corpo).
 8. **Cache HTTP.** Resposta `200` de `GET /v1/*` leva
    `Cache-Control: public, max-age=86400, stale-while-revalidate=604800` e
@@ -224,6 +225,16 @@ inexistente → 404.
 | `competidores` | 14,6 MB |
 | `municipio` | 1,2 MB |
 
-Com o teto provisório de 256 MB todas as consultas passam, com folga menor na
-consulta de share (~29%). Reduzir isso depende da clusterização por
+O teto canônico é **256 MB** (`API_BQ_MAX_BYTES_BILLED` = `268435456`), decisão
+D2 do `t_ec4d1b26`: todas as consultas acima passam, com folga menor na de share
+(~29%).
+
+**Gatilho de revisão.** Quando a clusterização do `t_cfe70dd5` entrar em
+staging, remedir o pior caso por endpoint e fixar o teto em
+`max(10 MB, menor potência de 2 em MB ≥ 2× pior caso)`. Até lá, 256 MB.
+Referências que não são teto: **100 MB** (plano 2d original, superado pelo pior
+caso medido) e **10 MB** (mínimo faturado por tabela, piso de faturamento, não
+teto).
+
+Reduzir o custo por consulta depende da clusterização por
 `(__publish_run_id, co_municipio, co_entidade, nu_ano_censo)` no publish.

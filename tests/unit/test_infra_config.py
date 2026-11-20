@@ -8,6 +8,10 @@ import pytest
 import yaml
 
 from panorama_api.config import Settings
+from panorama_api.config import DEFAULT_MAX_BYTES_BILLED as SETTINGS_MAX_BYTES
+from panorama_api.repositories.bigquery.config import (
+    DEFAULT_MAX_BYTES_BILLED as BIGQUERY_MAX_BYTES,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SERVICE_YAML = REPO_ROOT / "infra" / "cloud-run" / "service.yaml"
@@ -159,6 +163,21 @@ def test_cota_diaria_do_bigquery_e_50_gb(costs):
 
     assert bigquery["daily_query_limit_gb"] == 50
     assert bigquery["maximum_bytes_billed_per_query"] == 268435456
+
+
+def test_teto_de_bytes_declarado_e_canonico_e_unico(costs, template_spec):
+    """O teto por consulta é único: 256 MB nas três fontes de verdade.
+
+    Decisão D2 do `t_ec4d1b26`: 100 MB do plano 2d está superado pelo pior caso
+    medido, e 10 MB é o mínimo faturado por tabela, não um teto. Um valor
+    divergente em qualquer fonte reabre a ambiguidade que o card eliminou.
+    """
+    manifestado = int(_manifest_env(template_spec)["API_BQ_MAX_BYTES_BILLED"])
+
+    assert SETTINGS_MAX_BYTES == 268_435_456
+    assert BIGQUERY_MAX_BYTES == 268_435_456
+    assert manifestado == 268_435_456
+    assert costs["bigquery"]["maximum_bytes_billed_per_query"] == 268_435_456
 
 
 def test_budget_de_vinte_dolares_com_alertas_50_90_100(costs):

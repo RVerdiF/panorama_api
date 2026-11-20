@@ -13,8 +13,11 @@ from panorama_api.contract import CONTRACT_VERSION_DEFAULT
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9_-]+$")
 _DATA_VERSION = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
-#: Teto provisório por consulta (decisão do gateway 2026-11-17: medição real de
-#: até 86 MB; volta a 100 MB quando a clusterização entrar).
+#: Teto canônico por consulta (decisão D2, card `t_63f0a522`): 256 MB, via
+#: `API_BQ_MAX_BYTES_BILLED`. 100 MB ficou abaixo do pior caso medido (ver a
+#: tabela de custo por consulta em `docs/api-v1.md`). Revisão gatilhada pela
+#: clusterização de `t_cfe70dd5`: remedir o pior caso por endpoint e fixar em
+#: max(10 MB, menor potência de 2 em MB >= 2x pior caso). Até lá, 256 MB.
 DEFAULT_MAX_BYTES_BILLED = 256 * 1024 * 1024
 
 

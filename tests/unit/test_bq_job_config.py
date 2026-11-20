@@ -43,7 +43,7 @@ def test_teto_de_bytes_vem_do_ambiente() -> None:
         {
             "GCP_PROJECT": "p",
             "BQ_SERVING_DATASET": "d",
-            "BQ_MAX_BYTES_BILLED": "104857600",
+            "BQ_MAX_BYTES_BILLED": "134217728",
             "BQ_TIMEOUT_S": "3",
         }
     )
@@ -51,7 +51,7 @@ def test_teto_de_bytes_vem_do_ambiente() -> None:
         endpoint="schools", parameters=[]
     )
 
-    assert config.maximum_bytes_billed == 104_857_600
+    assert config.maximum_bytes_billed == 134_217_728
     assert int(config.job_timeout_ms) == 3_000
 
 

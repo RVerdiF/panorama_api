@@ -49,7 +49,7 @@ Variáveis de ambiente:
 | `BQ_PROJECT` | `panorama-escola-staging` | projeto das views |
 | `BQ_DATASET` | `panorama_serving` | dataset do contrato (só tabelas fixas no código) |
 | `BQ_LOCATION` | `us-central1` | localização das consultas (dataset está lá) |
-| `API_BQ_MAX_BYTES_BILLED` | `268435456` (256 MB) | teto de bytes por consulta |
+| `API_BQ_MAX_BYTES_BILLED` | `268435456` (256 MB) | teto canônico de bytes por consulta |
 | `API_VALIDATE_SCHEMA_ON_STARTUP` | `true` | validação nome+tipo das colunas no boot |
 | `API_CONTRACT_VERSION` | `mvp-1` | versão do contrato exposta em `meta` |
 

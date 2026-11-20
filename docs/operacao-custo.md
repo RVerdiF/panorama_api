@@ -88,11 +88,25 @@ requests/mês; acima disso o custo é Tier 1 (`us-central1`).
 | controle | valor | comportamento |
 |---|---|---|
 | cota diária do BigQuery | **50 GB/dia** | corte duro: jobs recusados acima disso (503 na API), custo zero |
-| teto por consulta | 256 MB (`API_BQ_MAX_BYTES_BILLED`) | provisório até a clusterização (`t_cfe70dd5`) |
+| teto por consulta | **256 MB** (`API_BQ_MAX_BYTES_BILLED` = `268435456`) | teto canônico (decisão D2); revisão gatilhada pela clusterização (`t_cfe70dd5`) |
 | budget mensal | **US$ 20** | aviso por e-mail em 50%, 90% e 100%; não corta o serviço |
 
 O budget não desliga nada: ele existe para avisar antes de o cartão ser
 tocado. Quem impede a cobrança é a cota diária.
+
+O teto por consulta é canônico em **256 MB** (`API_BQ_MAX_BYTES_BILLED`) e vale
+para toda a API: o pior caso medido por endpoint fica acima de 100 MB, então
+100 MB não serve de teto, e 10 MB é o mínimo faturado por tabela (piso de
+faturamento, não teto). **Gatilho de revisão:** quando a clusterização do
+`t_cfe70dd5` entrar em staging, remedir o pior caso por endpoint e fixar o teto
+em `max(10 MB, menor potência de 2 em MB ≥ 2× pior caso)`.
+
+Orçamento no pior caso: a franquia de **1 TB/mês** de bytes consultados dividida
+por 256 MB dá **~4000 consultas de pior caso por mês**. O cache HTTP/LRU corta
+a maior parte desse volume (um *hit* não gera job), então 256 MB é folgado na
+prática; a cota diária de 50 GB é o corte duro. Os bytes medidos por endpoint
+estão na tabela de
+[`api-v1.md`](api-v1.md#custo-por-consulta-dry-run-contra-panorama-escola-staging-sem-faturamento).
 
 ## Alertas
 
