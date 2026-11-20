@@ -9,7 +9,9 @@ region: us-central1
 bigquery:
   # Cota diária do projeto: 50 GB/dia. Estourar = jobs recusados, custo zero.
   daily_query_limit_gb: 50
-  # Teto por consulta (256 MB provisório; volta a 100 MB após t_cfe70dd5).
+  # Teto canônico por consulta (256 MB). Revisar quando a clusterização de
+  # t_cfe70dd5 entrar em staging: remedir o pior caso por endpoint e fixar em
+  # max(10 MB, menor potência de 2 em MB >= 2x pior caso).
   maximum_bytes_billed_per_query: 268435456
   free_tier_reference:
     measured_on: "2026-11-17"
