@@ -142,7 +142,8 @@ def test_politica_de_limpeza_mantem_so_tres_tags():
     policy = json.loads(CLEANUP_POLICY.read_text(encoding="utf-8"))
 
     (rule,) = policy
-    assert rule["action"] == "KEEP"
+    # Formato real da API: `action` é objeto ({"type": "Keep"}), não string.
+    assert rule["action"] == {"type": "Keep"}
     assert rule["mostRecentVersions"]["keepCount"] == 3
 
 
