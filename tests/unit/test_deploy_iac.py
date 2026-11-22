@@ -169,6 +169,21 @@ def test_build_sh_usa_o_cloudbuild_do_repo():
     assert "--substitutions=" in script
 
 
+def test_build_sh_usa_a_sa_de_ci_cd_como_identidade_do_build():
+    """O build roda com a SA de CI/CD, nunca com a default do projeto.
+
+    A SA default (`…-compute`) não tem `roles/cloudbuild.builds.builder` em
+    staging: o build falha fechado com 403 no upload do source. A flag precisa
+    estar no script para que o runbook não dependa de memória do operador.
+    """
+    script = BUILD_SH.read_text(encoding="utf-8")
+
+    assert "--service-account" in script
+    assert "panorama-data-build@${PROJECT}.iam.gserviceaccount.com" in script
+    # Nada de SA default do projeto em nenhum caminho do script.
+    assert "compute@developer" not in script
+
+
 # -- validação offline do manifesto -----------------------------------------
 
 

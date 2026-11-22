@@ -78,7 +78,7 @@ gcloud builds submit . \
 O primeiro passo (`valida-tag`) **falha fechado** com `_TAG` vazia: build sem
 tag explícita produziria uma imagem não rastreável até o commit.
 
-### Pré-requisito de IAM (verificado em 2026-11-22)
+### Pré-requisito de IAM (resolvido em 2026-11-22)
 
 `gcloud builds submit` falha antes de compilar se a service account do build não
 puder ler o bucket de staging do Cloud Build
@@ -91,11 +91,22 @@ puder ler o bucket de staging do Cloud Build
 | SA `panorama-escola-build` (declarada no Terraform do repo `panorama_escola`) | **não existe** no projeto |
 | resultado | `403 storage.objects.get` em `..._cloudbuild/source/*.tgz` |
 
-Correção (ação de IAM — exige autorização do dono, não é feita por este
-runbook): conceder `roles/cloudbuild.builds.builder` à SA que executa o build
-**ou** criar a SA dedicada `panorama-escola-build` prevista no Terraform com esse
-papel. Até lá o caminho alternativo é publicar a imagem de uma máquina
-autenticada (`docker push <imagem>:<tag>`), que também exige autorização.
+**Estado atual:** o papel `roles/cloudbuild.builds.builder` foi concedido à SA
+de CI/CD `panorama-data-build@panorama-escola-staging.iam.gserviceaccount.com`
+(declarado em `infra/envs/staging/main.tf` do repo `panorama_escola`). O build
+deve rodar **com essa identidade**, explicitamente:
+
+```bash
+gcloud builds submit . \
+  --config cloudbuild.yaml \
+  --project panorama-escola-staging \
+  --service-account projects/panorama-escola-staging/serviceAccounts/panorama-data-build@panorama-escola-staging.iam.gserviceaccount.com \
+  --substitutions=_TAG=$(git rev-parse --short=7 HEAD)
+```
+
+Sem `--service-account`, o build usa a SA default (`…-compute`), que **não**
+tem o papel e falha com o mesmo 403. `infra/cloud-run/build.sh` já passa a
+flag — use o script, não o comando cru.
 
 Evidência de publicação:
 
@@ -104,6 +115,15 @@ gcloud artifacts docker images list \
   us-central1-docker.pkg.dev/panorama-escola-staging/panorama-api/api \
   --include-tags --format="table(version,tags,create_time)"
 ```
+
+Resultado do primeiro build real (commit `0435550`, 2026-11-22):
+
+```text
+DIGEST                                                                   TAGS            CREATE_TIME
+sha256:e679078bb2ac50ea6066ef987ea18aa142d821e5d04071fdb1a1ab1e2b1d9005  0435550,latest  2026-11-22T17:41:10Z
+```
+
+Build id `a5820b08-76d8-4981-9f49-004b37cedfec`, status `SUCCESS`, 1M11S.
 
 ## Serviço Cloud Run
 
@@ -142,5 +162,27 @@ Chamada ao endpoint com autenticação exigida:
 ```bash
 TOKEN=$(gcloud auth print-identity-token)
 curl -s -o /dev/null -w '%{http_code}\n' \
-  -H "Authorization: Bearer $TOKEN" "$SERVICE_URL/health"   # 200
+  -H "Authorization: Bearer ${TOKEN}" "$SERVICE_URL/health"   # 200
+```
+
+### Estado verificado em staging (2026-11-22)
+
+O serviço está no ar:
+
+| item | valor |
+|---|---|
+| URL | `https://panorama-api-juskqqhdya-uc.a.run.app` |
+| imagem | `…/panorama-api/api@sha256:e679078bb2ac50ea…` (tag `0435550`) |
+| `minScale` / `maxScale` | `0` / `3` |
+| `containerConcurrency` / `timeoutSeconds` | `20` / `15` |
+| service account | `panorama-api-runtime@panorama-escola-staging.iam.gserviceaccount.com` |
+| autenticação | exigida: `/health` → **403** sem token, **200** com `print-identity-token` |
+
+```bash
+URL=$(gcloud run services describe panorama-api --region us-central1 \
+        --project panorama-escola-staging --format='value(status.url)')
+TOKEN=$(gcloud auth print-identity-token)
+curl -s -w '\nHTTP=%{http_code}\n' -H "Authorization: Bearer $TOKEN" "$URL/health"
+# {"status":"ok","version":"0.1.0","contract":"serving-marts/mvp-1"}
+# HTTP=200
 ```
