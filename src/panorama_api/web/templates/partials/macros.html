@@ -1,0 +1,7 @@
+{% macro valor(v, motivo=None) -%}
+{{ v | fmt_nulo(motivo) }}
+{%- endmacro %}
+
+{% macro oferta(v) -%}
+{{ v | fmt_oferta }}
+{%- endmacro %}
