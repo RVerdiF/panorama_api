@@ -41,6 +41,11 @@ Direção única, na outra ponta: **fora de `web/`, só `main.py` importa
 Regra de ouro para telas novas (F3–F5): a tela importa `web.dados`, `web.filters`
 e `web.conteudo` — nunca `services`, nunca `repositories`.
 
+O teste avalia a **AST**, não o texto: `from panorama_api import repositories`,
+`from ..repositories import X` e nomes relativos são resolvidos para o nome
+absoluto antes da comparação — escrever o import de forma rebuscada não burla a
+fronteira.
+
 ## 3. Por que `dados.py` é o seam
 
 `web/dados.py` reúne, para cada tela, uma função fina:

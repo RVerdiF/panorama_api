@@ -53,24 +53,67 @@ MODULO_FACHADA = WEB / "dados.py"
 # -- detector (AST) -----------------------------------------------------------
 
 
-def _modulos_importados(arvore: ast.AST) -> set[str]:
-    """Nomes de módulo importados: `import a.b` e `from a.b import x` (inclusive relativo)."""
+def _nome_do_modulo(caminho: Path) -> str:
+    """Nome absoluto do módulo do arquivo (``panorama_api.web.routes``).
+
+    É a base para resolver imports relativos. Arquivos fora do pacote (mutação
+    em ``tmp_path``) não têm base implícita: o chamador passa ``nome_modulo``.
+    """
+    try:
+        relativo = caminho.resolve().relative_to(PACOTE)
+    except ValueError:
+        return ""
+    return ".".join(("panorama_api", *relativo.with_suffix("").parts))
+
+
+def _modulo_resolvido(nome_modulo: str, no: ast.ImportFrom) -> str:
+    """Resolve ``from .x import y`` / ``from .. import y`` para o nome absoluto.
+
+    Semântica do Python: ``level`` é o número de pontos; o nível 1 é o pacote
+    que contém o arquivo. ``web/x.py`` + ``from ..repositories import y``
+    resolve para ``panorama_api.repositories``.
+    """
+    if not no.level:
+        return no.module or ""
+    partes = nome_modulo.split(".")[:-1] if nome_modulo else []
+    saltos = no.level - 1
+    if saltos:
+        if saltos > len(partes):
+            return ""  # relativo além do topo: nada sensato a resolver
+        partes = partes[: len(partes) - saltos]
+    if not partes:
+        return ""
+    return ".".join([*partes, *([no.module] if no.module else [])])
+
+
+def _modulos_importados(caminho: Path, nome_modulo: str | None = None) -> set[str]:
+    """Nomes de módulo importados, relativos já resolvidos ao nome absoluto.
+
+    Inclui tanto o módulo quanto cada nome importado: ``from panorama_api
+    import repositories`` produz ``panorama_api`` **e** ``panorama_api.repositories``.
+    """
+    modulo_do_arquivo = _nome_do_modulo(caminho) if nome_modulo is None else nome_modulo
     nomes: set[str] = set()
-    for no in ast.walk(arvore):
+    for no in ast.walk(ast.parse(caminho.read_text(encoding="utf-8"))):
         if isinstance(no, ast.Import):
             nomes.update(alias.name for alias in no.names)
         elif isinstance(no, ast.ImportFrom):
-            if no.level:  # import relativo: resolve para o próprio pacote `web`
-                partes = "." * no.level + (no.module or "")
-                nomes.add(partes)
-            elif no.module:
-                nomes.add(no.module)
+            base = _modulo_resolvido(modulo_do_arquivo, no)
+            if base:
+                nomes.add(base)
+                nomes.update(
+                    f"{base}.{alias.name}" for alias in no.names if alias.name != "*"
+                )
     return nomes
 
 
-def violacoes(caminho: Path, proibidos: Iterable[str] = IMPORTS_PROIBIDOS_NO_WEB) -> list[str]:
+def violacoes(
+    caminho: Path,
+    proibidos: Iterable[str] = IMPORTS_PROIBIDOS_NO_WEB,
+    nome_modulo: str | None = None,
+) -> list[str]:
     """Imports proibidos encontrados em ``caminho`` (vazio = fronteira respeitada)."""
-    nomes = _modulos_importados(ast.parse(caminho.read_text(encoding="utf-8")))
+    nomes = _modulos_importados(caminho, nome_modulo)
     return sorted(
         nome
         for nome in nomes
@@ -89,7 +132,7 @@ def _arquivos_fonte() -> list[Path]:
         for p in PACOTE.rglob("*.py")
         if "__pycache__" not in p.parts
         and WEB not in p.parents
-        and p.name != "main.py"
+        and p != PACOTE / "main.py"
     )
 
 
@@ -107,7 +150,7 @@ def test_web_nao_abre_conexao_ou_cliente_bigquery():
     arquivos = _arquivos_do_web()
     assert arquivos, "nenhum módulo de web/ encontrado — o teste não estaria testando nada"
     for caminho in arquivos:
-        nomes = _modulos_importados(ast.parse(caminho.read_text(encoding="utf-8")))
+        nomes = _modulos_importados(caminho)
         assert not [n for n in nomes if n == "google" or n.startswith("google.")], (
             f"{caminho.name} importa google.cloud/BigQuery: {sorted(nomes)}"
         )
@@ -156,23 +199,46 @@ def test_fora_de_web_so_main_importa_web():
 
 # -- o detector não é vazio por construção -----------------------------------
 
+SERVICOS = ("panorama_api.services",)
+WEB_MODULO = ("panorama_api.web",)
 
-@pytest.mark.parametrize(
-    "fonte",
-    [
-        "from panorama_api.repositories.serving import ServingRepository\n",
-        "from panorama_api.repositories import serving\n",
-        "import panorama_api.repositories.serving\n",
-        "from panorama_api.api.v1.schools import router\n",
-        "from google.cloud import bigquery\n",
-        "import google.cloud.bigquery\n",
-    ],
-)
-def test_detector_flagra_cada_import_proibido(fonte, tmp_path):
+#: (fonte, módulo do arquivo, proibidos). O módulo é necessário porque
+#: ``tmp_path`` está fora do pacote: sem ele imports relativos não teriam base.
+CASOS_PROIBIDOS = [
+    # absolutos diretos
+    ("from panorama_api.repositories.serving import ServingRepository\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    ("from panorama_api.repositories import serving\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    ("import panorama_api.repositories.serving\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    ("from panorama_api.api.v1.schools import router\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    ("from google.cloud import bigquery\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    ("import google.cloud.bigquery\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    # `from <pacote> import <submódulo>` — o nome está no alias, não no módulo
+    ("from panorama_api import repositories\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    ("from panorama_api import api\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    ("from panorama_api import repositories as repo\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    # relativos, resolvidos a partir do pacote do arquivo
+    ("from ..repositories.serving import ServingRepository\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    ("from .. import repositories\n", "panorama_api.web.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    ("from . import repositories\n", "panorama_api.tela", IMPORTS_PROIBIDOS_NO_WEB),
+    # `services` também é fronteira: só `web/dados.py` importa
+    ("from panorama_api.services import schools\n", "panorama_api.web.tela", SERVICOS),
+    ("from panorama_api import services\n", "panorama_api.web.tela", SERVICOS),
+    ("from ..services import schools\n", "panorama_api.web.tela", SERVICOS),
+    ("from .. import services\n", "panorama_api.web.tela", SERVICOS),
+    # `web` fora de `web/`: direção única app → web
+    ("from panorama_api.web import PREFIXO_WEB\n", "panorama_api.config", WEB_MODULO),
+    ("from panorama_api import web\n", "panorama_api.config", WEB_MODULO),
+    ("from . import web\n", "panorama_api.config", WEB_MODULO),
+]
+
+
+@pytest.mark.parametrize(("fonte", "nome_modulo", "proibidos"), CASOS_PROIBIDOS)
+def test_detector_flagra_cada_import_proibido(fonte, nome_modulo, proibidos, tmp_path):
     """Cada forma de import proibido é detectada — a fronteira falha se voltar."""
     arquivo = tmp_path / "tela_nova.py"
     arquivo.write_text(fonte, encoding="utf-8")
-    assert violacoes(arquivo), f"detector não flagrou: {fonte!r}"
+    encontrados = violacoes(arquivo, proibidos, nome_modulo)
+    assert encontrados, f"detector não flagrou: {fonte!r} (módulo {nome_modulo})"
 
 
 def test_detector_ignora_o_que_e_permitido(tmp_path):
@@ -184,13 +250,28 @@ def test_detector_ignora_o_que_e_permitido(tmp_path):
         "from panorama_api.contract import ETAPAS\n",
         encoding="utf-8",
     )
-    assert not violacoes(arquivo)
+    assert not violacoes(arquivo, nome_modulo="panorama_api.web.tela")
+
+
+def test_detector_resolve_viarios_niveis_relativos(tmp_path):
+    """`.` sobe zero, `..` sobe um: ``web/x.py`` + `.dados` = ``panorama_api.web.dados``."""
+    arquivo = tmp_path / "ok.py"
+    arquivo.write_text("from .dados import buscar_escolas\n", encoding="utf-8")
+    assert violacoes(arquivo, SERVICOS, "panorama_api.web.routes") == []
+    assert _modulos_importados(arquivo, "panorama_api.web.routes") >= {
+        "panorama_api.web.dados",
+        "panorama_api.web.dados.buscar_escolas",
+    }
+    arquivo.write_text("from ..repositories import serving\n", encoding="utf-8")
+    assert "panorama_api.repositories" in violacoes(
+        arquivo, IMPORTS_PROIBIDOS_NO_WEB, "panorama_api.web.routes"
+    )
 
 
 def test_detector_flagra_import_de_servico_em_tela(tmp_path):
     arquivo = tmp_path / "tela_nova.py"
     arquivo.write_text("from panorama_api.services import schools\n", encoding="utf-8")
-    assert violacoes(arquivo, ("panorama_api.services",)) == ["panorama_api.services"]
+    assert "panorama_api.services" in violacoes(arquivo, SERVICOS)
 
 
 # -- a fachada é só repasse: mesmo envelope do `/v1` -------------------------
