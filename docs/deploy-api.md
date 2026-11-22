@@ -78,6 +78,25 @@ gcloud builds submit . \
 O primeiro passo (`valida-tag`) **falha fechado** com `_TAG` vazia: build sem
 tag explícita produziria uma imagem não rastreável até o commit.
 
+### Pré-requisito de IAM (verificado em 2026-11-22)
+
+`gcloud builds submit` falha antes de compilar se a service account do build não
+puder ler o bucket de staging do Cloud Build
+(`gs://<projeto>_cloudbuild`). Estado encontrado no projeto de staging:
+
+| item | estado |
+|---|---|
+| `gcloud builds get-default-service-account` | `1033890592060-compute@developer.gserviceaccount.com` |
+| papel `roles/cloudbuild.builds.builder` no projeto | só em `1033890592060@cloudbuild.gserviceaccount.com` |
+| SA `panorama-escola-build` (declarada no Terraform do repo `panorama_escola`) | **não existe** no projeto |
+| resultado | `403 storage.objects.get` em `..._cloudbuild/source/*.tgz` |
+
+Correção (ação de IAM — exige autorização do dono, não é feita por este
+runbook): conceder `roles/cloudbuild.builds.builder` à SA que executa o build
+**ou** criar a SA dedicada `panorama-escola-build` prevista no Terraform com esse
+papel. Até lá o caminho alternativo é publicar a imagem de uma máquina
+autenticada (`docker push <imagem>:<tag>`), que também exige autorização.
+
 Evidência de publicação:
 
 ```bash
