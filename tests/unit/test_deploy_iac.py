@@ -19,6 +19,7 @@ SERVICE_YAML = REPO_ROOT / "infra" / "cloud-run" / "service.yaml"
 CLEANUP_POLICY = REPO_ROOT / "infra" / "artifact-registry" / "cleanup-policy.json"
 ENSURE_SH = REPO_ROOT / "infra" / "artifact-registry" / "ensure.sh"
 BUILD_SH = REPO_ROOT / "infra" / "cloud-run" / "build.sh"
+VALIDATE_SH = REPO_ROOT / "infra" / "cloud-run" / "validate.sh"
 
 SA_EMAIL = "panorama-api-runtime@panorama-escola-staging.iam.gserviceaccount.com"
 
@@ -165,6 +166,18 @@ def test_build_sh_usa_o_cloudbuild_do_repo():
     assert "gcloud builds submit" in script
     assert "cloudbuild.yaml" in script
     assert "--substitutions=" in script
+
+
+# -- validação offline do manifesto -----------------------------------------
+
+
+def test_validate_sh_valida_sem_criar_recurso():
+    script = VALIDATE_SH.read_text(encoding="utf-8")
+
+    assert "--dry-run" in script
+    assert "gcloud run services replace" in script
+    # Renderiza antes de chamar a API: placeholder não pode chegar ao GCP.
+    assert "grep -q" in script
 
 
 # -- manifesto do Cloud Run: identidade ------------------------------
