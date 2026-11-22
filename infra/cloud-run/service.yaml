@@ -12,6 +12,8 @@ metadata:
   name: panorama-api
   annotations:
     run.googleapis.com/ingress: all
+    # Autenticação exigida (sem `allUsers`/`--allow-unauthenticated`): a policy
+    # de IAM do serviço é o gate e não é tocada pelo manifesto.
 spec:
   template:
     metadata:
@@ -20,6 +22,10 @@ spec:
         autoscaling.knative.dev/maxScale: "3"
         run.googleapis.com/cpu-throttling: "true"
     spec:
+      # Identidade da API: SA dedicada, IAM mínimo e sem chave JSON
+      # (`infra/gcp/api-runtime-sa.yaml`, card `t_b44f8df1`). O ADC dentro do
+      # container resolve para esta SA — nenhuma credencial vai na imagem.
+      serviceAccountName: panorama-api-runtime@panorama-escola-staging.iam.gserviceaccount.com
       containerConcurrency: 20
       timeoutSeconds: 15
       containers:

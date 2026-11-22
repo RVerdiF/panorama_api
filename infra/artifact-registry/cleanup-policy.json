@@ -1,0 +1,9 @@
+[
+  {
+    "name": "manter-3-versions-mais-recentes",
+    "action": "KEEP",
+    "mostRecentVersions": {
+      "keepCount": 3
+    }
+  }
+]
