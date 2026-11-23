@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block titulo %}Busca de escolas — Panorama Escola{% endblock %}
+
+{% block conteudo %}
+<article class="cartao">
+  <h1>Busca de escolas</h1>
+  <p class="subtitulo">
+    Escolas de <strong>Minas Gerais</strong> no Censo Escolar (INEP). Busque pelo nome
+    da escola, escolha um município, ou combine os dois filtros.
+  </p>
+
+  <form class="formulario" method="get" action="{{ app_prefix }}/" role="search">
+    <div class="campo">
+      <label for="q">Nome da escola</label>
+      <input
+        type="search"
+        id="q"
+        name="q"
+        value="{{ filtros.q }}"
+        minlength="3"
+        maxlength="100"
+        autocomplete="off"
+        aria-describedby="q-dica">
+      <p class="dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
+    </div>
+
+    <div class="campo">
+      <label for="co_municipio">Município</label>
+      <select id="co_municipio" name="co_municipio">
+        <option value="">Todos os municípios de MG</option>
+        {% for municipio in municipios %}
+        <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == filtros.co_municipio %} selected{% endif %}>{{ municipio.no_municipio }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="campo campo--booleano">
+      <input
+        type="checkbox"
+        id="apenas_ativas"
+        name="apenas_ativas"
+        value="true"
+        {% if filtros.apenas_ativas %}checked{% endif %}>
+      <label for="apenas_ativas">Somente escolas ativas</label>
+    </div>
+
+    <div class="campo campo--acao">
+      <button type="submit">Buscar</button>
+    </div>
+  </form>
+
+  <section aria-labelledby="recorte">
+    <h2 id="recorte">Recorte da busca</h2>
+    <dl class="lista-definicoes">
+      <dt>Ano de referência</dt>
+      <dd>{{ meta.ano_referencia | fmt_ano }}</dd>
+      <dt>Etapa</dt>
+      <dd>{{ etapa_rotulo }}</dd>
+      <dt>Universo (meta.universo)</dt>
+      <dd><code>{{ meta.universo }}</code>{% if universo_descricao %} — {{ universo_descricao }}{% endif %}</dd>
+      <dt>Fonte (meta.fonte)</dt>
+      <dd>{{ meta.fonte.orgao }} · {{ meta.fonte.base }} · <code>{{ meta.fonte.tabela }}</code></dd>
+      {% if filtros.apenas_ativas %}
+      <dt>Filtro de situação</dt>
+      <dd>somente escolas ativas (<code>situacao_funcionamento = '1'</code>)</dd>
+      {% endif %}
+      <dt>Avisos (meta.avisos)</dt>
+      <dd>
+        {% if avisos is none %}
+        sem dado (nenhuma busca realizada)
+        {% elif avisos %}
+        <ul class="lista-regras">
+          {% for aviso in avisos %}
+          <li>{{ aviso }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        nenhum aviso para esta consulta
+        {% endif %}
+      </dd>
+    </dl>
+  </section>
+
+  <section aria-labelledby="escolas">
+    <h2 id="escolas">Escolas</h2>
+    {% if resposta and escolas %}
+    <p class="paginacao__contagem">Mostrando {{ paginacao.mostrando }}.</p>
+    <div class="tabela-rolavel">
+      <table class="tabela">
+        <caption class="visualmente-oculto">Escolas encontradas nesta página</caption>
+        <thead>
+          <tr>
+            <th scope="col">Escola</th>
+            <th scope="col">Código INEP</th>
+            <th scope="col">Município</th>
+            <th scope="col">Dependência (código INEP)</th>
+            <th scope="col">Situação (código INEP)</th>
+            <th scope="col">Oferta — educação básica</th>
+            <th scope="col">Último registro</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for escola in escolas %}
+          <tr>
+            <td>{{ escola.no_entidade | fmt_nulo }}</td>
+            <td><code>{{ escola.co_entidade }}</code></td>
+            <td>
+              {{ escola.no_municipio | fmt_nulo }}
+              {% if escola.co_municipio %}<code>{{ escola.co_municipio }}</code>{% endif %}
+            </td>
+            <td>{{ escola.tp_dependencia | fmt_nulo }}</td>
+            <td>{{ escola.tp_situacao_funcionamento | fmt_nulo }}</td>
+            <td>
+              {{ escola.oferta.bas | fmt_oferta }}
+              {% if escola.is_oferta_desconhecida %}<span class="nota">is_oferta_desconhecida</span>{% endif %}
+            </td>
+            <td>{{ escola.nu_ano_ultimo_registro | fmt_ano }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="paginacao" aria-label="Paginação da busca">
+      {% if paginacao.url_anterior %}
+      <a class="paginacao__link" href="{{ paginacao.url_anterior }}" rel="prev">Anterior</a>
+      {% endif %}
+      {% if paginacao.url_proxima %}
+      <a class="paginacao__link" href="{{ paginacao.url_proxima }}" rel="next">Próxima</a>
+      {% endif %}
+    </nav>
+    {% if paginacao.refinar %}
+    <p class="aviso">
+      Limite de paginação atingido. Refine a busca — nome mais específico ou um
+      município — para ver outras escolas.
+    </p>
+    {% endif %}
+    {% elif resposta %}
+    <p class="sem-dado">Nenhuma escola encontrada para esta busca.</p>
+    {% else %}
+    <p class="sem-dado">
+      Nenhuma escola listada ainda: informe o nome da escola ou escolha um município.
+    </p>
+    {% endif %}
+  </section>
+</article>
+{% endblock %}
