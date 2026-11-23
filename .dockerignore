@@ -20,6 +20,11 @@ docs
 infra
 scripts
 
+# Exceção: a lista versionada de municípios da busca (`/app`, card t_f28d76a9) é
+# package-data do front e precisa entrar na imagem.
+!src/panorama_api/web/data
+!src/panorama_api/web/data/*.json
+
 # Configuração e segredos locais.
 .env
 .env.*

@@ -31,9 +31,10 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-# Templates e assets do front (`/app`, card t_4370a4f1) não são módulos Python:
-# sem esta declaração um install não-editable sobe a API sem as telas.
-panorama_api = ["web/templates/**/*.html", "web/static/*"]
+# Templates, assets e dados estáticos do front (`/app`, cards t_4370a4f1 e
+# t_f28d76a9) não são módulos Python: sem esta declaração um install não-editable
+# sobe a API sem as telas e sem a lista de municípios.
+panorama_api = ["web/templates/**/*.html", "web/static/*", "web/data/*.json"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
