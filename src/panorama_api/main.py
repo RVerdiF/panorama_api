@@ -75,19 +75,21 @@ def create_app(
     )
     app.state.settings = settings
     app.state.repo = repository
-    # Cache HTTP das respostas GET /v1/*: ETag por DATA_VERSION + params,
-    # `Cache-Control` de 1 dia e LRU em memória (card t_817a670c).
+    # Cache HTTP das respostas GET /v1/*: ETag por DATA_VERSION + APP_BUILD +
+    # params, `Cache-Control` de 1 dia e LRU em memória (card t_817a670c; APP_BUILD
+    # na chave desde F9/D7 — mudança de código que altera a representação também
+    # precisa invalidar o corpo servido).
     app.add_middleware(HttpCacheMiddleware)
-    # Cache das páginas SSR /app (card t_68bd7615): mesma mecânica, com ETag de
-    # DATA_VERSION + APP_BUILD + caminho + query e `private, no-cache`, para que
-    # a revalidação do navegador seja respondida por 304 sem executar o handler
-    # (logo sem tocar no repositório/BigQuery). Assets ficam de fora: são
-    # imutáveis por nome com hash e mantêm o próprio `Cache-Control`.
+    # Cache das páginas SSR /app (card t_68bd7615): mesma mecânica e mesma chave,
+    # com `private, no-cache`, para que a revalidação do navegador seja respondida
+    # por 304 sem executar o handler (logo sem tocar no repositório/BigQuery).
+    # Assets ficam de fora: são imutáveis por nome com hash e mantêm o próprio
+    # `Cache-Control`.
     app.add_middleware(
         HttpCacheMiddleware,
         cache_control=CACHE_CONTROL_PAGINA,
         prefix=PREFIXO_WEB,
-        app_build=True,
+        pagina=True,
         exclude_prefix=f"{PREFIXO_WEB}/static/",
         match_root=True,
     )

@@ -68,7 +68,7 @@ def _limpar_cache_de_paginas(client) -> None:
         if (
             isinstance(pilha, HttpCacheMiddleware)
             and pilha.prefix == PREFIXO_WEB
-            and pilha.app_build
+            and pilha.pagina
         ):
             pilha.cache.clear()
             return

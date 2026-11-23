@@ -3,16 +3,21 @@
 Decisão do card ``t_817a670c`` (2026-11-17) para o `/v1`:
 
 * ``Cache-Control: public, max-age=86400, stale-while-revalidate=604800``;
-* ``ETag`` = hash de ``DATA_VERSION`` + caminho + query canônica — trocar a
-  versão dos dados invalida tudo sem precisar varrer o cache;
+* ``ETag`` = hash de ``DATA_VERSION`` + ``APP_BUILD`` + caminho + query
+  canônica — trocar a versão dos dados **ou** a versão do código invalida tudo
+  sem precisar varrer o cache;
 * LRU em memória com 1000 entradas (sem Redis; cada instância tem a sua);
 * erro **nunca** é cacheado nem recebe ``ETag``/``Cache-Control``.
 
 O card ``t_68bd7615`` (F2) reaproveita exatamente a mesma mecânica para as
-páginas SSR sob ``/app``, mudando só a política: ``ETag`` inclui também
-``APP_BUILD`` (o HTML muda a cada deploy de código) e ``Cache-Control`` é
+páginas SSR sob ``/app``, mudando só a política: ``Cache-Control`` é
 ``private, no-cache`` — o navegador revalida sempre e quem responde é o 304, que
 é decidido pelo hash antes do handler, sem tocar no repositório/BigQuery.
+
+``APP_BUILD`` entra na chave das **duas** superfícies (card ``t_d474a36d``, F9 =
+decisão D7): um deploy de código que muda o formato/serialização do JSON também
+muda a representação, então o ``ETag`` precisa acompanhar. Sem isso o cliente
+seguiria servindo o corpo antigo por até 1 dia (+7 de revalidação).
 
 O cache guarda o corpo já serializado (JSON ou HTML), então um *hit* não chama o
 repositório nem o BigQuery.
@@ -126,16 +131,16 @@ def cache_key(
     path: str,
     query: Iterable[tuple[str, str]],
     *,
-    app_build: str | None = None,
+    app_build: str,
 ) -> str:
-    """Chave canônica: ``DATA_VERSION`` (+ ``APP_BUILD``) + caminho + query.
+    """Chave canônica: ``DATA_VERSION`` + ``APP_BUILD`` + caminho + query.
 
-    ``app_build=None`` reproduz exatamente a chave do `/v1` (contrato público
-    preservado byte a byte); as páginas `/app` passam o build do código porque o
-    HTML muda a cada deploy mesmo sem dado novo.
+    As duas versões entram porque a representação muda por dois motivos
+    independentes: dado novo (``DATA_VERSION``) e código novo (``APP_BUILD``).
+    Por isso ``app_build`` é **obrigatório** — uma superfície que gerasse chave
+    sem ele voltaria a servir corpo antigo após um deploy que muda o formato.
     """
-    versao = data_version if app_build is None else f"{data_version}\x00{app_build}"
-    return f"{versao}\x00{path}\x00{canonical_query(query)}"
+    return f"{data_version}\x00{app_build}\x00{path}\x00{canonical_query(query)}"
 
 
 def etag_for(key: str) -> str:
@@ -170,15 +175,18 @@ def _opaque(tag: str) -> str:
 class HttpCacheMiddleware(BaseHTTPMiddleware):
     """Aplica cache HTTP às respostas ``GET`` bem-sucedidas de um prefixo.
 
-    Uma instância por superfície, cada uma com a sua política:
+    Uma instância por superfície; a **chave** é a mesma nas duas
+    (``DATA_VERSION`` + ``APP_BUILD`` + caminho + query). O que muda é a
+    política de ``Cache-Control``/veto:
 
-    * ``prefix="/v1/"`` (default, ``app_build=False``): o contrato público, com
-      ``ETag`` de ``DATA_VERSION`` + caminho + query e ``Cache-Control`` de 1 dia;
-    * ``prefix="/app"``, ``app_build=True``, ``exclude_prefix="/app/static/"``:
-      as páginas SSR, com ``APP_BUILD`` no ``ETag`` e
-      ``Cache-Control: private, no-cache`` (revalidação sempre, respondida por
-      304 sem executar o handler). Os assets ficam de fora porque já são
-      imutáveis pelo nome com hash e trazem o próprio ``Cache-Control``.
+    * ``prefix="/v1/"`` (default, ``pagina=False``): o contrato público, com
+      ``ETag`` de ``DATA_VERSION`` + ``APP_BUILD`` + caminho + query e
+      ``Cache-Control`` de 1 dia;
+    * ``prefix="/app"``, ``pagina=True``, ``exclude_prefix="/app/static/"``:
+      as páginas SSR, com ``Cache-Control: private, no-cache`` (revalidação
+      sempre, respondida por 304 sem executar o handler). Os assets ficam de
+      fora porque já são imutáveis pelo nome com hash e trazem o próprio
+      ``Cache-Control``.
     """
 
     def __init__(
@@ -188,7 +196,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         cache: LruCache | None = None,
         cache_control: str = CACHE_CONTROL,
         prefix: str = _CACHEABLE_PATH_PREFIX,
-        app_build: bool = False,
+        pagina: bool = False,
         exclude_prefix: str | None = None,
         match_root: bool = False,
     ) -> None:
@@ -196,7 +204,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         self.cache = cache if cache is not None else LruCache()
         self.cache_control = cache_control
         self.prefix = prefix
-        self.app_build = app_build
+        self.pagina = pagina
         self.exclude_prefix = exclude_prefix
         self.match_root = match_root
 
@@ -208,14 +216,17 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
 
         settings = getattr(request.app.state, "settings", None)
         data_version = getattr(settings, "data_version", "dev")
-        build = getattr(settings, "app_build", "dev") if self.app_build else None
+        app_build = getattr(settings, "app_build", "dev")
         key = cache_key(
             data_version,
             request.url.path,
             request.query_params.multi_items(),
-            app_build=build,
+            app_build=app_build,
         )
         etag = etag_for(key)
+        # A linha `http_cache` do `/v1` não ganha campo novo (contrato de log
+        # preservado); só as páginas publicam `app_build`.
+        build = app_build if self.pagina else None
 
         if etag_matches(
             request.headers.get("if-none-match"), etag, allow_star=False
@@ -304,7 +315,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
     def _vetos(self) -> tuple[str, ...]:
         # Nas páginas, `private` é a política do próprio middleware — só
         # `no-store` veta a resposta.
-        if self.app_build:
+        if self.pagina:
             return _FORBIDDEN_CACHE_CONTROL_PAGINA
         return _FORBIDDEN_CACHE_CONTROL
 

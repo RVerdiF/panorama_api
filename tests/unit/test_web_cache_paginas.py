@@ -85,6 +85,11 @@ def _pega(client: TestClient, url: str = SENDA, **kwargs):
     return client.get(url, **kwargs)
 
 
+def _get_mercado_v1(client: TestClient, **kwargs):
+    """`GET /v1/markets/3106200?ano=2025` (mesma rota dos testes de `/v1`)."""
+    return client.get(V1_MARKET, params={"ano": 2025}, **kwargs)
+
+
 # -- 200: política de cache da página ----------------------------------------
 
 
@@ -276,11 +281,17 @@ def test_settings_recusa_data_version_invalida_no_boot():
     assert "DATA_VERSION" in str(erro.value)
 
 
-# -- contrato /v1 preservado --------------------------------------------------
+# -- chave/contrato /v1 agora inclui APP_BUILD (card F9 / decisão D7) ---------
 
 
-def test_app_build_nao_entra_no_cache_de_v1():
-    """`/v1` é contrato público: só `DATA_VERSION` decide o `ETag`."""
+def test_app_build_entra_no_etag_de_v1():
+    """`/v1` é contrato público de **dado**, mas o corpo também depende do código.
+
+    Card `t_d474a36d` (F9, decisão D7): mudança de formato/serialização sem
+    troca de dado não pode continuar servindo JSON antigo por até 1 dia + 7 de
+    revalidação, então `APP_BUILD` entra na chave do `/v1` como nas páginas.
+    O corpo e o `Cache-Control` continuam idênticos.
+    """
     app_a, _ = _app(app_build="build-a")
     app_b, _ = _app(app_build="build-b")
 
@@ -289,9 +300,57 @@ def test_app_build_nao_entra_no_cache_de_v1():
         depois = client_b.get(V1_MARKET, params={"ano": 2025})
 
     assert antes.status_code == depois.status_code == 200
-    assert antes.headers["etag"] == depois.headers["etag"]
+    assert antes.headers["etag"] != depois.headers["etag"]
+    assert antes.content == depois.content  # dado igual, código diferente
     assert antes.headers["cache-control"] == CACHE_CONTROL
     assert depois.headers["cache-control"] == CACHE_CONTROL
+
+
+def test_app_build_igual_mantem_etag_e_hit_de_v1():
+    """Mesmo `APP_BUILD` mantém o `ETag` (nada de invalidação espúria)."""
+    app_a, _ = _app(app_build="build-a")
+    app_a2, _ = _app(app_build="build-a")
+
+    with TestClient(app_a) as client_a, TestClient(app_a2) as client_a2:
+        primeiro = client_a.get(V1_MARKET, params={"ano": 2025})
+        segundo = client_a2.get(V1_MARKET, params={"ano": 2025})
+
+    assert primeiro.status_code == segundo.status_code == 200
+    assert primeiro.headers["etag"] == segundo.headers["etag"]
+
+
+def test_trocar_app_build_em_v1_invalida_304_com_etag_antigo():
+    """ETag emitido antes do deploy não pode produzir 304 depois dele."""
+    app, repo = _app(app_build="build-a")
+    with TestClient(app) as client:
+        antes = _get_mercado_v1(client)
+        chamadas = len(repo.calls)
+
+        app.state.settings.app_build = "build-b"
+        revalidando = _get_mercado_v1(
+            client, headers={"If-None-Match": antes.headers["etag"]}
+        )
+
+    assert revalidando.status_code == 200  # não 304: a representação mudou
+    assert revalidando.headers["etag"] != antes.headers["etag"]
+    assert len(repo.calls) > chamadas  # o handler reexecutou (sem dado obsoleto)
+
+
+def test_if_none_match_de_v1_continua_304_sem_tocar_no_repositorio():
+    """Critério de aceite: o 304 da chave nova também não consulta nada."""
+    app, repo = _app(app_build="build-a")
+    with TestClient(app) as client:
+        primeira = _get_mercado_v1(client)
+        chamadas = len(repo.calls)
+
+        segunda = _get_mercado_v1(
+            client, headers={"If-None-Match": primeira.headers["etag"]}
+        )
+
+    assert segunda.status_code == 304
+    assert segunda.content == b""
+    assert segunda.headers["etag"] == primeira.headers["etag"]
+    assert len(repo.calls) == chamadas
 
 
 def test_data_version_continua_mudando_o_etag_de_v1():
@@ -305,15 +364,16 @@ def test_data_version_continua_mudando_o_etag_de_v1():
     assert antes.headers["etag"] != depois.headers["etag"]
 
 
-def test_chave_do_v1_permanece_identica_sem_app_build():
-    """Sem `app_build` a chave é bit a bit a do card anterior."""
-    chave = cache_key("2026.11.17", "/v1/schools", [("a", "1")])
+def test_chave_do_v1_inclui_data_version_e_app_build():
+    """A chave canônica é a mesma das páginas: `DATA_VERSION` + `APP_BUILD`."""
+    chave = cache_key("2026.11.17", "/v1/schools", [("a", "1")], app_build="b-a")
 
-    assert chave == "2026.11.17\x00/v1/schools\x00a=1"
-    assert cache_key("2026.11.17", "/v1/schools", [("a", "1")], app_build="b") != chave
+    assert chave == "2026.11.17\x00b-a\x00/v1/schools\x00a=1"
     assert (
-        cache_key("2026.11.17", "/v1/schools", [("a", "1")], app_build="b")
-        != cache_key("2026.11.17", "/v1/schools", [("a", "1")], app_build="c")
+        cache_key("2026.11.20", "/v1/schools", [("a", "1")], app_build="b-a") != chave
+    )
+    assert (
+        cache_key("2026.11.17", "/v1/schools", [("a", "1")], app_build="b-b") != chave
     )
 
 
@@ -386,7 +446,7 @@ def test_raiz_do_v1_com_if_none_match_forjado_continua_404_sem_cache():
     registrar requisições que antes não existiam.
     """
     app, repo = _app()
-    etag_forjado = etag_for(cache_key("2026.11.17", "/v1", []))
+    etag_forjado = etag_for(cache_key("2026.11.17", "/v1", [], app_build="build-a"))
     with TestClient(app) as client:
         resposta = client.get("/v1", headers={"If-None-Match": etag_forjado})
 
