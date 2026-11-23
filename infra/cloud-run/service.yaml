@@ -7,20 +7,18 @@
 # Região: `us-central1`, fixada em `deploy.sh` — o manifesto não carrega região.
 # É a mesma região do dataset `panorama_serving` e do Artifact Registry.
 
-# Guarda do gate de IAP (card `t_3c7efbc0`): o manifesto passa a DECLARAR IAP no
-# nível do serviço. É a mesma anotação que `gcloud run deploy --iap` grava
-# (`IAP_ANNOTATION` em `googlecloudsdk/api_lib/run/service.py`), e precisa ficar
-# em `metadata.annotations` do Service — no template ela é ignorada.
-#
-# Declarar não aplica: `deploy.sh` valida e o replace aplica. Aplicar OAuth
-# client, allowlist e remoção de `allUsers` é o card F8 (`docs/iap-cloud-run.md`).
+# Staging é privado por IAM, SEM IAP (decisão D2 revisada pelo dono em
+# 2026-11-23: login só quando o sistema for ao ar). Não há anotação
+# `run.googleapis.com/iap-enabled` aqui de propósito: com a API do IAP
+# desabilitada o serviço ficaria inacessível, e o gate é a policy de IAM do
+# serviço (`roles/run.invoker` por pessoa). O runbook do IAP
+# (`docs/iap-cloud-run.md`) fica para a fase de publicação.
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
   name: panorama-api
   annotations:
     run.googleapis.com/ingress: all
-    run.googleapis.com/iap-enabled: "true"
     # Autenticação exigida (sem `allUsers`/`--allow-unauthenticated`): a policy
     # de IAM do serviço é o gate e não é tocada pelo manifesto.
 spec:
@@ -59,9 +57,14 @@ spec:
               value: us-central1
             - name: API_BQ_MAX_BYTES_BILLED
               value: "268435456"
-            # Invalida o cache HTTP (ETag/LRU) a cada publicação nova.
+            # Invalida o cache HTTP (ETag/LRU) a cada publicação de dados.
             - name: DATA_VERSION
               value: "${DATA_VERSION}"
+            # Invalida o cache HTTP a cada deploy de código (card F8). Sem esta
+            # variável o valor seria o default "dev" e um deploy novo não
+            # invalidaria nada. `deploy.sh` exige a variável e a substitui.
+            - name: APP_BUILD
+              value: "${APP_BUILD}"
             # Anos do seletor das telas de mercado (card F5). Obrigatório: sem
             # esta variável o app falha no boot (mesma política de DATA_VERSION).
             # Só anos publicados; o maior é o padrão da tela.

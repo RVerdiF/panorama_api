@@ -101,8 +101,9 @@ def test_env_do_manifesto_usa_os_aliases_do_settings(template_spec):
 
 def test_settings_carrega_os_valores_do_manifesto(template_spec, monkeypatch):
     env = _manifest_env(template_spec)
+    padroes = {"${DATA_VERSION}": "2026.11.17", "${APP_BUILD}": "31b900f"}
     for name, value in env.items():
-        monkeypatch.setenv(name, "2026.11.17" if value == "${DATA_VERSION}" else value)
+        monkeypatch.setenv(name, padroes.get(value, value))
 
     settings = Settings()
 
@@ -110,8 +111,10 @@ def test_settings_carrega_os_valores_do_manifesto(template_spec, monkeypatch):
     assert settings.bq_dataset == "panorama_serving"
     assert settings.bq_location == "us-central1"
     assert settings.max_bytes_billed == 268435456
-    # DATA_VERSION do deploy é o que invalida ETag/LRU.
+    # DATA_VERSION do deploy é o que invalida ETag/LRU a cada publicação.
     assert settings.data_version == "2026.11.17"
+    # APP_BUILD é o que invalida ETag/LRU a cada deploy de código (card F8).
+    assert settings.app_build == "31b900f"
 
 
 # -- seletor de ano do front (card F5) --------------------------------------
@@ -199,33 +202,45 @@ def test_deploy_nao_deixa_placeholder_sem_substituir():
     assert "grep -q '\\${' \"$MANIFEST\"" in script
 
 
-# -- IAP declarado no manifesto (card `t_3c7efbc0`) -------------------------
-
-IAP_ANOTACAO = "run.googleapis.com/iap-enabled"
+# -- APP_BUILD no manifesto e no deploy (card F8) ---------------------------
 
 
-def test_iap_esta_declarado_no_nivel_do_servico(service):
-    """IAP é anotação do Service, não do template: no template ela é ignorada.
+def test_manifesto_declara_app_build(template_spec):
+    """Sem `APP_BUILD` o deploy roda com o default `dev` e não invalida cache.
 
-    É a mesma anotação que `gcloud run deploy --iap` grava (`IAP_ANNOTATION`
-    = `'run.googleapis.com/iap-enabled'`, valor `'true'`) em
-    `googlecloudsdk/api_lib/run/service.py`.
+    Critério do card F8: a variável existe no manifesto e é substituída pelo
+    deploy, como `DATA_VERSION`.
     """
-    anotacoes_do_servico = service["metadata"]["annotations"]
-    anotacoes_do_template = service["spec"]["template"]["metadata"].get("annotations", {})
+    env = _manifest_env(template_spec)
 
-    assert anotacoes_do_servico.get(IAP_ANOTACAO) == "true"
-    # Anotação é mapa de strings: `true` booleano é outro tipo de erro.
-    assert isinstance(anotacoes_do_servico[IAP_ANOTACAO], str)
-    # Declarar IAP no template não habilita nada — o erro silencioso a evitar.
-    assert IAP_ANOTACAO not in anotacoes_do_template
+    assert env.get("APP_BUILD") == "${APP_BUILD}"
 
 
-def _rodar_deploy(tmp_path: Path, manifesto: str) -> tuple[subprocess.CompletedProcess, Path]:
-    """Roda `deploy.sh` em dry-run sobre um manifesto temporário.
+def test_settings_carrega_app_build_do_manifesto(template_spec, monkeypatch):
+    env = _manifest_env(template_spec)
+    padroes = {"${DATA_VERSION}": "2026.11.17", "${APP_BUILD}": "31b900f"}
+    for name, value in env.items():
+        monkeypatch.setenv(name, padroes.get(value, value))
+
+    settings = Settings()
+
+    assert settings.app_build == "31b900f"
+
+
+def test_deploy_substitui_app_build_no_manifesto():
+    script = DEPLOY_SH.read_text(encoding="utf-8")
+
+    assert "s|\\${APP_BUILD}|${APP_BUILD}|g" in script
+
+
+def _rodar_deploy(
+    tmp_path: Path, manifesto: str, dry_run: bool = True, com_app_build: bool = True
+) -> tuple[subprocess.CompletedProcess, Path, Path]:
+    """Roda `deploy.sh` sobre um manifesto temporário.
 
     Copia o script para `tmp_path` (o checkout não muda) e põe um `gcloud`
-    falso no PATH: se o script invocar o CLI, aparece o arquivo marcador.
+    falso no PATH: ele marca o arquivo `marcador` e copia o manifesto recebido
+    (4º argumento) para `capturado`.
     """
     destino = tmp_path / "cloud-run"
     destino.mkdir()
@@ -235,29 +250,38 @@ def _rodar_deploy(tmp_path: Path, manifesto: str) -> tuple[subprocess.CompletedP
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     marcador = tmp_path / "gcloud-invocado"
+    capturado = tmp_path / "manifesto-enviado.yaml"
     falso = bin_dir / "gcloud"
-    falso.write_text(f'#!/bin/sh\ntouch "{marcador}"\nexit 99\n', encoding="utf-8")
+    falso.write_text(
+        "#!/bin/sh\n"
+        f'touch "{marcador}"\n'
+        f'if [ -n "$4" ] && [ -f "$4" ]; then cp "$4" "{capturado}"; fi\n'
+        "exit 99\n",
+        encoding="utf-8",
+    )
     falso.chmod(0o755)
+
+    env = {
+        "PATH": os.pathsep.join([str(bin_dir), "/usr/bin", "/bin"]),
+        "IMAGE": "us-central1-docker.pkg.dev/p/ar/api@sha256:" + "0" * 64,
+        "DATA_VERSION": "2026.11.18",
+        "DRY_RUN": "1" if dry_run else "0",
+    }
+    if com_app_build:
+        env["APP_BUILD"] = "31b900f"
 
     resultado = subprocess.run(
         ["bash", str(destino / "deploy.sh")],
         capture_output=True,
         text=True,
         cwd=tmp_path,
-        env={
-            "PATH": os.pathsep.join([str(bin_dir), "/usr/bin", "/bin"]),
-            "IMAGE": "us-central1-docker.pkg.dev/p/ar/api@sha256:" + "0" * 64,
-            "DATA_VERSION": "2026.11.18",
-            "DRY_RUN": "1",
-        },
+        env=env,
     )
-    return resultado, marcador
+    return resultado, marcador, capturado
 
 
-def test_deploy_em_dry_run_passa_com_iap_declarado(tmp_path):
-    resultado, marcador = _rodar_deploy(
-        tmp_path, SERVICE_YAML.read_text(encoding="utf-8")
-    )
+def test_deploy_em_dry_run_passa_com_manifesto_completo(tmp_path):
+    resultado, marcador, _ = _rodar_deploy(tmp_path, SERVICE_YAML.read_text(encoding="utf-8"))
 
     assert resultado.returncode == 0, resultado.stderr
     assert "dry-run" in resultado.stdout
@@ -265,49 +289,49 @@ def test_deploy_em_dry_run_passa_com_iap_declarado(tmp_path):
     assert not marcador.exists(), "deploy.sh chamou gcloud com DRY_RUN=1"
 
 
-def test_deploy_falha_fechado_quando_anotacao_de_iap_some(tmp_path):
-    """A guarda impede publicar um serviço aberto sem ninguém notar."""
-    manifesto = SERVICE_YAML.read_text(encoding="utf-8")
-    sem_iap = "".join(
-        linha
-        for linha in manifesto.splitlines(keepends=True)
-        if IAP_ANOTACAO not in linha
-    )
-    assert IAP_ANOTACAO not in sem_iap, "sanidade: mutação não removida"
-
-    resultado, marcador = _rodar_deploy(tmp_path, sem_iap)
-
-    assert resultado.returncode == 1
-    assert "IAP ausente no manifesto" in resultado.stderr
-    assert not marcador.exists()
-
-
-def test_deploy_falha_fechado_com_iap_no_template(tmp_path):
-    """Anotação no lugar errado é o falso positivo mais provável do IAP."""
-    manifesto = SERVICE_YAML.read_text(encoding="utf-8")
-    fora_do_servico = manifesto.replace(f"    {IAP_ANOTACAO}: \"true\"\n", "", 1).replace(
-        '        run.googleapis.com/cpu-throttling: "true"\n',
-        '        run.googleapis.com/cpu-throttling: "true"\n'
-        f'        {IAP_ANOTACAO}: "true"\n',
-        1,
-    )
-    assert fora_do_servico != manifesto, "sanidade: mutação não aplicada"
-
-    resultado, _ = _rodar_deploy(tmp_path, fora_do_servico)
-
-    assert resultado.returncode == 1
-    assert "IAP ausente no manifesto" in resultado.stderr
-
-
-def test_deploy_falha_fechado_com_iap_desligado(tmp_path):
-    manifesto = SERVICE_YAML.read_text(encoding="utf-8").replace(
-        f'{IAP_ANOTACAO}: "true"', f'{IAP_ANOTACAO}: "false"', 1
+def test_deploy_falha_fechado_sem_app_build(tmp_path):
+    """Sem `APP_BUILD` o app subiria com `dev`: o deploy recusa, como com DATA_VERSION."""
+    resultado, marcador, _ = _rodar_deploy(
+        tmp_path, SERVICE_YAML.read_text(encoding="utf-8"), com_app_build=False
     )
 
-    resultado, _ = _rodar_deploy(tmp_path, manifesto)
+    assert resultado.returncode != 0
+    assert "APP_BUILD" in resultado.stderr
+    assert not marcador.exists(), "deploy.sh chamou gcloud sem APP_BUILD"
 
-    assert resultado.returncode == 1
-    assert "IAP ausente no manifesto" in resultado.stderr
+
+def test_deploy_entrega_app_build_no_manifesto(tmp_path):
+    """Plumbing fim a fim: o gcloud recebe o manifesto já com `APP_BUILD`."""
+    resultado, marcador, capturado = _rodar_deploy(
+        tmp_path, SERVICE_YAML.read_text(encoding="utf-8"), dry_run=False
+    )
+
+    assert marcador.exists()
+    # O `gcloud` falso sai com 99: prova de que o script chegou ao replace.
+    assert resultado.returncode == 99
+    enviado = capturado.read_text(encoding="utf-8")
+    assert "${" not in enviado
+    assert 'name: APP_BUILD\n              value: "31b900f"' in enviado
+
+
+# -- staging sem IAP: privado por IAM (card F8, D2 revisada) ---------------
+
+
+def test_manifesto_nao_declara_iap_no_staging(service):
+    """D2 revisada pelo dono (2026-11-23): login só na fase de publicação.
+
+    Com `iap.googleapis.com` desabilitada, a anotação de IAP deixaria o serviço
+    inacessível. O gate do staging é a policy de IAM do serviço.
+    """
+    assert "run.googleapis.com/iap-enabled" not in service["metadata"].get("annotations", {})
+    template = service["spec"]["template"]["metadata"].get("annotations", {})
+    assert "run.googleapis.com/iap-enabled" not in template
+
+
+def test_deploy_nao_tem_guarda_de_iap():
+    script = DEPLOY_SH.read_text(encoding="utf-8")
+
+    assert "iap-enabled" not in script
 
 
 # -- cota, budget e alertas ------------------------------------------------

@@ -10,6 +10,7 @@ OUT="${1:-$(mktemp -t service.rendered.XXXXXX.yaml)}"
 
 sed -e "s|\${IMAGE}|us-central1-docker.pkg.dev/panorama-escola-staging/panorama-api/api:dry-run|g" \
     -e "s|\${DATA_VERSION}|dry-run|g" \
+    -e "s|\${APP_BUILD}|dry-run|g" \
     "$REPO_ROOT/infra/cloud-run/service.yaml" > "$OUT"
 
 if grep -q '\${' "$OUT"; then

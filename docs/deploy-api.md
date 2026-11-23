@@ -142,7 +142,8 @@ Parâmetros em `infra/cloud-run/service.yaml` (fonte única, guardado por
 | porta | `8080` (via `$PORT`) | — |
 
 `env` do manifesto: `BQ_PROJECT`, `BQ_DATASET`, `BQ_LOCATION`,
-`API_BQ_MAX_BYTES_BILLED` (256 MB, decisão D2), `DATA_VERSION`,
+`API_BQ_MAX_BYTES_BILLED` (256 MB, decisão D2), `DATA_VERSION`, `APP_BUILD`
+(identificador do deploy de código; invalida ETag/LRU, card F8),
 `APP_ANOS_DISPONIVEIS` (anos do seletor das telas de mercado, CSV crescente; o
 maior é o padrão e ausência/invalidade derruba o boot — card F5).
 
@@ -150,20 +151,30 @@ maior é o padrão e ausência/invalidade derruba o boot — card F5).
 `allUsers`/`roles/run.invoker` para `allUsers` e o deploy não usa
 `--allow-unauthenticated`. Abrir ao público é decisão do dono, não default.
 
-O front sob `/app` usa **IAP habilitado direto no Cloud Run** (decisão D2 do
-plano): a anotação `run.googleapis.com/iap-enabled: "true"` está declarada em
-`infra/cloud-run/service.yaml` e `deploy.sh` aborta se ela sumir. Setup do OAuth
-client "External", allowlist de pilotos e remoção de `allUsers`:
-[`iap-cloud-run.md`](iap-cloud-run.md).
+**Staging é privado por IAM, sem IAP** (decisão D2 revisada pelo dono em
+2026-11-23: login só quando o sistema for ao ar). O manifesto **não** declara
+`run.googleapis.com/iap-enabled`; o gate é a policy de IAM do serviço —
+`roles/run.invoker` por pessoa, sem `allUsers`:
+
+```bash
+gcloud run services add-iam-policy-binding panorama-api \
+  --region us-central1 --project panorama-escola-staging \
+  --member user:rafaelverdifreitas@hotmail.com --role roles/run.invoker
+```
+
+O runbook de IAP/OAuth/allowlist fica em [`iap-cloud-run.md`](iap-cloud-run.md)
+para a fase de publicação.
 
 ```bash
 IMAGE=us-central1-docker.pkg.dev/panorama-escola-staging/panorama-api/api:<sha> \
 DATA_VERSION=<run de publicação> \
+APP_BUILD=<sha curto do deploy> \
 bash infra/cloud-run/deploy.sh
 ```
 
 `deploy.sh` valida o manifesto antes de aplicar: placeholder não substituído,
-`minScale != 0` e `maxScale > 3` abortam o deploy.
+`minScale != 0` e `maxScale > 3` abortam o deploy; `APP_BUILD` e `DATA_VERSION`
+ausentes também (o script não deixa o app subir com o default `dev`).
 
 Chamada ao endpoint com autenticação exigida:
 

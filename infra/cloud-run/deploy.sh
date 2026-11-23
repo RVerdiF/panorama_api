@@ -4,6 +4,7 @@
 # Uso:
 #   IMAGE=us-central1-docker.pkg.dev/panorama-escola-staging/panorama-api/api@sha256:... \
 #   DATA_VERSION=<run de publicação> \
+#   APP_BUILD=<identificador do deploy de código, ex.: sha curto> \
 #   bash infra/cloud-run/deploy.sh
 #
 # Modo dry (não invoca `gcloud`, só roda as guardas): `DRY_RUN=1`.
@@ -17,6 +18,9 @@ PROJECT="${GCP_PROJECT:-panorama-escola-staging}"
 REGION="us-central1"
 IMAGE="${IMAGE:?defina IMAGE (referência completa no Artifact Registry)}"
 DATA_VERSION="${DATA_VERSION:?defina DATA_VERSION (identificador do run de publicação)}"
+# Sem APP_BUILD o app sobe com o default "dev" e o ETag/LRU não invalida a cada
+# deploy de código (card F8): por isso é obrigatório, como DATA_VERSION.
+APP_BUILD="${APP_BUILD:?defina APP_BUILD (identificador do deploy de código)}"
 DRY_RUN="${DRY_RUN:-0}"
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,26 +28,13 @@ MANIFEST="$(mktemp)"
 trap 'rm -f "$MANIFEST"' EXIT
 
 sed -e "s|\${IMAGE}|${IMAGE}|g" -e "s|\${DATA_VERSION}|${DATA_VERSION}|g" \
+    -e "s|\${APP_BUILD}|${APP_BUILD}|g" \
     "$HERE/service.yaml" > "$MANIFEST"
 
 # Nenhum placeholder pode sobrar: manifesto incompleto não vai para o Cloud Run.
 if grep -q '\${' "$MANIFEST"; then
     echo "manifesto com placeholder não substituído:" >&2
     grep '\${' "$MANIFEST" >&2
-    exit 1
-fi
-
-# Guarda do gate de IAP (card `t_3c7efbc0`): o serviço não é publicado sem IAP
-# declarado. Defesa em profundidade — o teste de infra protege o arquivo, esta
-# guarda protege o que realmente chega ao GCP. A anotação tem que estar no
-# `metadata.annotations` do Service (antes de `spec:`) com o valor `"true"`;
-# dentro do template o Cloud Run a ignora e o serviço ficaria aberto.
-IAP_ESPERADO='run.googleapis.com/iap-enabled: "true"'
-IAP_ENCONTRADO="$(awk '/^spec:/{exit} /run\.googleapis\.com\/iap-enabled:/{sub(/^[ \t]+/, ""); print}' "$MANIFEST")"
-if [ "$IAP_ENCONTRADO" != "$IAP_ESPERADO" ]; then
-    echo "IAP ausente no manifesto (esperado '$IAP_ESPERADO' em metadata.annotations):" >&2
-    echo "  encontrado: '${IAP_ENCONTRADO:-<nada>}'" >&2
-    echo "serviço sem IAP não pode ser publicado (card t_3c7efbc0; docs/iap-cloud-run.md)" >&2
     exit 1
 fi
 
