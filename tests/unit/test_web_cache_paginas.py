@@ -171,6 +171,38 @@ def test_lru_serve_a_pagina_sem_tocar_no_repositorio():
     assert len(repo.calls) == chamadas
 
 
+def test_lru_preserva_o_content_type_da_pagina_no_hit():
+    """Regressão: o *hit* do LRU saía como `application/json`.
+
+    O `_StreamingResponse` do `BaseHTTPMiddleware` tem `media_type=None`, então
+    guardar os headers do próprio middleware (sem o `content-type` real) fazia o
+    HTML cacheado perder o tipo e o navegador não renderizar.
+    """
+    app, repo = _app()
+    with TestClient(app) as client:
+        miss = _pega(client)
+        chamadas = len(repo.calls)
+        hit = _pega(client)
+
+    assert len(repo.calls) == chamadas  # veio do LRU
+    assert miss.headers["content-type"].startswith("text/html")
+    assert hit.headers["content-type"] == miss.headers["content-type"]
+    assert hit.text == miss.text
+
+
+def test_lru_de_v1_continua_json_no_hit_e_no_miss():
+    app, repo = _app()
+    with TestClient(app) as client:
+        miss = client.get(V1_MARKET, params={"ano": 2025})
+        chamadas = len(repo.calls)
+        hit = client.get(V1_MARKET, params={"ano": 2025})
+
+    assert miss.status_code == hit.status_code == 200
+    assert len(repo.calls) == chamadas  # veio do LRU
+    assert miss.headers["content-type"] == hit.headers["content-type"]
+    assert hit.headers["content-type"].startswith("application/json")
+
+
 def test_order_da_query_nao_muda_o_etag_da_pagina():
     app, repo = _app()
     with TestClient(app) as client:

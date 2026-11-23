@@ -256,7 +256,16 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
             return response
 
         body = await _collect_body(cast(StreamingResponse, response))
-        media_type = response.media_type or "application/json"
+        # O `BaseHTTPMiddleware` devolve um `_StreamingResponse` com
+        # `media_type=None`; o tipo real só existe no header. Guardar o valor do
+        # header (e não o default) é o que faz o *hit* do LRU sair com o mesmo
+        # `Content-Type` do *miss* — um HTML cacheado como `application/json`
+        # não é renderizado pelo navegador.
+        media_type = (
+            response.headers.get("content-type")
+            or response.media_type
+            or "application/json"
+        )
         headers = dict(response.headers)
         headers.pop("content-length", None)
 
