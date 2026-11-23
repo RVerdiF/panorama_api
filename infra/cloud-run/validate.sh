@@ -5,7 +5,8 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$HERE/../.." && pwd)"
-OUT="${1:-$HERE/service.rendered.yaml}"
+# Default fora do repo: validar não pode deixar o checkout sujo.
+OUT="${1:-$(mktemp -t service.rendered.XXXXXX.yaml)}"
 
 sed -e "s|\${IMAGE}|us-central1-docker.pkg.dev/panorama-escola-staging/panorama-api/api:dry-run|g" \
     -e "s|\${DATA_VERSION}|dry-run|g" \

@@ -194,6 +194,9 @@ def test_validate_sh_valida_sem_criar_recurso():
     assert "gcloud run services replace" in script
     # Renderiza antes de chamar a API: placeholder não pode chegar ao GCP.
     assert "grep -q" in script
+    # Validar é leitura: o manifesto renderizado não pode cair no checkout.
+    assert "service.rendered.yaml" not in script
+    assert "mktemp" in script
 
 
 # -- manifesto do Cloud Run: identidade ------------------------------

@@ -20,8 +20,9 @@ RUN python -m venv /opt/venv
 
 WORKDIR /build
 
-# Licença/metadados primeiro: declarar a few. `pyproject.toml` é a fonte das
-# dependências (não há requirements.txt neste repo).
+# Metadados/licença primeiro: declarar antes o README evita retrabalho de cache
+# quando só a documentação muda. `pyproject.toml` é a fonte das dependências
+# (não há requirements.txt neste repo).
 COPY pyproject.toml README.md ./
 COPY src ./src
 
