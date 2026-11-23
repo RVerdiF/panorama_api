@@ -310,12 +310,53 @@ def test_alertas_descrevem_as_cinco_condicoes_do_card(costs):
         "latencia_p95_acima_2s",
         "erros_5xx_acima_1pct",
         "instancias_no_teto_por_10min",
+        "http_503_acima_de_5_em_15min",
     }
     assert "10 GB" in alertas["bigquery_bytes_acima_10gb_dia"]["condition"]
     assert "bytesBilledLimitExceeded" in alertas["bigquery_bytes_billed_limit_exceeded"]["condition"]
     assert "p95" in alertas["latencia_p95_acima_2s"]["condition"]
     assert "5xx" in alertas["erros_5xx_acima_1pct"]["condition"]
     assert "max_instances" in alertas["instancias_no_teto_por_10min"]["condition"]
+
+
+def test_alerta_de_503_do_front_e_de_15_min_com_limite_5(costs):
+    """Card F6 (plano §7.2): 503 em `/app` **ou** `/v1` ≥ 5 em 15 min."""
+    alerta = {item["name"]: item for item in costs["alerts"]}["http_503_acima_de_5_em_15min"]
+
+    assert "/app" in alerta["condition"] and "/v1" in alerta["condition"]
+    assert "503" in alerta["condition"]
+    assert alerta["threshold"] == ">= 5 ocorrências"
+    assert alerta["window"] == "15 min"
+    assert alerta["source"] == "log"
+
+
+def test_metricas_de_log_declaradas_tem_filtro_e_alertas_existentes(costs):
+    """Fonte única: alerta de log aponta para métrica, métrica para alerta."""
+    alertas = {item["name"] for item in costs["alerts"]}
+    metricas = {item["name"]: item for item in costs["log_metrics"]}
+
+    assert set(metricas) == {"page_view_por_rota", "http_503_por_rota"}
+    for metrica in metricas.values():
+        assert metrica["filter"].startswith("jsonPayload.message=")
+        assert metrica["fields"]
+
+    assert metricas["http_503_por_rota"]["alerts"] == ["http_503_acima_de_5_em_15min"]
+    for nome in metricas["http_503_por_rota"]["alerts"]:
+        assert nome in alertas
+    # A base do `page_view` é a linha de mesmo nome emitida pelo front, com os
+    # sete campos do plano §7.1.
+    campo = metricas["page_view_por_rota"]
+    assert campo["filter"] == 'jsonPayload.message="page_view"'
+    assert set(campo["fields"]) == {
+        "route",
+        "status",
+        "cache",
+        "ms",
+        "data_version",
+        "app_build",
+        "user_hash",
+    }
+    assert campo["group_by"] == ["route", "data_version", "app_build"]
 
 
 def test_alertas_sao_aviso_e_nao_corte(costs):

@@ -33,6 +33,7 @@ from panorama_api.repositories.bigquery_repo import BigQueryServingRepository
 from panorama_api.repositories.serving import ServingRepository
 from panorama_api.web import PREFIXO_WEB
 from panorama_api.web.middleware import WebGZipMiddleware
+from panorama_api.web.observability import PageViewMiddleware
 from panorama_api.web.routes import RETRY_AFTER_SEGUNDOS, pagina_erro
 from panorama_api.web.routes import router as web_router
 
@@ -95,6 +96,11 @@ def create_app(
     # Fica fora da camada do cache: o LRU guarda o corpo cru e cada requisição
     # negocia a compressão pelo `Accept-Encoding`.
     app.add_middleware(WebGZipMiddleware, minimum_size=500)
+    # Linha `page_view` por requisição de `/app` (card F6, plano §7). Fica por
+    # fora do cache de páginas para ler a decisão `hit`/`miss` que ele publica em
+    # `request.scope` — e por fora do gzip, para medir a requisição como um todo.
+    # Assets `/app/static/*` são ignorados: não são páginas.
+    app.add_middleware(PageViewMiddleware)
 
     app.add_exception_handler(ProblemError, _handle_problem)
     app.add_exception_handler(RequestValidationError, _handle_validation)
