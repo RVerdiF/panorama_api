@@ -1,0 +1,3414 @@
+[
+  {
+    "co_municipio": "3100104",
+    "no_municipio": "Abadia dos Dourados"
+  },
+  {
+    "co_municipio": "3100203",
+    "no_municipio": "Abaeté"
+  },
+  {
+    "co_municipio": "3100302",
+    "no_municipio": "Abre Campo"
+  },
+  {
+    "co_municipio": "3100401",
+    "no_municipio": "Acaiaca"
+  },
+  {
+    "co_municipio": "3100500",
+    "no_municipio": "Açucena"
+  },
+  {
+    "co_municipio": "3100609",
+    "no_municipio": "Água Boa"
+  },
+  {
+    "co_municipio": "3100708",
+    "no_municipio": "Água Comprida"
+  },
+  {
+    "co_municipio": "3100807",
+    "no_municipio": "Aguanil"
+  },
+  {
+    "co_municipio": "3100906",
+    "no_municipio": "Águas Formosas"
+  },
+  {
+    "co_municipio": "3101003",
+    "no_municipio": "Águas Vermelhas"
+  },
+  {
+    "co_municipio": "3101102",
+    "no_municipio": "Aimorés"
+  },
+  {
+    "co_municipio": "3101201",
+    "no_municipio": "Aiuruoca"
+  },
+  {
+    "co_municipio": "3101300",
+    "no_municipio": "Alagoa"
+  },
+  {
+    "co_municipio": "3101409",
+    "no_municipio": "Albertina"
+  },
+  {
+    "co_municipio": "3101508",
+    "no_municipio": "Além Paraíba"
+  },
+  {
+    "co_municipio": "3101607",
+    "no_municipio": "Alfenas"
+  },
+  {
+    "co_municipio": "3101631",
+    "no_municipio": "Alfredo Vasconcelos"
+  },
+  {
+    "co_municipio": "3101706",
+    "no_municipio": "Almenara"
+  },
+  {
+    "co_municipio": "3101805",
+    "no_municipio": "Alpercata"
+  },
+  {
+    "co_municipio": "3101904",
+    "no_municipio": "Alpinópolis"
+  },
+  {
+    "co_municipio": "3102001",
+    "no_municipio": "Alterosa"
+  },
+  {
+    "co_municipio": "3102050",
+    "no_municipio": "Alto Caparaó"
+  },
+  {
+    "co_municipio": "3153509",
+    "no_municipio": "Alto Jequitibá"
+  },
+  {
+    "co_municipio": "3102100",
+    "no_municipio": "Alto Rio Doce"
+  },
+  {
+    "co_municipio": "3102209",
+    "no_municipio": "Alvarenga"
+  },
+  {
+    "co_municipio": "3102308",
+    "no_municipio": "Alvinópolis"
+  },
+  {
+    "co_municipio": "3102407",
+    "no_municipio": "Alvorada de Minas"
+  },
+  {
+    "co_municipio": "3102506",
+    "no_municipio": "Amparo do Serra"
+  },
+  {
+    "co_municipio": "3102605",
+    "no_municipio": "Andradas"
+  },
+  {
+    "co_municipio": "3102803",
+    "no_municipio": "Andrelândia"
+  },
+  {
+    "co_municipio": "3102852",
+    "no_municipio": "Angelândia"
+  },
+  {
+    "co_municipio": "3102902",
+    "no_municipio": "Antônio Carlos"
+  },
+  {
+    "co_municipio": "3103009",
+    "no_municipio": "Antônio Dias"
+  },
+  {
+    "co_municipio": "3103108",
+    "no_municipio": "Antônio Prado de Minas"
+  },
+  {
+    "co_municipio": "3103207",
+    "no_municipio": "Araçaí"
+  },
+  {
+    "co_municipio": "3103306",
+    "no_municipio": "Aracitaba"
+  },
+  {
+    "co_municipio": "3103405",
+    "no_municipio": "Araçuaí"
+  },
+  {
+    "co_municipio": "3103504",
+    "no_municipio": "Araguari"
+  },
+  {
+    "co_municipio": "3103603",
+    "no_municipio": "Arantina"
+  },
+  {
+    "co_municipio": "3103702",
+    "no_municipio": "Araponga"
+  },
+  {
+    "co_municipio": "3103751",
+    "no_municipio": "Araporã"
+  },
+  {
+    "co_municipio": "3103801",
+    "no_municipio": "Arapuá"
+  },
+  {
+    "co_municipio": "3103900",
+    "no_municipio": "Araújos"
+  },
+  {
+    "co_municipio": "3104007",
+    "no_municipio": "Araxá"
+  },
+  {
+    "co_municipio": "3104106",
+    "no_municipio": "Arceburgo"
+  },
+  {
+    "co_municipio": "3104205",
+    "no_municipio": "Arcos"
+  },
+  {
+    "co_municipio": "3104304",
+    "no_municipio": "Areado"
+  },
+  {
+    "co_municipio": "3104403",
+    "no_municipio": "Argirita"
+  },
+  {
+    "co_municipio": "3104452",
+    "no_municipio": "Aricanduva"
+  },
+  {
+    "co_municipio": "3104502",
+    "no_municipio": "Arinos"
+  },
+  {
+    "co_municipio": "3104601",
+    "no_municipio": "Astolfo Dutra"
+  },
+  {
+    "co_municipio": "3104700",
+    "no_municipio": "Ataléia"
+  },
+  {
+    "co_municipio": "3104809",
+    "no_municipio": "Augusto de Lima"
+  },
+  {
+    "co_municipio": "3104908",
+    "no_municipio": "Baependi"
+  },
+  {
+    "co_municipio": "3105004",
+    "no_municipio": "Baldim"
+  },
+  {
+    "co_municipio": "3105103",
+    "no_municipio": "Bambuí"
+  },
+  {
+    "co_municipio": "3105202",
+    "no_municipio": "Bandeira"
+  },
+  {
+    "co_municipio": "3105301",
+    "no_municipio": "Bandeira do Sul"
+  },
+  {
+    "co_municipio": "3105400",
+    "no_municipio": "Barão de Cocais"
+  },
+  {
+    "co_municipio": "3105509",
+    "no_municipio": "Barão do Monte Alto"
+  },
+  {
+    "co_municipio": "3105608",
+    "no_municipio": "Barbacena"
+  },
+  {
+    "co_municipio": "3105707",
+    "no_municipio": "Barra Longa"
+  },
+  {
+    "co_municipio": "3105905",
+    "no_municipio": "Barroso"
+  },
+  {
+    "co_municipio": "3106002",
+    "no_municipio": "Bela Vista de Minas"
+  },
+  {
+    "co_municipio": "3106101",
+    "no_municipio": "Belmiro Braga"
+  },
+  {
+    "co_municipio": "3106200",
+    "no_municipio": "Belo Horizonte"
+  },
+  {
+    "co_municipio": "3106309",
+    "no_municipio": "Belo Oriente"
+  },
+  {
+    "co_municipio": "3106408",
+    "no_municipio": "Belo Vale"
+  },
+  {
+    "co_municipio": "3106507",
+    "no_municipio": "Berilo"
+  },
+  {
+    "co_municipio": "3106655",
+    "no_municipio": "Berizal"
+  },
+  {
+    "co_municipio": "3106606",
+    "no_municipio": "Bertópolis"
+  },
+  {
+    "co_municipio": "3106705",
+    "no_municipio": "Betim"
+  },
+  {
+    "co_municipio": "3106804",
+    "no_municipio": "Bias Fortes"
+  },
+  {
+    "co_municipio": "3106903",
+    "no_municipio": "Bicas"
+  },
+  {
+    "co_municipio": "3107000",
+    "no_municipio": "Biquinhas"
+  },
+  {
+    "co_municipio": "3107109",
+    "no_municipio": "Boa Esperança"
+  },
+  {
+    "co_municipio": "3107208",
+    "no_municipio": "Bocaina de Minas"
+  },
+  {
+    "co_municipio": "3107307",
+    "no_municipio": "Bocaiúva"
+  },
+  {
+    "co_municipio": "3107406",
+    "no_municipio": "Bom Despacho"
+  },
+  {
+    "co_municipio": "3107505",
+    "no_municipio": "Bom Jardim de Minas"
+  },
+  {
+    "co_municipio": "3107604",
+    "no_municipio": "Bom Jesus da Penha"
+  },
+  {
+    "co_municipio": "3107703",
+    "no_municipio": "Bom Jesus do Amparo"
+  },
+  {
+    "co_municipio": "3107802",
+    "no_municipio": "Bom Jesus do Galho"
+  },
+  {
+    "co_municipio": "3107901",
+    "no_municipio": "Bom Repouso"
+  },
+  {
+    "co_municipio": "3108008",
+    "no_municipio": "Bom Sucesso"
+  },
+  {
+    "co_municipio": "3108107",
+    "no_municipio": "Bonfim"
+  },
+  {
+    "co_municipio": "3108206",
+    "no_municipio": "Bonfinópolis de Minas"
+  },
+  {
+    "co_municipio": "3108255",
+    "no_municipio": "Bonito de Minas"
+  },
+  {
+    "co_municipio": "3108305",
+    "no_municipio": "Borda da Mata"
+  },
+  {
+    "co_municipio": "3108404",
+    "no_municipio": "Botelhos"
+  },
+  {
+    "co_municipio": "3108503",
+    "no_municipio": "Botumirim"
+  },
+  {
+    "co_municipio": "3108701",
+    "no_municipio": "Brás Pires"
+  },
+  {
+    "co_municipio": "3108552",
+    "no_municipio": "Brasilândia de Minas"
+  },
+  {
+    "co_municipio": "3108602",
+    "no_municipio": "Brasília de Minas"
+  },
+  {
+    "co_municipio": "3108800",
+    "no_municipio": "Braúnas"
+  },
+  {
+    "co_municipio": "3108909",
+    "no_municipio": "Brazópolis"
+  },
+  {
+    "co_municipio": "3109006",
+    "no_municipio": "Brumadinho"
+  },
+  {
+    "co_municipio": "3109105",
+    "no_municipio": "Bueno Brandão"
+  },
+  {
+    "co_municipio": "3109204",
+    "no_municipio": "Buenópolis"
+  },
+  {
+    "co_municipio": "3109253",
+    "no_municipio": "Bugre"
+  },
+  {
+    "co_municipio": "3109303",
+    "no_municipio": "Buritis"
+  },
+  {
+    "co_municipio": "3109402",
+    "no_municipio": "Buritizeiro"
+  },
+  {
+    "co_municipio": "3109451",
+    "no_municipio": "Cabeceira Grande"
+  },
+  {
+    "co_municipio": "3109501",
+    "no_municipio": "Cabo Verde"
+  },
+  {
+    "co_municipio": "3109600",
+    "no_municipio": "Cachoeira da Prata"
+  },
+  {
+    "co_municipio": "3109709",
+    "no_municipio": "Cachoeira de Minas"
+  },
+  {
+    "co_municipio": "3102704",
+    "no_municipio": "Cachoeira de Pajeú"
+  },
+  {
+    "co_municipio": "3109808",
+    "no_municipio": "Cachoeira Dourada"
+  },
+  {
+    "co_municipio": "3109907",
+    "no_municipio": "Caetanópolis"
+  },
+  {
+    "co_municipio": "3110004",
+    "no_municipio": "Caeté"
+  },
+  {
+    "co_municipio": "3110103",
+    "no_municipio": "Caiana"
+  },
+  {
+    "co_municipio": "3110202",
+    "no_municipio": "Cajuri"
+  },
+  {
+    "co_municipio": "3110301",
+    "no_municipio": "Caldas"
+  },
+  {
+    "co_municipio": "3110400",
+    "no_municipio": "Camacho"
+  },
+  {
+    "co_municipio": "3110509",
+    "no_municipio": "Camanducaia"
+  },
+  {
+    "co_municipio": "3110608",
+    "no_municipio": "Cambuí"
+  },
+  {
+    "co_municipio": "3110707",
+    "no_municipio": "Cambuquira"
+  },
+  {
+    "co_municipio": "3110806",
+    "no_municipio": "Campanário"
+  },
+  {
+    "co_municipio": "3110905",
+    "no_municipio": "Campanha"
+  },
+  {
+    "co_municipio": "3111002",
+    "no_municipio": "Campestre"
+  },
+  {
+    "co_municipio": "3111101",
+    "no_municipio": "Campina Verde"
+  },
+  {
+    "co_municipio": "3111150",
+    "no_municipio": "Campo Azul"
+  },
+  {
+    "co_municipio": "3111200",
+    "no_municipio": "Campo Belo"
+  },
+  {
+    "co_municipio": "3111309",
+    "no_municipio": "Campo do Meio"
+  },
+  {
+    "co_municipio": "3111408",
+    "no_municipio": "Campo Florido"
+  },
+  {
+    "co_municipio": "3111507",
+    "no_municipio": "Campos Altos"
+  },
+  {
+    "co_municipio": "3111606",
+    "no_municipio": "Campos Gerais"
+  },
+  {
+    "co_municipio": "3111903",
+    "no_municipio": "Cana Verde"
+  },
+  {
+    "co_municipio": "3111705",
+    "no_municipio": "Canaã"
+  },
+  {
+    "co_municipio": "3111804",
+    "no_municipio": "Canápolis"
+  },
+  {
+    "co_municipio": "3112000",
+    "no_municipio": "Candeias"
+  },
+  {
+    "co_municipio": "3112059",
+    "no_municipio": "Cantagalo"
+  },
+  {
+    "co_municipio": "3112109",
+    "no_municipio": "Caparaó"
+  },
+  {
+    "co_municipio": "3112208",
+    "no_municipio": "Capela Nova"
+  },
+  {
+    "co_municipio": "3112307",
+    "no_municipio": "Capelinha"
+  },
+  {
+    "co_municipio": "3112406",
+    "no_municipio": "Capetinga"
+  },
+  {
+    "co_municipio": "3112505",
+    "no_municipio": "Capim Branco"
+  },
+  {
+    "co_municipio": "3112604",
+    "no_municipio": "Capinópolis"
+  },
+  {
+    "co_municipio": "3112653",
+    "no_municipio": "Capitão Andrade"
+  },
+  {
+    "co_municipio": "3112703",
+    "no_municipio": "Capitão Enéas"
+  },
+  {
+    "co_municipio": "3112802",
+    "no_municipio": "Capitólio"
+  },
+  {
+    "co_municipio": "3112901",
+    "no_municipio": "Caputira"
+  },
+  {
+    "co_municipio": "3113008",
+    "no_municipio": "Caraí"
+  },
+  {
+    "co_municipio": "3113107",
+    "no_municipio": "Caranaíba"
+  },
+  {
+    "co_municipio": "3113206",
+    "no_municipio": "Carandaí"
+  },
+  {
+    "co_municipio": "3113305",
+    "no_municipio": "Carangola"
+  },
+  {
+    "co_municipio": "3113404",
+    "no_municipio": "Caratinga"
+  },
+  {
+    "co_municipio": "3113503",
+    "no_municipio": "Carbonita"
+  },
+  {
+    "co_municipio": "3113602",
+    "no_municipio": "Careaçu"
+  },
+  {
+    "co_municipio": "3113701",
+    "no_municipio": "Carlos Chagas"
+  },
+  {
+    "co_municipio": "3113800",
+    "no_municipio": "Carmésia"
+  },
+  {
+    "co_municipio": "3113909",
+    "no_municipio": "Carmo da Cachoeira"
+  },
+  {
+    "co_municipio": "3114006",
+    "no_municipio": "Carmo da Mata"
+  },
+  {
+    "co_municipio": "3114105",
+    "no_municipio": "Carmo de Minas"
+  },
+  {
+    "co_municipio": "3114204",
+    "no_municipio": "Carmo do Cajuru"
+  },
+  {
+    "co_municipio": "3114303",
+    "no_municipio": "Carmo do Paranaíba"
+  },
+  {
+    "co_municipio": "3114402",
+    "no_municipio": "Carmo do Rio Claro"
+  },
+  {
+    "co_municipio": "3114501",
+    "no_municipio": "Carmópolis de Minas"
+  },
+  {
+    "co_municipio": "3114550",
+    "no_municipio": "Carneirinho"
+  },
+  {
+    "co_municipio": "3114600",
+    "no_municipio": "Carrancas"
+  },
+  {
+    "co_municipio": "3114709",
+    "no_municipio": "Carvalhópolis"
+  },
+  {
+    "co_municipio": "3114808",
+    "no_municipio": "Carvalhos"
+  },
+  {
+    "co_municipio": "3114907",
+    "no_municipio": "Casa Grande"
+  },
+  {
+    "co_municipio": "3115003",
+    "no_municipio": "Cascalho Rico"
+  },
+  {
+    "co_municipio": "3115102",
+    "no_municipio": "Cássia"
+  },
+  {
+    "co_municipio": "3115300",
+    "no_municipio": "Cataguases"
+  },
+  {
+    "co_municipio": "3115359",
+    "no_municipio": "Catas Altas"
+  },
+  {
+    "co_municipio": "3115409",
+    "no_municipio": "Catas Altas da Noruega"
+  },
+  {
+    "co_municipio": "3115458",
+    "no_municipio": "Catuji"
+  },
+  {
+    "co_municipio": "3115474",
+    "no_municipio": "Catuti"
+  },
+  {
+    "co_municipio": "3115508",
+    "no_municipio": "Caxambu"
+  },
+  {
+    "co_municipio": "3115607",
+    "no_municipio": "Cedro do Abaeté"
+  },
+  {
+    "co_municipio": "3115706",
+    "no_municipio": "Central de Minas"
+  },
+  {
+    "co_municipio": "3115805",
+    "no_municipio": "Centralina"
+  },
+  {
+    "co_municipio": "3115904",
+    "no_municipio": "Chácara"
+  },
+  {
+    "co_municipio": "3116001",
+    "no_municipio": "Chalé"
+  },
+  {
+    "co_municipio": "3116100",
+    "no_municipio": "Chapada do Norte"
+  },
+  {
+    "co_municipio": "3116159",
+    "no_municipio": "Chapada Gaúcha"
+  },
+  {
+    "co_municipio": "3116209",
+    "no_municipio": "Chiador"
+  },
+  {
+    "co_municipio": "3116308",
+    "no_municipio": "Cipotânea"
+  },
+  {
+    "co_municipio": "3116407",
+    "no_municipio": "Claraval"
+  },
+  {
+    "co_municipio": "3116506",
+    "no_municipio": "Claro dos Poções"
+  },
+  {
+    "co_municipio": "3116605",
+    "no_municipio": "Cláudio"
+  },
+  {
+    "co_municipio": "3116704",
+    "no_municipio": "Coimbra"
+  },
+  {
+    "co_municipio": "3116803",
+    "no_municipio": "Coluna"
+  },
+  {
+    "co_municipio": "3116902",
+    "no_municipio": "Comendador Gomes"
+  },
+  {
+    "co_municipio": "3117009",
+    "no_municipio": "Comercinho"
+  },
+  {
+    "co_municipio": "3117108",
+    "no_municipio": "Conceição da Aparecida"
+  },
+  {
+    "co_municipio": "3115201",
+    "no_municipio": "Conceição da Barra de Minas"
+  },
+  {
+    "co_municipio": "3117306",
+    "no_municipio": "Conceição das Alagoas"
+  },
+  {
+    "co_municipio": "3117207",
+    "no_municipio": "Conceição das Pedras"
+  },
+  {
+    "co_municipio": "3117405",
+    "no_municipio": "Conceição de Ipanema"
+  },
+  {
+    "co_municipio": "3117504",
+    "no_municipio": "Conceição do Mato Dentro"
+  },
+  {
+    "co_municipio": "3117603",
+    "no_municipio": "Conceição do Pará"
+  },
+  {
+    "co_municipio": "3117702",
+    "no_municipio": "Conceição do Rio Verde"
+  },
+  {
+    "co_municipio": "3117801",
+    "no_municipio": "Conceição dos Ouros"
+  },
+  {
+    "co_municipio": "3117836",
+    "no_municipio": "Cônego Marinho"
+  },
+  {
+    "co_municipio": "3117876",
+    "no_municipio": "Confins"
+  },
+  {
+    "co_municipio": "3117900",
+    "no_municipio": "Congonhal"
+  },
+  {
+    "co_municipio": "3118007",
+    "no_municipio": "Congonhas"
+  },
+  {
+    "co_municipio": "3118106",
+    "no_municipio": "Congonhas do Norte"
+  },
+  {
+    "co_municipio": "3118205",
+    "no_municipio": "Conquista"
+  },
+  {
+    "co_municipio": "3118304",
+    "no_municipio": "Conselheiro Lafaiete"
+  },
+  {
+    "co_municipio": "3118403",
+    "no_municipio": "Conselheiro Pena"
+  },
+  {
+    "co_municipio": "3118502",
+    "no_municipio": "Consolação"
+  },
+  {
+    "co_municipio": "3118601",
+    "no_municipio": "Contagem"
+  },
+  {
+    "co_municipio": "3118700",
+    "no_municipio": "Coqueiral"
+  },
+  {
+    "co_municipio": "3118809",
+    "no_municipio": "Coração de Jesus"
+  },
+  {
+    "co_municipio": "3118908",
+    "no_municipio": "Cordisburgo"
+  },
+  {
+    "co_municipio": "3119005",
+    "no_municipio": "Cordislândia"
+  },
+  {
+    "co_municipio": "3119104",
+    "no_municipio": "Corinto"
+  },
+  {
+    "co_municipio": "3119203",
+    "no_municipio": "Coroaci"
+  },
+  {
+    "co_municipio": "3119302",
+    "no_municipio": "Coromandel"
+  },
+  {
+    "co_municipio": "3119401",
+    "no_municipio": "Coronel Fabriciano"
+  },
+  {
+    "co_municipio": "3119500",
+    "no_municipio": "Coronel Murta"
+  },
+  {
+    "co_municipio": "3119609",
+    "no_municipio": "Coronel Pacheco"
+  },
+  {
+    "co_municipio": "3119708",
+    "no_municipio": "Coronel Xavier Chaves"
+  },
+  {
+    "co_municipio": "3119807",
+    "no_municipio": "Córrego Danta"
+  },
+  {
+    "co_municipio": "3119906",
+    "no_municipio": "Córrego do Bom Jesus"
+  },
+  {
+    "co_municipio": "3119955",
+    "no_municipio": "Córrego Fundo"
+  },
+  {
+    "co_municipio": "3120003",
+    "no_municipio": "Córrego Novo"
+  },
+  {
+    "co_municipio": "3120102",
+    "no_municipio": "Couto de Magalhães de Minas"
+  },
+  {
+    "co_municipio": "3120151",
+    "no_municipio": "Crisólita"
+  },
+  {
+    "co_municipio": "3120201",
+    "no_municipio": "Cristais"
+  },
+  {
+    "co_municipio": "3120300",
+    "no_municipio": "Cristália"
+  },
+  {
+    "co_municipio": "3120409",
+    "no_municipio": "Cristiano Otoni"
+  },
+  {
+    "co_municipio": "3120508",
+    "no_municipio": "Cristina"
+  },
+  {
+    "co_municipio": "3120607",
+    "no_municipio": "Crucilândia"
+  },
+  {
+    "co_municipio": "3120706",
+    "no_municipio": "Cruzeiro da Fortaleza"
+  },
+  {
+    "co_municipio": "3120805",
+    "no_municipio": "Cruzília"
+  },
+  {
+    "co_municipio": "3120839",
+    "no_municipio": "Cuparaque"
+  },
+  {
+    "co_municipio": "3120870",
+    "no_municipio": "Curral de Dentro"
+  },
+  {
+    "co_municipio": "3120904",
+    "no_municipio": "Curvelo"
+  },
+  {
+    "co_municipio": "3121001",
+    "no_municipio": "Datas"
+  },
+  {
+    "co_municipio": "3121100",
+    "no_municipio": "Delfim Moreira"
+  },
+  {
+    "co_municipio": "3121209",
+    "no_municipio": "Delfinópolis"
+  },
+  {
+    "co_municipio": "3121258",
+    "no_municipio": "Delta"
+  },
+  {
+    "co_municipio": "3121308",
+    "no_municipio": "Descoberto"
+  },
+  {
+    "co_municipio": "3121407",
+    "no_municipio": "Desterro de Entre Rios"
+  },
+  {
+    "co_municipio": "3121506",
+    "no_municipio": "Desterro do Melo"
+  },
+  {
+    "co_municipio": "3121605",
+    "no_municipio": "Diamantina"
+  },
+  {
+    "co_municipio": "3121704",
+    "no_municipio": "Diogo de Vasconcelos"
+  },
+  {
+    "co_municipio": "3121803",
+    "no_municipio": "Dionísio"
+  },
+  {
+    "co_municipio": "3121902",
+    "no_municipio": "Divinésia"
+  },
+  {
+    "co_municipio": "3122009",
+    "no_municipio": "Divino"
+  },
+  {
+    "co_municipio": "3122108",
+    "no_municipio": "Divino das Laranjeiras"
+  },
+  {
+    "co_municipio": "3122207",
+    "no_municipio": "Divinolândia de Minas"
+  },
+  {
+    "co_municipio": "3122306",
+    "no_municipio": "Divinópolis"
+  },
+  {
+    "co_municipio": "3122355",
+    "no_municipio": "Divisa Alegre"
+  },
+  {
+    "co_municipio": "3122405",
+    "no_municipio": "Divisa Nova"
+  },
+  {
+    "co_municipio": "3122454",
+    "no_municipio": "Divisópolis"
+  },
+  {
+    "co_municipio": "3122470",
+    "no_municipio": "Dom Bosco"
+  },
+  {
+    "co_municipio": "3122504",
+    "no_municipio": "Dom Cavati"
+  },
+  {
+    "co_municipio": "3122603",
+    "no_municipio": "Dom Joaquim"
+  },
+  {
+    "co_municipio": "3122702",
+    "no_municipio": "Dom Silvério"
+  },
+  {
+    "co_municipio": "3122801",
+    "no_municipio": "Dom Viçoso"
+  },
+  {
+    "co_municipio": "3122900",
+    "no_municipio": "Dona Euzébia"
+  },
+  {
+    "co_municipio": "3123007",
+    "no_municipio": "Dores de Campos"
+  },
+  {
+    "co_municipio": "3123106",
+    "no_municipio": "Dores de Guanhães"
+  },
+  {
+    "co_municipio": "3123205",
+    "no_municipio": "Dores do Indaiá"
+  },
+  {
+    "co_municipio": "3123304",
+    "no_municipio": "Dores do Turvo"
+  },
+  {
+    "co_municipio": "3123403",
+    "no_municipio": "Doresópolis"
+  },
+  {
+    "co_municipio": "3123502",
+    "no_municipio": "Douradoquara"
+  },
+  {
+    "co_municipio": "3123528",
+    "no_municipio": "Durandé"
+  },
+  {
+    "co_municipio": "3123601",
+    "no_municipio": "Elói Mendes"
+  },
+  {
+    "co_municipio": "3123700",
+    "no_municipio": "Engenheiro Caldas"
+  },
+  {
+    "co_municipio": "3123809",
+    "no_municipio": "Engenheiro Navarro"
+  },
+  {
+    "co_municipio": "3123858",
+    "no_municipio": "Entre Folhas"
+  },
+  {
+    "co_municipio": "3123908",
+    "no_municipio": "Entre Rios de Minas"
+  },
+  {
+    "co_municipio": "3124005",
+    "no_municipio": "Ervália"
+  },
+  {
+    "co_municipio": "3124104",
+    "no_municipio": "Esmeraldas"
+  },
+  {
+    "co_municipio": "3124203",
+    "no_municipio": "Espera Feliz"
+  },
+  {
+    "co_municipio": "3124302",
+    "no_municipio": "Espinosa"
+  },
+  {
+    "co_municipio": "3124401",
+    "no_municipio": "Espírito Santo do Dourado"
+  },
+  {
+    "co_municipio": "3124500",
+    "no_municipio": "Estiva"
+  },
+  {
+    "co_municipio": "3124609",
+    "no_municipio": "Estrela Dalva"
+  },
+  {
+    "co_municipio": "3124708",
+    "no_municipio": "Estrela do Indaiá"
+  },
+  {
+    "co_municipio": "3124807",
+    "no_municipio": "Estrela do Sul"
+  },
+  {
+    "co_municipio": "3124906",
+    "no_municipio": "Eugenópolis"
+  },
+  {
+    "co_municipio": "3125002",
+    "no_municipio": "Ewbank da Câmara"
+  },
+  {
+    "co_municipio": "3125101",
+    "no_municipio": "Extrema"
+  },
+  {
+    "co_municipio": "3125200",
+    "no_municipio": "Fama"
+  },
+  {
+    "co_municipio": "3125309",
+    "no_municipio": "Faria Lemos"
+  },
+  {
+    "co_municipio": "3125408",
+    "no_municipio": "Felício dos Santos"
+  },
+  {
+    "co_municipio": "3125606",
+    "no_municipio": "Felisburgo"
+  },
+  {
+    "co_municipio": "3125705",
+    "no_municipio": "Felixlândia"
+  },
+  {
+    "co_municipio": "3125804",
+    "no_municipio": "Fernandes Tourinho"
+  },
+  {
+    "co_municipio": "3125903",
+    "no_municipio": "Ferros"
+  },
+  {
+    "co_municipio": "3125952",
+    "no_municipio": "Fervedouro"
+  },
+  {
+    "co_municipio": "3126000",
+    "no_municipio": "Florestal"
+  },
+  {
+    "co_municipio": "3126109",
+    "no_municipio": "Formiga"
+  },
+  {
+    "co_municipio": "3126208",
+    "no_municipio": "Formoso"
+  },
+  {
+    "co_municipio": "3126307",
+    "no_municipio": "Fortaleza de Minas"
+  },
+  {
+    "co_municipio": "3126406",
+    "no_municipio": "Fortuna de Minas"
+  },
+  {
+    "co_municipio": "3126505",
+    "no_municipio": "Francisco Badaró"
+  },
+  {
+    "co_municipio": "3126604",
+    "no_municipio": "Francisco Dumont"
+  },
+  {
+    "co_municipio": "3126703",
+    "no_municipio": "Francisco Sá"
+  },
+  {
+    "co_municipio": "3126752",
+    "no_municipio": "Franciscópolis"
+  },
+  {
+    "co_municipio": "3126802",
+    "no_municipio": "Frei Gaspar"
+  },
+  {
+    "co_municipio": "3126901",
+    "no_municipio": "Frei Inocêncio"
+  },
+  {
+    "co_municipio": "3126950",
+    "no_municipio": "Frei Lagonegro"
+  },
+  {
+    "co_municipio": "3127008",
+    "no_municipio": "Fronteira"
+  },
+  {
+    "co_municipio": "3127057",
+    "no_municipio": "Fronteira dos Vales"
+  },
+  {
+    "co_municipio": "3127073",
+    "no_municipio": "Fruta de Leite"
+  },
+  {
+    "co_municipio": "3127107",
+    "no_municipio": "Frutal"
+  },
+  {
+    "co_municipio": "3127206",
+    "no_municipio": "Funilândia"
+  },
+  {
+    "co_municipio": "3127305",
+    "no_municipio": "Galiléia"
+  },
+  {
+    "co_municipio": "3127339",
+    "no_municipio": "Gameleiras"
+  },
+  {
+    "co_municipio": "3127354",
+    "no_municipio": "Glaucilândia"
+  },
+  {
+    "co_municipio": "3127370",
+    "no_municipio": "Goiabeira"
+  },
+  {
+    "co_municipio": "3127388",
+    "no_municipio": "Goianá"
+  },
+  {
+    "co_municipio": "3127404",
+    "no_municipio": "Gonçalves"
+  },
+  {
+    "co_municipio": "3127503",
+    "no_municipio": "Gonzaga"
+  },
+  {
+    "co_municipio": "3127602",
+    "no_municipio": "Gouveia"
+  },
+  {
+    "co_municipio": "3127701",
+    "no_municipio": "Governador Valadares"
+  },
+  {
+    "co_municipio": "3127800",
+    "no_municipio": "Grão Mogol"
+  },
+  {
+    "co_municipio": "3127909",
+    "no_municipio": "Grupiara"
+  },
+  {
+    "co_municipio": "3128006",
+    "no_municipio": "Guanhães"
+  },
+  {
+    "co_municipio": "3128105",
+    "no_municipio": "Guapé"
+  },
+  {
+    "co_municipio": "3128204",
+    "no_municipio": "Guaraciaba"
+  },
+  {
+    "co_municipio": "3128253",
+    "no_municipio": "Guaraciama"
+  },
+  {
+    "co_municipio": "3128303",
+    "no_municipio": "Guaranésia"
+  },
+  {
+    "co_municipio": "3128402",
+    "no_municipio": "Guarani"
+  },
+  {
+    "co_municipio": "3128501",
+    "no_municipio": "Guarará"
+  },
+  {
+    "co_municipio": "3128600",
+    "no_municipio": "Guarda-Mor"
+  },
+  {
+    "co_municipio": "3128709",
+    "no_municipio": "Guaxupé"
+  },
+  {
+    "co_municipio": "3128808",
+    "no_municipio": "Guidoval"
+  },
+  {
+    "co_municipio": "3128907",
+    "no_municipio": "Guimarânia"
+  },
+  {
+    "co_municipio": "3129004",
+    "no_municipio": "Guiricema"
+  },
+  {
+    "co_municipio": "3129103",
+    "no_municipio": "Gurinhatã"
+  },
+  {
+    "co_municipio": "3129202",
+    "no_municipio": "Heliodora"
+  },
+  {
+    "co_municipio": "3129301",
+    "no_municipio": "Iapu"
+  },
+  {
+    "co_municipio": "3129400",
+    "no_municipio": "Ibertioga"
+  },
+  {
+    "co_municipio": "3129509",
+    "no_municipio": "Ibiá"
+  },
+  {
+    "co_municipio": "3129608",
+    "no_municipio": "Ibiaí"
+  },
+  {
+    "co_municipio": "3129657",
+    "no_municipio": "Ibiracatu"
+  },
+  {
+    "co_municipio": "3129707",
+    "no_municipio": "Ibiraci"
+  },
+  {
+    "co_municipio": "3129806",
+    "no_municipio": "Ibirité"
+  },
+  {
+    "co_municipio": "3129905",
+    "no_municipio": "Ibitiúra de Minas"
+  },
+  {
+    "co_municipio": "3130002",
+    "no_municipio": "Ibituruna"
+  },
+  {
+    "co_municipio": "3130051",
+    "no_municipio": "Icaraí de Minas"
+  },
+  {
+    "co_municipio": "3130101",
+    "no_municipio": "Igarapé"
+  },
+  {
+    "co_municipio": "3130200",
+    "no_municipio": "Igaratinga"
+  },
+  {
+    "co_municipio": "3130309",
+    "no_municipio": "Iguatama"
+  },
+  {
+    "co_municipio": "3130408",
+    "no_municipio": "Ijaci"
+  },
+  {
+    "co_municipio": "3130507",
+    "no_municipio": "Ilicínea"
+  },
+  {
+    "co_municipio": "3130556",
+    "no_municipio": "Imbé de Minas"
+  },
+  {
+    "co_municipio": "3130606",
+    "no_municipio": "Inconfidentes"
+  },
+  {
+    "co_municipio": "3130655",
+    "no_municipio": "Indaiabira"
+  },
+  {
+    "co_municipio": "3130705",
+    "no_municipio": "Indianópolis"
+  },
+  {
+    "co_municipio": "3130804",
+    "no_municipio": "Ingaí"
+  },
+  {
+    "co_municipio": "3130903",
+    "no_municipio": "Inhapim"
+  },
+  {
+    "co_municipio": "3131000",
+    "no_municipio": "Inhaúma"
+  },
+  {
+    "co_municipio": "3131109",
+    "no_municipio": "Inimutaba"
+  },
+  {
+    "co_municipio": "3131158",
+    "no_municipio": "Ipaba"
+  },
+  {
+    "co_municipio": "3131208",
+    "no_municipio": "Ipanema"
+  },
+  {
+    "co_municipio": "3131307",
+    "no_municipio": "Ipatinga"
+  },
+  {
+    "co_municipio": "3131406",
+    "no_municipio": "Ipiaçu"
+  },
+  {
+    "co_municipio": "3131505",
+    "no_municipio": "Ipuiúna"
+  },
+  {
+    "co_municipio": "3131604",
+    "no_municipio": "Iraí de Minas"
+  },
+  {
+    "co_municipio": "3131703",
+    "no_municipio": "Itabira"
+  },
+  {
+    "co_municipio": "3131802",
+    "no_municipio": "Itabirinha"
+  },
+  {
+    "co_municipio": "3131901",
+    "no_municipio": "Itabirito"
+  },
+  {
+    "co_municipio": "3132008",
+    "no_municipio": "Itacambira"
+  },
+  {
+    "co_municipio": "3132107",
+    "no_municipio": "Itacarambi"
+  },
+  {
+    "co_municipio": "3132206",
+    "no_municipio": "Itaguara"
+  },
+  {
+    "co_municipio": "3132305",
+    "no_municipio": "Itaipé"
+  },
+  {
+    "co_municipio": "3132404",
+    "no_municipio": "Itajubá"
+  },
+  {
+    "co_municipio": "3132503",
+    "no_municipio": "Itamarandiba"
+  },
+  {
+    "co_municipio": "3132602",
+    "no_municipio": "Itamarati de Minas"
+  },
+  {
+    "co_municipio": "3132701",
+    "no_municipio": "Itambacuri"
+  },
+  {
+    "co_municipio": "3132800",
+    "no_municipio": "Itambé do Mato Dentro"
+  },
+  {
+    "co_municipio": "3132909",
+    "no_municipio": "Itamogi"
+  },
+  {
+    "co_municipio": "3133006",
+    "no_municipio": "Itamonte"
+  },
+  {
+    "co_municipio": "3133105",
+    "no_municipio": "Itanhandu"
+  },
+  {
+    "co_municipio": "3133204",
+    "no_municipio": "Itanhomi"
+  },
+  {
+    "co_municipio": "3133303",
+    "no_municipio": "Itaobim"
+  },
+  {
+    "co_municipio": "3133402",
+    "no_municipio": "Itapagipe"
+  },
+  {
+    "co_municipio": "3133501",
+    "no_municipio": "Itapecerica"
+  },
+  {
+    "co_municipio": "3133600",
+    "no_municipio": "Itapeva"
+  },
+  {
+    "co_municipio": "3133709",
+    "no_municipio": "Itatiaiuçu"
+  },
+  {
+    "co_municipio": "3133758",
+    "no_municipio": "Itaú de Minas"
+  },
+  {
+    "co_municipio": "3133808",
+    "no_municipio": "Itaúna"
+  },
+  {
+    "co_municipio": "3133907",
+    "no_municipio": "Itaverava"
+  },
+  {
+    "co_municipio": "3134004",
+    "no_municipio": "Itinga"
+  },
+  {
+    "co_municipio": "3134103",
+    "no_municipio": "Itueta"
+  },
+  {
+    "co_municipio": "3134202",
+    "no_municipio": "Ituiutaba"
+  },
+  {
+    "co_municipio": "3134301",
+    "no_municipio": "Itumirim"
+  },
+  {
+    "co_municipio": "3134400",
+    "no_municipio": "Iturama"
+  },
+  {
+    "co_municipio": "3134509",
+    "no_municipio": "Itutinga"
+  },
+  {
+    "co_municipio": "3134608",
+    "no_municipio": "Jaboticatubas"
+  },
+  {
+    "co_municipio": "3134707",
+    "no_municipio": "Jacinto"
+  },
+  {
+    "co_municipio": "3134806",
+    "no_municipio": "Jacuí"
+  },
+  {
+    "co_municipio": "3134905",
+    "no_municipio": "Jacutinga"
+  },
+  {
+    "co_municipio": "3135001",
+    "no_municipio": "Jaguaraçu"
+  },
+  {
+    "co_municipio": "3135050",
+    "no_municipio": "Jaíba"
+  },
+  {
+    "co_municipio": "3135076",
+    "no_municipio": "Jampruca"
+  },
+  {
+    "co_municipio": "3135100",
+    "no_municipio": "Janaúba"
+  },
+  {
+    "co_municipio": "3135209",
+    "no_municipio": "Januária"
+  },
+  {
+    "co_municipio": "3135308",
+    "no_municipio": "Japaraíba"
+  },
+  {
+    "co_municipio": "3135357",
+    "no_municipio": "Japonvar"
+  },
+  {
+    "co_municipio": "3135407",
+    "no_municipio": "Jeceaba"
+  },
+  {
+    "co_municipio": "3135456",
+    "no_municipio": "Jenipapo de Minas"
+  },
+  {
+    "co_municipio": "3135506",
+    "no_municipio": "Jequeri"
+  },
+  {
+    "co_municipio": "3135605",
+    "no_municipio": "Jequitaí"
+  },
+  {
+    "co_municipio": "3135704",
+    "no_municipio": "Jequitibá"
+  },
+  {
+    "co_municipio": "3135803",
+    "no_municipio": "Jequitinhonha"
+  },
+  {
+    "co_municipio": "3135902",
+    "no_municipio": "Jesuânia"
+  },
+  {
+    "co_municipio": "3136009",
+    "no_municipio": "Joaíma"
+  },
+  {
+    "co_municipio": "3136108",
+    "no_municipio": "Joanésia"
+  },
+  {
+    "co_municipio": "3136207",
+    "no_municipio": "João Monlevade"
+  },
+  {
+    "co_municipio": "3136306",
+    "no_municipio": "João Pinheiro"
+  },
+  {
+    "co_municipio": "3136405",
+    "no_municipio": "Joaquim Felício"
+  },
+  {
+    "co_municipio": "3136504",
+    "no_municipio": "Jordânia"
+  },
+  {
+    "co_municipio": "3136520",
+    "no_municipio": "José Gonçalves de Minas"
+  },
+  {
+    "co_municipio": "3136553",
+    "no_municipio": "José Raydan"
+  },
+  {
+    "co_municipio": "3136579",
+    "no_municipio": "Josenópolis"
+  },
+  {
+    "co_municipio": "3136652",
+    "no_municipio": "Juatuba"
+  },
+  {
+    "co_municipio": "3136702",
+    "no_municipio": "Juiz de Fora"
+  },
+  {
+    "co_municipio": "3136801",
+    "no_municipio": "Juramento"
+  },
+  {
+    "co_municipio": "3136900",
+    "no_municipio": "Juruaia"
+  },
+  {
+    "co_municipio": "3136959",
+    "no_municipio": "Juvenília"
+  },
+  {
+    "co_municipio": "3137007",
+    "no_municipio": "Ladainha"
+  },
+  {
+    "co_municipio": "3137106",
+    "no_municipio": "Lagamar"
+  },
+  {
+    "co_municipio": "3137205",
+    "no_municipio": "Lagoa da Prata"
+  },
+  {
+    "co_municipio": "3137304",
+    "no_municipio": "Lagoa dos Patos"
+  },
+  {
+    "co_municipio": "3137403",
+    "no_municipio": "Lagoa Dourada"
+  },
+  {
+    "co_municipio": "3137502",
+    "no_municipio": "Lagoa Formosa"
+  },
+  {
+    "co_municipio": "3137536",
+    "no_municipio": "Lagoa Grande"
+  },
+  {
+    "co_municipio": "3137601",
+    "no_municipio": "Lagoa Santa"
+  },
+  {
+    "co_municipio": "3137700",
+    "no_municipio": "Lajinha"
+  },
+  {
+    "co_municipio": "3137809",
+    "no_municipio": "Lambari"
+  },
+  {
+    "co_municipio": "3137908",
+    "no_municipio": "Lamim"
+  },
+  {
+    "co_municipio": "3138005",
+    "no_municipio": "Laranjal"
+  },
+  {
+    "co_municipio": "3138104",
+    "no_municipio": "Lassance"
+  },
+  {
+    "co_municipio": "3138203",
+    "no_municipio": "Lavras"
+  },
+  {
+    "co_municipio": "3138302",
+    "no_municipio": "Leandro Ferreira"
+  },
+  {
+    "co_municipio": "3138351",
+    "no_municipio": "Leme do Prado"
+  },
+  {
+    "co_municipio": "3138401",
+    "no_municipio": "Leopoldina"
+  },
+  {
+    "co_municipio": "3138500",
+    "no_municipio": "Liberdade"
+  },
+  {
+    "co_municipio": "3138609",
+    "no_municipio": "Lima Duarte"
+  },
+  {
+    "co_municipio": "3138625",
+    "no_municipio": "Limeira do Oeste"
+  },
+  {
+    "co_municipio": "3138658",
+    "no_municipio": "Lontra"
+  },
+  {
+    "co_municipio": "3138674",
+    "no_municipio": "Luisburgo"
+  },
+  {
+    "co_municipio": "3138682",
+    "no_municipio": "Luislândia"
+  },
+  {
+    "co_municipio": "3138708",
+    "no_municipio": "Luminárias"
+  },
+  {
+    "co_municipio": "3138807",
+    "no_municipio": "Luz"
+  },
+  {
+    "co_municipio": "3138906",
+    "no_municipio": "Machacalis"
+  },
+  {
+    "co_municipio": "3139003",
+    "no_municipio": "Machado"
+  },
+  {
+    "co_municipio": "3139102",
+    "no_municipio": "Madre de Deus de Minas"
+  },
+  {
+    "co_municipio": "3139201",
+    "no_municipio": "Malacacheta"
+  },
+  {
+    "co_municipio": "3139250",
+    "no_municipio": "Mamonas"
+  },
+  {
+    "co_municipio": "3139300",
+    "no_municipio": "Manga"
+  },
+  {
+    "co_municipio": "3139409",
+    "no_municipio": "Manhuaçu"
+  },
+  {
+    "co_municipio": "3139508",
+    "no_municipio": "Manhumirim"
+  },
+  {
+    "co_municipio": "3139607",
+    "no_municipio": "Mantena"
+  },
+  {
+    "co_municipio": "3139805",
+    "no_municipio": "Mar de Espanha"
+  },
+  {
+    "co_municipio": "3139706",
+    "no_municipio": "Maravilhas"
+  },
+  {
+    "co_municipio": "3139904",
+    "no_municipio": "Maria da Fé"
+  },
+  {
+    "co_municipio": "3140001",
+    "no_municipio": "Mariana"
+  },
+  {
+    "co_municipio": "3140100",
+    "no_municipio": "Marilac"
+  },
+  {
+    "co_municipio": "3140159",
+    "no_municipio": "Mário Campos"
+  },
+  {
+    "co_municipio": "3140209",
+    "no_municipio": "Maripá de Minas"
+  },
+  {
+    "co_municipio": "3140308",
+    "no_municipio": "Marliéria"
+  },
+  {
+    "co_municipio": "3140407",
+    "no_municipio": "Marmelópolis"
+  },
+  {
+    "co_municipio": "3140506",
+    "no_municipio": "Martinho Campos"
+  },
+  {
+    "co_municipio": "3140530",
+    "no_municipio": "Martins Soares"
+  },
+  {
+    "co_municipio": "3140555",
+    "no_municipio": "Mata Verde"
+  },
+  {
+    "co_municipio": "3140605",
+    "no_municipio": "Materlândia"
+  },
+  {
+    "co_municipio": "3140704",
+    "no_municipio": "Mateus Leme"
+  },
+  {
+    "co_municipio": "3171501",
+    "no_municipio": "Mathias Lobato"
+  },
+  {
+    "co_municipio": "3140803",
+    "no_municipio": "Matias Barbosa"
+  },
+  {
+    "co_municipio": "3140852",
+    "no_municipio": "Matias Cardoso"
+  },
+  {
+    "co_municipio": "3140902",
+    "no_municipio": "Matipó"
+  },
+  {
+    "co_municipio": "3141009",
+    "no_municipio": "Mato Verde"
+  },
+  {
+    "co_municipio": "3141108",
+    "no_municipio": "Matozinhos"
+  },
+  {
+    "co_municipio": "3141207",
+    "no_municipio": "Matutina"
+  },
+  {
+    "co_municipio": "3141306",
+    "no_municipio": "Medeiros"
+  },
+  {
+    "co_municipio": "3141405",
+    "no_municipio": "Medina"
+  },
+  {
+    "co_municipio": "3141504",
+    "no_municipio": "Mendes Pimentel"
+  },
+  {
+    "co_municipio": "3141603",
+    "no_municipio": "Mercês"
+  },
+  {
+    "co_municipio": "3141702",
+    "no_municipio": "Mesquita"
+  },
+  {
+    "co_municipio": "3141801",
+    "no_municipio": "Minas Novas"
+  },
+  {
+    "co_municipio": "3141900",
+    "no_municipio": "Minduri"
+  },
+  {
+    "co_municipio": "3142007",
+    "no_municipio": "Mirabela"
+  },
+  {
+    "co_municipio": "3142106",
+    "no_municipio": "Miradouro"
+  },
+  {
+    "co_municipio": "3142205",
+    "no_municipio": "Miraí"
+  },
+  {
+    "co_municipio": "3142254",
+    "no_municipio": "Miravânia"
+  },
+  {
+    "co_municipio": "3142304",
+    "no_municipio": "Moeda"
+  },
+  {
+    "co_municipio": "3142403",
+    "no_municipio": "Moema"
+  },
+  {
+    "co_municipio": "3142502",
+    "no_municipio": "Monjolos"
+  },
+  {
+    "co_municipio": "3142601",
+    "no_municipio": "Monsenhor Paulo"
+  },
+  {
+    "co_municipio": "3142700",
+    "no_municipio": "Montalvânia"
+  },
+  {
+    "co_municipio": "3142809",
+    "no_municipio": "Monte Alegre de Minas"
+  },
+  {
+    "co_municipio": "3142908",
+    "no_municipio": "Monte Azul"
+  },
+  {
+    "co_municipio": "3143005",
+    "no_municipio": "Monte Belo"
+  },
+  {
+    "co_municipio": "3143104",
+    "no_municipio": "Monte Carmelo"
+  },
+  {
+    "co_municipio": "3143153",
+    "no_municipio": "Monte Formoso"
+  },
+  {
+    "co_municipio": "3143203",
+    "no_municipio": "Monte Santo de Minas"
+  },
+  {
+    "co_municipio": "3143401",
+    "no_municipio": "Monte Sião"
+  },
+  {
+    "co_municipio": "3143302",
+    "no_municipio": "Montes Claros"
+  },
+  {
+    "co_municipio": "3143450",
+    "no_municipio": "Montezuma"
+  },
+  {
+    "co_municipio": "3143500",
+    "no_municipio": "Morada Nova de Minas"
+  },
+  {
+    "co_municipio": "3143609",
+    "no_municipio": "Morro da Garça"
+  },
+  {
+    "co_municipio": "3143708",
+    "no_municipio": "Morro do Pilar"
+  },
+  {
+    "co_municipio": "3143807",
+    "no_municipio": "Munhoz"
+  },
+  {
+    "co_municipio": "3143906",
+    "no_municipio": "Muriaé"
+  },
+  {
+    "co_municipio": "3144003",
+    "no_municipio": "Mutum"
+  },
+  {
+    "co_municipio": "3144102",
+    "no_municipio": "Muzambinho"
+  },
+  {
+    "co_municipio": "3144201",
+    "no_municipio": "Nacip Raydan"
+  },
+  {
+    "co_municipio": "3144300",
+    "no_municipio": "Nanuque"
+  },
+  {
+    "co_municipio": "3144359",
+    "no_municipio": "Naque"
+  },
+  {
+    "co_municipio": "3144375",
+    "no_municipio": "Natalândia"
+  },
+  {
+    "co_municipio": "3144409",
+    "no_municipio": "Natércia"
+  },
+  {
+    "co_municipio": "3144508",
+    "no_municipio": "Nazareno"
+  },
+  {
+    "co_municipio": "3144607",
+    "no_municipio": "Nepomuceno"
+  },
+  {
+    "co_municipio": "3144656",
+    "no_municipio": "Ninheira"
+  },
+  {
+    "co_municipio": "3144672",
+    "no_municipio": "Nova Belém"
+  },
+  {
+    "co_municipio": "3144706",
+    "no_municipio": "Nova Era"
+  },
+  {
+    "co_municipio": "3144805",
+    "no_municipio": "Nova Lima"
+  },
+  {
+    "co_municipio": "3144904",
+    "no_municipio": "Nova Módica"
+  },
+  {
+    "co_municipio": "3145000",
+    "no_municipio": "Nova Ponte"
+  },
+  {
+    "co_municipio": "3145059",
+    "no_municipio": "Nova Porteirinha"
+  },
+  {
+    "co_municipio": "3145109",
+    "no_municipio": "Nova Resende"
+  },
+  {
+    "co_municipio": "3145208",
+    "no_municipio": "Nova Serrana"
+  },
+  {
+    "co_municipio": "3136603",
+    "no_municipio": "Nova União"
+  },
+  {
+    "co_municipio": "3145307",
+    "no_municipio": "Novo Cruzeiro"
+  },
+  {
+    "co_municipio": "3145356",
+    "no_municipio": "Novo Oriente de Minas"
+  },
+  {
+    "co_municipio": "3145372",
+    "no_municipio": "Novorizonte"
+  },
+  {
+    "co_municipio": "3145406",
+    "no_municipio": "Olaria"
+  },
+  {
+    "co_municipio": "3145455",
+    "no_municipio": "Olhos-d'Água"
+  },
+  {
+    "co_municipio": "3145505",
+    "no_municipio": "Olímpio Noronha"
+  },
+  {
+    "co_municipio": "3145604",
+    "no_municipio": "Oliveira"
+  },
+  {
+    "co_municipio": "3145703",
+    "no_municipio": "Oliveira Fortes"
+  },
+  {
+    "co_municipio": "3145802",
+    "no_municipio": "Onça de Pitangui"
+  },
+  {
+    "co_municipio": "3145851",
+    "no_municipio": "Oratórios"
+  },
+  {
+    "co_municipio": "3145877",
+    "no_municipio": "Orizânia"
+  },
+  {
+    "co_municipio": "3145901",
+    "no_municipio": "Ouro Branco"
+  },
+  {
+    "co_municipio": "3146008",
+    "no_municipio": "Ouro Fino"
+  },
+  {
+    "co_municipio": "3146107",
+    "no_municipio": "Ouro Preto"
+  },
+  {
+    "co_municipio": "3146206",
+    "no_municipio": "Ouro Verde de Minas"
+  },
+  {
+    "co_municipio": "3146255",
+    "no_municipio": "Padre Carvalho"
+  },
+  {
+    "co_municipio": "3146305",
+    "no_municipio": "Padre Paraíso"
+  },
+  {
+    "co_municipio": "3146552",
+    "no_municipio": "Pai Pedro"
+  },
+  {
+    "co_municipio": "3146404",
+    "no_municipio": "Paineiras"
+  },
+  {
+    "co_municipio": "3146503",
+    "no_municipio": "Pains"
+  },
+  {
+    "co_municipio": "3146602",
+    "no_municipio": "Paiva"
+  },
+  {
+    "co_municipio": "3146701",
+    "no_municipio": "Palma"
+  },
+  {
+    "co_municipio": "3146750",
+    "no_municipio": "Palmópolis"
+  },
+  {
+    "co_municipio": "3146909",
+    "no_municipio": "Papagaios"
+  },
+  {
+    "co_municipio": "3147105",
+    "no_municipio": "Pará de Minas"
+  },
+  {
+    "co_municipio": "3147006",
+    "no_municipio": "Paracatu"
+  },
+  {
+    "co_municipio": "3147204",
+    "no_municipio": "Paraguaçu"
+  },
+  {
+    "co_municipio": "3147303",
+    "no_municipio": "Paraisópolis"
+  },
+  {
+    "co_municipio": "3147402",
+    "no_municipio": "Paraopeba"
+  },
+  {
+    "co_municipio": "3147600",
+    "no_municipio": "Passa Quatro"
+  },
+  {
+    "co_municipio": "3147709",
+    "no_municipio": "Passa Tempo"
+  },
+  {
+    "co_municipio": "3147808",
+    "no_municipio": "Passa Vinte"
+  },
+  {
+    "co_municipio": "3147501",
+    "no_municipio": "Passabém"
+  },
+  {
+    "co_municipio": "3147907",
+    "no_municipio": "Passos"
+  },
+  {
+    "co_municipio": "3147956",
+    "no_municipio": "Patis"
+  },
+  {
+    "co_municipio": "3148004",
+    "no_municipio": "Patos de Minas"
+  },
+  {
+    "co_municipio": "3148103",
+    "no_municipio": "Patrocínio"
+  },
+  {
+    "co_municipio": "3148202",
+    "no_municipio": "Patrocínio do Muriaé"
+  },
+  {
+    "co_municipio": "3148301",
+    "no_municipio": "Paula Cândido"
+  },
+  {
+    "co_municipio": "3148400",
+    "no_municipio": "Paulistas"
+  },
+  {
+    "co_municipio": "3148509",
+    "no_municipio": "Pavão"
+  },
+  {
+    "co_municipio": "3148608",
+    "no_municipio": "Peçanha"
+  },
+  {
+    "co_municipio": "3148707",
+    "no_municipio": "Pedra Azul"
+  },
+  {
+    "co_municipio": "3148756",
+    "no_municipio": "Pedra Bonita"
+  },
+  {
+    "co_municipio": "3148806",
+    "no_municipio": "Pedra do Anta"
+  },
+  {
+    "co_municipio": "3148905",
+    "no_municipio": "Pedra do Indaiá"
+  },
+  {
+    "co_municipio": "3149002",
+    "no_municipio": "Pedra Dourada"
+  },
+  {
+    "co_municipio": "3149101",
+    "no_municipio": "Pedralva"
+  },
+  {
+    "co_municipio": "3149150",
+    "no_municipio": "Pedras de Maria da Cruz"
+  },
+  {
+    "co_municipio": "3149200",
+    "no_municipio": "Pedrinópolis"
+  },
+  {
+    "co_municipio": "3149309",
+    "no_municipio": "Pedro Leopoldo"
+  },
+  {
+    "co_municipio": "3149408",
+    "no_municipio": "Pedro Teixeira"
+  },
+  {
+    "co_municipio": "3149507",
+    "no_municipio": "Pequeri"
+  },
+  {
+    "co_municipio": "3149606",
+    "no_municipio": "Pequi"
+  },
+  {
+    "co_municipio": "3149705",
+    "no_municipio": "Perdigão"
+  },
+  {
+    "co_municipio": "3149804",
+    "no_municipio": "Perdizes"
+  },
+  {
+    "co_municipio": "3149903",
+    "no_municipio": "Perdões"
+  },
+  {
+    "co_municipio": "3149952",
+    "no_municipio": "Periquito"
+  },
+  {
+    "co_municipio": "3150000",
+    "no_municipio": "Pescador"
+  },
+  {
+    "co_municipio": "3150109",
+    "no_municipio": "Piau"
+  },
+  {
+    "co_municipio": "3150158",
+    "no_municipio": "Piedade de Caratinga"
+  },
+  {
+    "co_municipio": "3150208",
+    "no_municipio": "Piedade de Ponte Nova"
+  },
+  {
+    "co_municipio": "3150307",
+    "no_municipio": "Piedade do Rio Grande"
+  },
+  {
+    "co_municipio": "3150406",
+    "no_municipio": "Piedade dos Gerais"
+  },
+  {
+    "co_municipio": "3150505",
+    "no_municipio": "Pimenta"
+  },
+  {
+    "co_municipio": "3150539",
+    "no_municipio": "Pingo-d'Água"
+  },
+  {
+    "co_municipio": "3150570",
+    "no_municipio": "Pintópolis"
+  },
+  {
+    "co_municipio": "3150604",
+    "no_municipio": "Piracema"
+  },
+  {
+    "co_municipio": "3150703",
+    "no_municipio": "Pirajuba"
+  },
+  {
+    "co_municipio": "3150802",
+    "no_municipio": "Piranga"
+  },
+  {
+    "co_municipio": "3150901",
+    "no_municipio": "Piranguçu"
+  },
+  {
+    "co_municipio": "3151008",
+    "no_municipio": "Piranguinho"
+  },
+  {
+    "co_municipio": "3151107",
+    "no_municipio": "Pirapetinga"
+  },
+  {
+    "co_municipio": "3151206",
+    "no_municipio": "Pirapora"
+  },
+  {
+    "co_municipio": "3151305",
+    "no_municipio": "Piraúba"
+  },
+  {
+    "co_municipio": "3151404",
+    "no_municipio": "Pitangui"
+  },
+  {
+    "co_municipio": "3151503",
+    "no_municipio": "Piumhi"
+  },
+  {
+    "co_municipio": "3151602",
+    "no_municipio": "Planura"
+  },
+  {
+    "co_municipio": "3151701",
+    "no_municipio": "Poço Fundo"
+  },
+  {
+    "co_municipio": "3151800",
+    "no_municipio": "Poços de Caldas"
+  },
+  {
+    "co_municipio": "3151909",
+    "no_municipio": "Pocrane"
+  },
+  {
+    "co_municipio": "3152006",
+    "no_municipio": "Pompéu"
+  },
+  {
+    "co_municipio": "3152105",
+    "no_municipio": "Ponte Nova"
+  },
+  {
+    "co_municipio": "3152131",
+    "no_municipio": "Ponto Chique"
+  },
+  {
+    "co_municipio": "3152170",
+    "no_municipio": "Ponto dos Volantes"
+  },
+  {
+    "co_municipio": "3152204",
+    "no_municipio": "Porteirinha"
+  },
+  {
+    "co_municipio": "3152303",
+    "no_municipio": "Porto Firme"
+  },
+  {
+    "co_municipio": "3152402",
+    "no_municipio": "Poté"
+  },
+  {
+    "co_municipio": "3152501",
+    "no_municipio": "Pouso Alegre"
+  },
+  {
+    "co_municipio": "3152600",
+    "no_municipio": "Pouso Alto"
+  },
+  {
+    "co_municipio": "3152709",
+    "no_municipio": "Prados"
+  },
+  {
+    "co_municipio": "3152808",
+    "no_municipio": "Prata"
+  },
+  {
+    "co_municipio": "3152907",
+    "no_municipio": "Pratápolis"
+  },
+  {
+    "co_municipio": "3153004",
+    "no_municipio": "Pratinha"
+  },
+  {
+    "co_municipio": "3153103",
+    "no_municipio": "Presidente Bernardes"
+  },
+  {
+    "co_municipio": "3153202",
+    "no_municipio": "Presidente Juscelino"
+  },
+  {
+    "co_municipio": "3153301",
+    "no_municipio": "Presidente Kubitschek"
+  },
+  {
+    "co_municipio": "3153400",
+    "no_municipio": "Presidente Olegário"
+  },
+  {
+    "co_municipio": "3153608",
+    "no_municipio": "Prudente de Morais"
+  },
+  {
+    "co_municipio": "3153707",
+    "no_municipio": "Quartel Geral"
+  },
+  {
+    "co_municipio": "3153806",
+    "no_municipio": "Queluzito"
+  },
+  {
+    "co_municipio": "3153905",
+    "no_municipio": "Raposos"
+  },
+  {
+    "co_municipio": "3154002",
+    "no_municipio": "Raul Soares"
+  },
+  {
+    "co_municipio": "3154101",
+    "no_municipio": "Recreio"
+  },
+  {
+    "co_municipio": "3154150",
+    "no_municipio": "Reduto"
+  },
+  {
+    "co_municipio": "3154200",
+    "no_municipio": "Resende Costa"
+  },
+  {
+    "co_municipio": "3154309",
+    "no_municipio": "Resplendor"
+  },
+  {
+    "co_municipio": "3154408",
+    "no_municipio": "Ressaquinha"
+  },
+  {
+    "co_municipio": "3154457",
+    "no_municipio": "Riachinho"
+  },
+  {
+    "co_municipio": "3154507",
+    "no_municipio": "Riacho dos Machados"
+  },
+  {
+    "co_municipio": "3154606",
+    "no_municipio": "Ribeirão das Neves"
+  },
+  {
+    "co_municipio": "3154705",
+    "no_municipio": "Ribeirão Vermelho"
+  },
+  {
+    "co_municipio": "3154804",
+    "no_municipio": "Rio Acima"
+  },
+  {
+    "co_municipio": "3154903",
+    "no_municipio": "Rio Casca"
+  },
+  {
+    "co_municipio": "3155108",
+    "no_municipio": "Rio do Prado"
+  },
+  {
+    "co_municipio": "3155009",
+    "no_municipio": "Rio Doce"
+  },
+  {
+    "co_municipio": "3155207",
+    "no_municipio": "Rio Espera"
+  },
+  {
+    "co_municipio": "3155306",
+    "no_municipio": "Rio Manso"
+  },
+  {
+    "co_municipio": "3155405",
+    "no_municipio": "Rio Novo"
+  },
+  {
+    "co_municipio": "3155504",
+    "no_municipio": "Rio Paranaíba"
+  },
+  {
+    "co_municipio": "3155603",
+    "no_municipio": "Rio Pardo de Minas"
+  },
+  {
+    "co_municipio": "3155702",
+    "no_municipio": "Rio Piracicaba"
+  },
+  {
+    "co_municipio": "3155801",
+    "no_municipio": "Rio Pomba"
+  },
+  {
+    "co_municipio": "3155900",
+    "no_municipio": "Rio Preto"
+  },
+  {
+    "co_municipio": "3156007",
+    "no_municipio": "Rio Vermelho"
+  },
+  {
+    "co_municipio": "3156106",
+    "no_municipio": "Ritápolis"
+  },
+  {
+    "co_municipio": "3156205",
+    "no_municipio": "Rochedo de Minas"
+  },
+  {
+    "co_municipio": "3156304",
+    "no_municipio": "Rodeiro"
+  },
+  {
+    "co_municipio": "3156403",
+    "no_municipio": "Romaria"
+  },
+  {
+    "co_municipio": "3156452",
+    "no_municipio": "Rosário da Limeira"
+  },
+  {
+    "co_municipio": "3156502",
+    "no_municipio": "Rubelita"
+  },
+  {
+    "co_municipio": "3156601",
+    "no_municipio": "Rubim"
+  },
+  {
+    "co_municipio": "3156700",
+    "no_municipio": "Sabará"
+  },
+  {
+    "co_municipio": "3156809",
+    "no_municipio": "Sabinópolis"
+  },
+  {
+    "co_municipio": "3156908",
+    "no_municipio": "Sacramento"
+  },
+  {
+    "co_municipio": "3157005",
+    "no_municipio": "Salinas"
+  },
+  {
+    "co_municipio": "3157104",
+    "no_municipio": "Salto da Divisa"
+  },
+  {
+    "co_municipio": "3157203",
+    "no_municipio": "Santa Bárbara"
+  },
+  {
+    "co_municipio": "3157252",
+    "no_municipio": "Santa Bárbara do Leste"
+  },
+  {
+    "co_municipio": "3157278",
+    "no_municipio": "Santa Bárbara do Monte Verde"
+  },
+  {
+    "co_municipio": "3157302",
+    "no_municipio": "Santa Bárbara do Tugúrio"
+  },
+  {
+    "co_municipio": "3157336",
+    "no_municipio": "Santa Cruz de Minas"
+  },
+  {
+    "co_municipio": "3157377",
+    "no_municipio": "Santa Cruz de Salinas"
+  },
+  {
+    "co_municipio": "3157401",
+    "no_municipio": "Santa Cruz do Escalvado"
+  },
+  {
+    "co_municipio": "3157500",
+    "no_municipio": "Santa Efigênia de Minas"
+  },
+  {
+    "co_municipio": "3157609",
+    "no_municipio": "Santa Fé de Minas"
+  },
+  {
+    "co_municipio": "3157658",
+    "no_municipio": "Santa Helena de Minas"
+  },
+  {
+    "co_municipio": "3157708",
+    "no_municipio": "Santa Juliana"
+  },
+  {
+    "co_municipio": "3157807",
+    "no_municipio": "Santa Luzia"
+  },
+  {
+    "co_municipio": "3157906",
+    "no_municipio": "Santa Margarida"
+  },
+  {
+    "co_municipio": "3158003",
+    "no_municipio": "Santa Maria de Itabira"
+  },
+  {
+    "co_municipio": "3158102",
+    "no_municipio": "Santa Maria do Salto"
+  },
+  {
+    "co_municipio": "3158201",
+    "no_municipio": "Santa Maria do Suaçuí"
+  },
+  {
+    "co_municipio": "3159209",
+    "no_municipio": "Santa Rita de Caldas"
+  },
+  {
+    "co_municipio": "3159407",
+    "no_municipio": "Santa Rita de Ibitipoca"
+  },
+  {
+    "co_municipio": "3159308",
+    "no_municipio": "Santa Rita de Jacutinga"
+  },
+  {
+    "co_municipio": "3159357",
+    "no_municipio": "Santa Rita de Minas"
+  },
+  {
+    "co_municipio": "3159506",
+    "no_municipio": "Santa Rita do Itueto"
+  },
+  {
+    "co_municipio": "3159605",
+    "no_municipio": "Santa Rita do Sapucaí"
+  },
+  {
+    "co_municipio": "3159704",
+    "no_municipio": "Santa Rosa da Serra"
+  },
+  {
+    "co_municipio": "3159803",
+    "no_municipio": "Santa Vitória"
+  },
+  {
+    "co_municipio": "3158300",
+    "no_municipio": "Santana da Vargem"
+  },
+  {
+    "co_municipio": "3158409",
+    "no_municipio": "Santana de Cataguases"
+  },
+  {
+    "co_municipio": "3158508",
+    "no_municipio": "Santana de Pirapama"
+  },
+  {
+    "co_municipio": "3158607",
+    "no_municipio": "Santana do Deserto"
+  },
+  {
+    "co_municipio": "3158706",
+    "no_municipio": "Santana do Garambéu"
+  },
+  {
+    "co_municipio": "3158805",
+    "no_municipio": "Santana do Jacaré"
+  },
+  {
+    "co_municipio": "3158904",
+    "no_municipio": "Santana do Manhuaçu"
+  },
+  {
+    "co_municipio": "3158953",
+    "no_municipio": "Santana do Paraíso"
+  },
+  {
+    "co_municipio": "3159001",
+    "no_municipio": "Santana do Riacho"
+  },
+  {
+    "co_municipio": "3159100",
+    "no_municipio": "Santana dos Montes"
+  },
+  {
+    "co_municipio": "3159902",
+    "no_municipio": "Santo Antônio do Amparo"
+  },
+  {
+    "co_municipio": "3160009",
+    "no_municipio": "Santo Antônio do Aventureiro"
+  },
+  {
+    "co_municipio": "3160108",
+    "no_municipio": "Santo Antônio do Grama"
+  },
+  {
+    "co_municipio": "3160207",
+    "no_municipio": "Santo Antônio do Itambé"
+  },
+  {
+    "co_municipio": "3160306",
+    "no_municipio": "Santo Antônio do Jacinto"
+  },
+  {
+    "co_municipio": "3160405",
+    "no_municipio": "Santo Antônio do Monte"
+  },
+  {
+    "co_municipio": "3160454",
+    "no_municipio": "Santo Antônio do Retiro"
+  },
+  {
+    "co_municipio": "3160504",
+    "no_municipio": "Santo Antônio do Rio Abaixo"
+  },
+  {
+    "co_municipio": "3160603",
+    "no_municipio": "Santo Hipólito"
+  },
+  {
+    "co_municipio": "3160702",
+    "no_municipio": "Santos Dumont"
+  },
+  {
+    "co_municipio": "3160801",
+    "no_municipio": "São Bento Abade"
+  },
+  {
+    "co_municipio": "3160900",
+    "no_municipio": "São Brás do Suaçuí"
+  },
+  {
+    "co_municipio": "3160959",
+    "no_municipio": "São Domingos das Dores"
+  },
+  {
+    "co_municipio": "3161007",
+    "no_municipio": "São Domingos do Prata"
+  },
+  {
+    "co_municipio": "3161056",
+    "no_municipio": "São Félix de Minas"
+  },
+  {
+    "co_municipio": "3161106",
+    "no_municipio": "São Francisco"
+  },
+  {
+    "co_municipio": "3161205",
+    "no_municipio": "São Francisco de Paula"
+  },
+  {
+    "co_municipio": "3161304",
+    "no_municipio": "São Francisco de Sales"
+  },
+  {
+    "co_municipio": "3161403",
+    "no_municipio": "São Francisco do Glória"
+  },
+  {
+    "co_municipio": "3161502",
+    "no_municipio": "São Geraldo"
+  },
+  {
+    "co_municipio": "3161601",
+    "no_municipio": "São Geraldo da Piedade"
+  },
+  {
+    "co_municipio": "3161650",
+    "no_municipio": "São Geraldo do Baixio"
+  },
+  {
+    "co_municipio": "3161700",
+    "no_municipio": "São Gonçalo do Abaeté"
+  },
+  {
+    "co_municipio": "3161809",
+    "no_municipio": "São Gonçalo do Pará"
+  },
+  {
+    "co_municipio": "3161908",
+    "no_municipio": "São Gonçalo do Rio Abaixo"
+  },
+  {
+    "co_municipio": "3125507",
+    "no_municipio": "São Gonçalo do Rio Preto"
+  },
+  {
+    "co_municipio": "3162005",
+    "no_municipio": "São Gonçalo do Sapucaí"
+  },
+  {
+    "co_municipio": "3162104",
+    "no_municipio": "São Gotardo"
+  },
+  {
+    "co_municipio": "3162203",
+    "no_municipio": "São João Batista do Glória"
+  },
+  {
+    "co_municipio": "3162252",
+    "no_municipio": "São João da Lagoa"
+  },
+  {
+    "co_municipio": "3162302",
+    "no_municipio": "São João da Mata"
+  },
+  {
+    "co_municipio": "3162401",
+    "no_municipio": "São João da Ponte"
+  },
+  {
+    "co_municipio": "3162450",
+    "no_municipio": "São João das Missões"
+  },
+  {
+    "co_municipio": "3162500",
+    "no_municipio": "São João del Rei"
+  },
+  {
+    "co_municipio": "3162559",
+    "no_municipio": "São João do Manhuaçu"
+  },
+  {
+    "co_municipio": "3162575",
+    "no_municipio": "São João do Manteninha"
+  },
+  {
+    "co_municipio": "3162609",
+    "no_municipio": "São João do Oriente"
+  },
+  {
+    "co_municipio": "3162658",
+    "no_municipio": "São João do Pacuí"
+  },
+  {
+    "co_municipio": "3162708",
+    "no_municipio": "São João do Paraíso"
+  },
+  {
+    "co_municipio": "3162807",
+    "no_municipio": "São João Evangelista"
+  },
+  {
+    "co_municipio": "3162906",
+    "no_municipio": "São João Nepomuceno"
+  },
+  {
+    "co_municipio": "3162922",
+    "no_municipio": "São Joaquim de Bicas"
+  },
+  {
+    "co_municipio": "3162948",
+    "no_municipio": "São José da Barra"
+  },
+  {
+    "co_municipio": "3162955",
+    "no_municipio": "São José da Lapa"
+  },
+  {
+    "co_municipio": "3163003",
+    "no_municipio": "São José da Safira"
+  },
+  {
+    "co_municipio": "3163102",
+    "no_municipio": "São José da Varginha"
+  },
+  {
+    "co_municipio": "3163201",
+    "no_municipio": "São José do Alegre"
+  },
+  {
+    "co_municipio": "3163300",
+    "no_municipio": "São José do Divino"
+  },
+  {
+    "co_municipio": "3163409",
+    "no_municipio": "São José do Goiabal"
+  },
+  {
+    "co_municipio": "3163508",
+    "no_municipio": "São José do Jacuri"
+  },
+  {
+    "co_municipio": "3163607",
+    "no_municipio": "São José do Mantimento"
+  },
+  {
+    "co_municipio": "3163706",
+    "no_municipio": "São Lourenço"
+  },
+  {
+    "co_municipio": "3163805",
+    "no_municipio": "São Miguel do Anta"
+  },
+  {
+    "co_municipio": "3163904",
+    "no_municipio": "São Pedro da União"
+  },
+  {
+    "co_municipio": "3164100",
+    "no_municipio": "São Pedro do Suaçuí"
+  },
+  {
+    "co_municipio": "3164001",
+    "no_municipio": "São Pedro dos Ferros"
+  },
+  {
+    "co_municipio": "3164209",
+    "no_municipio": "São Romão"
+  },
+  {
+    "co_municipio": "3164308",
+    "no_municipio": "São Roque de Minas"
+  },
+  {
+    "co_municipio": "3164407",
+    "no_municipio": "São Sebastião da Bela Vista"
+  },
+  {
+    "co_municipio": "3164431",
+    "no_municipio": "São Sebastião da Vargem Alegre"
+  },
+  {
+    "co_municipio": "3164472",
+    "no_municipio": "São Sebastião do Anta"
+  },
+  {
+    "co_municipio": "3164506",
+    "no_municipio": "São Sebastião do Maranhão"
+  },
+  {
+    "co_municipio": "3164605",
+    "no_municipio": "São Sebastião do Oeste"
+  },
+  {
+    "co_municipio": "3164704",
+    "no_municipio": "São Sebastião do Paraíso"
+  },
+  {
+    "co_municipio": "3164803",
+    "no_municipio": "São Sebastião do Rio Preto"
+  },
+  {
+    "co_municipio": "3164902",
+    "no_municipio": "São Sebastião do Rio Verde"
+  },
+  {
+    "co_municipio": "3165008",
+    "no_municipio": "São Tiago"
+  },
+  {
+    "co_municipio": "3165107",
+    "no_municipio": "São Tomás de Aquino"
+  },
+  {
+    "co_municipio": "3165206",
+    "no_municipio": "São Tomé das Letras"
+  },
+  {
+    "co_municipio": "3165305",
+    "no_municipio": "São Vicente de Minas"
+  },
+  {
+    "co_municipio": "3165404",
+    "no_municipio": "Sapucaí-Mirim"
+  },
+  {
+    "co_municipio": "3165503",
+    "no_municipio": "Sardoá"
+  },
+  {
+    "co_municipio": "3165537",
+    "no_municipio": "Sarzedo"
+  },
+  {
+    "co_municipio": "3165560",
+    "no_municipio": "Sem-Peixe"
+  },
+  {
+    "co_municipio": "3165578",
+    "no_municipio": "Senador Amaral"
+  },
+  {
+    "co_municipio": "3165602",
+    "no_municipio": "Senador Cortes"
+  },
+  {
+    "co_municipio": "3165701",
+    "no_municipio": "Senador Firmino"
+  },
+  {
+    "co_municipio": "3165800",
+    "no_municipio": "Senador José Bento"
+  },
+  {
+    "co_municipio": "3165909",
+    "no_municipio": "Senador Modestino Gonçalves"
+  },
+  {
+    "co_municipio": "3166006",
+    "no_municipio": "Senhora de Oliveira"
+  },
+  {
+    "co_municipio": "3166105",
+    "no_municipio": "Senhora do Porto"
+  },
+  {
+    "co_municipio": "3166204",
+    "no_municipio": "Senhora dos Remédios"
+  },
+  {
+    "co_municipio": "3166303",
+    "no_municipio": "Sericita"
+  },
+  {
+    "co_municipio": "3166402",
+    "no_municipio": "Seritinga"
+  },
+  {
+    "co_municipio": "3166501",
+    "no_municipio": "Serra Azul de Minas"
+  },
+  {
+    "co_municipio": "3166600",
+    "no_municipio": "Serra da Saudade"
+  },
+  {
+    "co_municipio": "3166808",
+    "no_municipio": "Serra do Salitre"
+  },
+  {
+    "co_municipio": "3166709",
+    "no_municipio": "Serra dos Aimorés"
+  },
+  {
+    "co_municipio": "3166907",
+    "no_municipio": "Serrania"
+  },
+  {
+    "co_municipio": "3166956",
+    "no_municipio": "Serranópolis de Minas"
+  },
+  {
+    "co_municipio": "3167004",
+    "no_municipio": "Serranos"
+  },
+  {
+    "co_municipio": "3167103",
+    "no_municipio": "Serro"
+  },
+  {
+    "co_municipio": "3167202",
+    "no_municipio": "Sete Lagoas"
+  },
+  {
+    "co_municipio": "3165552",
+    "no_municipio": "Setubinha"
+  },
+  {
+    "co_municipio": "3167301",
+    "no_municipio": "Silveirânia"
+  },
+  {
+    "co_municipio": "3167400",
+    "no_municipio": "Silvianópolis"
+  },
+  {
+    "co_municipio": "3167509",
+    "no_municipio": "Simão Pereira"
+  },
+  {
+    "co_municipio": "3167608",
+    "no_municipio": "Simonésia"
+  },
+  {
+    "co_municipio": "3167707",
+    "no_municipio": "Sobrália"
+  },
+  {
+    "co_municipio": "3167806",
+    "no_municipio": "Soledade de Minas"
+  },
+  {
+    "co_municipio": "3167905",
+    "no_municipio": "Tabuleiro"
+  },
+  {
+    "co_municipio": "3168002",
+    "no_municipio": "Taiobeiras"
+  },
+  {
+    "co_municipio": "3168051",
+    "no_municipio": "Taparuba"
+  },
+  {
+    "co_municipio": "3168101",
+    "no_municipio": "Tapira"
+  },
+  {
+    "co_municipio": "3168200",
+    "no_municipio": "Tapiraí"
+  },
+  {
+    "co_municipio": "3168309",
+    "no_municipio": "Taquaraçu de Minas"
+  },
+  {
+    "co_municipio": "3168408",
+    "no_municipio": "Tarumirim"
+  },
+  {
+    "co_municipio": "3168507",
+    "no_municipio": "Teixeiras"
+  },
+  {
+    "co_municipio": "3168606",
+    "no_municipio": "Teófilo Otoni"
+  },
+  {
+    "co_municipio": "3168705",
+    "no_municipio": "Timóteo"
+  },
+  {
+    "co_municipio": "3168804",
+    "no_municipio": "Tiradentes"
+  },
+  {
+    "co_municipio": "3168903",
+    "no_municipio": "Tiros"
+  },
+  {
+    "co_municipio": "3169000",
+    "no_municipio": "Tocantins"
+  },
+  {
+    "co_municipio": "3169059",
+    "no_municipio": "Tocos do Moji"
+  },
+  {
+    "co_municipio": "3169109",
+    "no_municipio": "Toledo"
+  },
+  {
+    "co_municipio": "3169208",
+    "no_municipio": "Tombos"
+  },
+  {
+    "co_municipio": "3169307",
+    "no_municipio": "Três Corações"
+  },
+  {
+    "co_municipio": "3169356",
+    "no_municipio": "Três Marias"
+  },
+  {
+    "co_municipio": "3169406",
+    "no_municipio": "Três Pontas"
+  },
+  {
+    "co_municipio": "3169505",
+    "no_municipio": "Tumiritinga"
+  },
+  {
+    "co_municipio": "3169604",
+    "no_municipio": "Tupaciguara"
+  },
+  {
+    "co_municipio": "3169703",
+    "no_municipio": "Turmalina"
+  },
+  {
+    "co_municipio": "3169802",
+    "no_municipio": "Turvolândia"
+  },
+  {
+    "co_municipio": "3169901",
+    "no_municipio": "Ubá"
+  },
+  {
+    "co_municipio": "3170008",
+    "no_municipio": "Ubaí"
+  },
+  {
+    "co_municipio": "3170057",
+    "no_municipio": "Ubaporanga"
+  },
+  {
+    "co_municipio": "3170107",
+    "no_municipio": "Uberaba"
+  },
+  {
+    "co_municipio": "3170206",
+    "no_municipio": "Uberlândia"
+  },
+  {
+    "co_municipio": "3170305",
+    "no_municipio": "Umburatiba"
+  },
+  {
+    "co_municipio": "3170404",
+    "no_municipio": "Unaí"
+  },
+  {
+    "co_municipio": "3170438",
+    "no_municipio": "União de Minas"
+  },
+  {
+    "co_municipio": "3170479",
+    "no_municipio": "Uruana de Minas"
+  },
+  {
+    "co_municipio": "3170503",
+    "no_municipio": "Urucânia"
+  },
+  {
+    "co_municipio": "3170529",
+    "no_municipio": "Urucuia"
+  },
+  {
+    "co_municipio": "3170578",
+    "no_municipio": "Vargem Alegre"
+  },
+  {
+    "co_municipio": "3170602",
+    "no_municipio": "Vargem Bonita"
+  },
+  {
+    "co_municipio": "3170651",
+    "no_municipio": "Vargem Grande do Rio Pardo"
+  },
+  {
+    "co_municipio": "3170701",
+    "no_municipio": "Varginha"
+  },
+  {
+    "co_municipio": "3170750",
+    "no_municipio": "Varjão de Minas"
+  },
+  {
+    "co_municipio": "3170800",
+    "no_municipio": "Várzea da Palma"
+  },
+  {
+    "co_municipio": "3170909",
+    "no_municipio": "Varzelândia"
+  },
+  {
+    "co_municipio": "3171006",
+    "no_municipio": "Vazante"
+  },
+  {
+    "co_municipio": "3171030",
+    "no_municipio": "Verdelândia"
+  },
+  {
+    "co_municipio": "3171071",
+    "no_municipio": "Veredinha"
+  },
+  {
+    "co_municipio": "3171105",
+    "no_municipio": "Veríssimo"
+  },
+  {
+    "co_municipio": "3171154",
+    "no_municipio": "Vermelho Novo"
+  },
+  {
+    "co_municipio": "3171204",
+    "no_municipio": "Vespasiano"
+  },
+  {
+    "co_municipio": "3171303",
+    "no_municipio": "Viçosa"
+  },
+  {
+    "co_municipio": "3171402",
+    "no_municipio": "Vieiras"
+  },
+  {
+    "co_municipio": "3171600",
+    "no_municipio": "Virgem da Lapa"
+  },
+  {
+    "co_municipio": "3171709",
+    "no_municipio": "Virgínia"
+  },
+  {
+    "co_municipio": "3171808",
+    "no_municipio": "Virginópolis"
+  },
+  {
+    "co_municipio": "3171907",
+    "no_municipio": "Virgolândia"
+  },
+  {
+    "co_municipio": "3172004",
+    "no_municipio": "Visconde do Rio Branco"
+  },
+  {
+    "co_municipio": "3172103",
+    "no_municipio": "Volta Grande"
+  },
+  {
+    "co_municipio": "3172202",
+    "no_municipio": "Wenceslau Braz"
+  }
+]
