@@ -184,6 +184,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         prefix: str = _CACHEABLE_PATH_PREFIX,
         app_build: bool = False,
         exclude_prefix: str | None = None,
+        match_root: bool = False,
     ) -> None:
         super().__init__(app)
         self.cache = cache if cache is not None else LruCache()
@@ -191,6 +192,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         self.prefix = prefix
         self.app_build = app_build
         self.exclude_prefix = exclude_prefix
+        self.match_root = match_root
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
@@ -281,7 +283,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         caminho = request.url.path
         if self.exclude_prefix is not None and _pertence(caminho, self.exclude_prefix):
             return False
-        return _pertence(caminho, self.prefix)
+        return _pertence(caminho, self.prefix, aceita_raiz=self.match_root)
 
     @property
     def _vetos(self) -> tuple[str, ...]:
@@ -316,10 +318,18 @@ def _not_modified(headers: dict[str, str]) -> Response:
     return response
 
 
-def _pertence(caminho: str, prefixo: str) -> bool:
-    """Um caminho está sob o prefixo (o próprio prefixo ou algo abaixo dele)."""
+def _pertence(caminho: str, prefixo: str, *, aceita_raiz: bool = False) -> bool:
+    """Um caminho está sob o prefixo.
+
+    Por default só casa com algo **abaixo** do prefixo (``startswith("/v1/")``),
+    que é o contrato histórico do `/v1`: o caminho exato ``/v1`` nunca foi
+    cacheado. ``aceita_raiz=True`` (páginas ``/app``) inclui o próprio prefixo,
+    porque ``/app`` é uma página de verdade.
+    """
+    if caminho.startswith(prefixo):
+        return True
     raiz = prefixo.rstrip("/")
-    return caminho == raiz or caminho.startswith(raiz + "/")
+    return aceita_raiz and caminho == raiz
 
 
 def _vetoed(

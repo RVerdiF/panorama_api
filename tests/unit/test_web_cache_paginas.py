@@ -30,6 +30,7 @@ from panorama_api.core.http_cache import (
     CACHE_CONTROL,
     CACHE_CONTROL_PAGINA,
     cache_key,
+    etag_for,
 )
 from panorama_api.main import create_app
 from panorama_api.web.routes import CACHE_CONTROL_ERRO
@@ -337,3 +338,26 @@ def test_asset_continua_imutavel_e_sem_etag():
     assert asset.status_code == 200
     assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
     assert "etag" not in asset.headers
+
+
+# -- regressão: a raiz /v1 nunca foi cacheada --------------------------------
+
+
+def test_raiz_do_v1_com_if_none_match_forjado_continua_404_sem_cache():
+    """`/v1` (sem barra) não é rota: 404 problem+json, sem ETag/Cache-Control.
+
+    Regressão do review: o casamento do prefixo não pode aceitar a raiz `/v1`
+    (só `/app` aceita a própria raiz). Sem isso, um `If-None-Match` forjado
+    com a chave do caminho `/v1` devolvia 304 e o log `http_cache` passava a
+    registrar requisições que antes não existiam.
+    """
+    app, repo = _app()
+    etag_forjado = etag_for(cache_key("2026.11.17", "/v1", []))
+    with TestClient(app) as client:
+        resposta = client.get("/v1", headers={"If-None-Match": etag_forjado})
+
+    assert resposta.status_code == 404
+    assert resposta.headers["content-type"].startswith("application/problem+json")
+    assert "etag" not in resposta.headers
+    assert "cache-control" not in resposta.headers
+    assert repo.calls == []

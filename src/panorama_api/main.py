@@ -88,6 +88,7 @@ def create_app(
         prefix=PREFIXO_WEB,
         app_build=True,
         exclude_prefix=f"{PREFIXO_WEB}/static/",
+        match_root=True,
     )
     # gzip do HTML/CSS do front e das páginas de erro (egress, plano §3).
     # Restrito a `/app`: `/v1` é contrato público e não pode ganhar headers novos.
