@@ -50,8 +50,45 @@ def fmt_oferta(valor: Any) -> str:
     return "Sim" if valor else "Não"
 
 
+def fmt_ano(valor: Any) -> str:
+    """Ano censitário: sem separador de milhar e sem `0` para ausência.
+
+    `fmt_nulo` formata números com milhar (``2.025``), o que está errado para
+    ano. Aqui o ano sai como ``2025`` e a ausência continua ``sem dado``.
+    """
+    if valor is None:
+        return SEM_DADO
+    if isinstance(valor, bool):  # bool é subclasse de int: não é ano
+        return fmt_nulo(valor)
+    if isinstance(valor, int):
+        return str(valor)
+    texto = str(valor).strip()
+    return texto or SEM_DADO
+
+
+def fmt_gap_lider(valor: Any) -> str:
+    """Saldo de matrícula para o líder do município (plano §1).
+
+    ``gap_mat_bas_para_lider = 0`` é **medição válida**: a própria escola é a
+    líder, não ausência de dado. Por isso o texto é "a escola lidera" em vez de
+    "0" — que na tabela seria lido como "sem matrícula".
+    """
+    if valor is None:
+        return SEM_DADO
+    if valor == 0:
+        return "a escola lidera"
+    return fmt_nulo(valor)
+
+
 def _sem_dado(motivo: str | None) -> str:
     return f"{SEM_DADO} ({motivo})" if motivo else SEM_DADO
 
 
-__all__ = ["OFERTA_DESCONHECIDA", "SEM_DADO", "fmt_nulo", "fmt_oferta"]
+__all__ = [
+    "OFERTA_DESCONHECIDA",
+    "SEM_DADO",
+    "fmt_ano",
+    "fmt_gap_lider",
+    "fmt_nulo",
+    "fmt_oferta",
+]

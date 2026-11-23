@@ -203,6 +203,97 @@ li {
   overflow-x: auto;
 }
 
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+caption {
+  caption-side: top;
+  text-align: left;
+  padding-bottom: 0.5rem;
+  color: var(--cor-texto-suave);
+  font-size: 0.875rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--cor-borda);
+  vertical-align: top;
+}
+
+thead th {
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--cor-texto-suave);
+  border-bottom: 2px solid var(--cor-borda);
+}
+
+tbody th {
+  font-weight: 600;
+}
+
+.gap-lider {
+  font-weight: 700;
+}
+
+.serie-figura {
+  margin: 0 0 1rem;
+}
+
+.serie {
+  display: block;
+  width: 100%;
+  max-width: 40rem;
+  height: auto;
+}
+
+.serie__barra {
+  fill: var(--cor-destaque);
+}
+
+.serie__eixo {
+  stroke: var(--cor-borda);
+  stroke-width: 1;
+}
+
+.serie__ausente {
+  stroke: var(--cor-texto-suave);
+  stroke-width: 2;
+  stroke-dasharray: 3 3;
+}
+
+.serie__ano,
+.serie__valor {
+  fill: var(--cor-texto-suave);
+  font-size: 11px;
+}
+
+.serie__valor {
+  fill: var(--cor-texto);
+}
+
+.serie-figura figcaption {
+  margin-top: 0.4rem;
+  color: var(--cor-texto-suave);
+  font-size: 0.8rem;
+  max-width: 60ch;
+}
+
+.recorte {
+  margin-top: 1rem;
+}
+
+.nao-se-aplica {
+  border-left: 3px solid var(--cor-texto-suave);
+  background: rgba(0, 0, 0, 0.03);
+  padding: 0.6rem 0.9rem;
+}
+
 @media (max-width: 40rem) {
   .lista-definicoes {
     grid-template-columns: 1fr;

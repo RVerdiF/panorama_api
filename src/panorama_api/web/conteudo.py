@@ -13,7 +13,15 @@ Proibições que este módulo materializa:
 
 from __future__ import annotations
 
-from panorama_api.contract import DEFINICAO_RETENCAO, Etapa
+from typing import Mapping
+
+from panorama_api.contract import (
+    DEFINICAO_RETENCAO,
+    UNIVERSO_ESCOLAS_ATIVAS_MG,
+    UNIVERSO_ESCOLAS_MG,
+    UNIVERSO_PRIVADAS_ATIVAS_MG,
+    Etapa,
+)
 from panorama_api.web.dados import DESCRICAO_COMPETIDORES
 
 #: Rótulo canônico do proxy de retenção (contrato 2b R4). A métrica se chama
@@ -24,6 +32,33 @@ ROTULO_RETENCAO = "Proxy de retenção líquida (não é taxa de evasão)"
 #: Definição visível da comparação de concorrência: mesma unidade geográfica
 #: (município) e mesmo ano censitário.
 DEFINICAO_CONCORRENCIA = DESCRICAO_COMPETIDORES
+
+#: Universo de cada resposta do contrato, traduzido para leitura humana
+#: (contrato 2b R1). Compartilhado entre a metodologia e as telas que exibem
+#: `meta.universo` — a mesma string, sem duas cópias que possam divergir.
+UNIVERSOS: Mapping[str, str] = {
+    UNIVERSO_ESCOLAS_MG: "Todas as escolas do recorte (inclui inativas).",
+    UNIVERSO_PRIVADAS_ATIVAS_MG: "Escolas privadas ativas no ano de referência.",
+    UNIVERSO_ESCOLAS_ATIVAS_MG: "Escolas ativas no ano de referência.",
+}
+
+#: Título único da seção que não existe para a escola consultada (página 200).
+NAO_SE_APLICA = "Não se aplica"
+#: Motivo da seção quando a escola está fora do universo de privadas ativas.
+MOTIVO_FORA_DO_UNIVERSO_PRIVADO = (
+    "Indicadores e comparação municipal existem apenas para escolas privadas "
+    "ativas (universo privadas_ativas_mg)."
+)
+#: Motivo quando a escola É privada ativa mas a mart não tem a linha do ano
+#: (o `/v1` responde 404 nesse caso — ausência de dado, nunca zero).
+MOTIVO_SECAO_INDICADORES = (
+    "Os indicadores só existem para escolas privadas ativas com matrícula da "
+    "educação básica observada no ano de referência."
+)
+MOTIVO_SECAO_COMPETIDORES = (
+    "A comparação municipal só existe para escolas privadas ativas com "
+    "matrícula da educação básica observada no município e ano."
+)
 
 #: Nome de exibição de cada etapa. `bas` é o total oficial, não a soma das
 #: subetapas (`docs/api-v1.md`).
@@ -83,7 +118,12 @@ __all__ = [
     "DEFINICAO_CONCORRENCIA",
     "DEFINICOES",
     "ETAPAS_ROTULOS",
+    "MOTIVO_FORA_DO_UNIVERSO_PRIVADO",
+    "MOTIVO_SECAO_COMPETIDORES",
+    "MOTIVO_SECAO_INDICADORES",
+    "NAO_SE_APLICA",
     "ROTULO_RETENCAO",
+    "UNIVERSOS",
     "rotulo_etapa",
     "traduzir_aviso",
     "traduzir_avisos",
