@@ -42,6 +42,55 @@ ETag: "<32 hex>"
   não entram no LRU e a próxima requisição consulta o BigQuery de novo.
 - `GET /health`, `/docs` e `/openapi.json` ficam fora do cache (só `/v1/*`).
 
+## Cache das páginas `/app` (card `t_68bd7615`)
+
+As páginas SSR sob `/app` reaproveitam o **mesmo** middleware e o mesmo `LruCache`
+de `core/http_cache.py`; só a política muda:
+
+```text
+Cache-Control: private, no-cache
+ETag: "<32 hex>"
+```
+
+- `ETag(página) = sha256(DATA_VERSION + APP_BUILD + caminho + query canônica)`,
+  truncado em 32 hex. `APP_BUILD` entra porque o HTML muda a cada deploy de
+  código mesmo sem dado novo; `DATA_VERSION` entra porque muda o dado.
+- `private, no-cache`: o navegador revalida **sempre** antes de reusar. Quem
+  evita o trabalho é o `304`, decidido pelo hash **antes** do handler — logo uma
+  revalidação não executa a página e não toca no repositório nem no BigQuery.
+  `private` porque a resposta é por usuário do piloto atrás do IAP, não é
+  conteúdo de CDN.
+- LRU em memória com a mesma política do `/v1` (1000 entradas, a chave inclui
+  `DATA_VERSION`+`APP_BUILD`): um *hit* serve o HTML sem executar o handler.
+- `If-None-Match` diferente ou ausente → `200` com o corpo e o `ETag` novo;
+  igual (`W/"..."`, listas e `*`) → `304` sem corpo.
+- **Erro nunca é cacheado**: `4xx`/`5xx` saem com `Cache-Control: no-store`,
+  **sem** `ETag`, e não entram no LRU. O `503` mantém `Retry-After: 300`.
+- Assets `/app/static/<hash>-<nome>` ficam **fora** desse cache: já são
+  imutáveis por nome com hash e mantêm
+  `Cache-Control: public, max-age=31536000, immutable` (o handler de asset não
+  é cacheado nem revalidado; a URL muda quando o conteúdo muda).
+- `/v1` **não muda**: continua `public, max-age=86400, stale-while-revalidate=604800`
+  com `ETag` só de `DATA_VERSION`. Incluir `APP_BUILD` no `/v1` é o card opcional
+  F9 (decisão D7), não este.
+
+### Invalidação das páginas (`DATA_VERSION` e `APP_BUILD`)
+
+Valem as mesmas regras do `/v1`, com uma versão a mais:
+
+1. **Publicar dados** → subir o serviço com `DATA_VERSION` novo: `ETag` de todas
+   as páginas muda e o navegador recebe `200` com o HTML atualizado.
+2. **Deploy de código** (template, CSS de layout, filtro de formatação) → subir
+   com `APP_BUILD` novo: mesmo efeito, sem precisar republicar dados.
+3. As entradas antigas do LRU param de ser consultadas e saem pela política LRU.
+
+Ambos os valores são validados no boot com o vocabulário
+`[A-Za-z0-9._-]{1,64}` (`DATA_VERSION` e `APP_BUILD` em `Settings`); vazio ou com
+caractere estranho derruba o boot (falha fechada). O manifesto
+`infra/cloud-run/service.yaml` ainda **não** declara `APP_BUILD`: até o deploy do
+card F8 o valor em produção é o default `dev` (as páginas continuam corretas; o
+que falta é só a invalidação automática a cada deploy de código).
+
 ### Invalidação por `DATA_VERSION`
 
 `DATA_VERSION` é variável de ambiente do serviço (no manifesto). A chave do
@@ -134,6 +183,8 @@ por requisição, ambas com campos consultáveis:
 
 - `http_cache` — campos `cache` (`hit`/`miss`), `status`, `path`,
   `data_version`. `hit` = servido do LRU ou 304; `miss` = foi ao BigQuery.
+  Nas páginas `/app` a mesma linha acrescenta `app_build` (as linhas de `/v1`
+  continuam com exatamente os campos acima).
 - `bq_query` — campos `bq_ms` (tempo da consulta no BigQuery, em ms),
   `endpoint` (ex. `market_share`) e `status` (`ok`/`error`).
 

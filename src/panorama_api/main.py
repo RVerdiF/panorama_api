@@ -23,7 +23,10 @@ from panorama_api.core.errors import (
     problem_response,
     validation_errors,
 )
-from panorama_api.core.http_cache import HttpCacheMiddleware
+from panorama_api.core.http_cache import (
+    CACHE_CONTROL_PAGINA,
+    HttpCacheMiddleware,
+)
 from panorama_api.core.logging_config import configure_logging
 from panorama_api.core.startup import validate_schema
 from panorama_api.repositories.bigquery_repo import BigQueryServingRepository
@@ -74,6 +77,19 @@ def create_app(
     # Cache HTTP das respostas GET /v1/*: ETag por DATA_VERSION + params,
     # `Cache-Control` de 1 dia e LRU em memória (card t_817a670c).
     app.add_middleware(HttpCacheMiddleware)
+    # Cache das páginas SSR /app (card t_68bd7615): mesma mecânica, com ETag de
+    # DATA_VERSION + APP_BUILD + caminho + query e `private, no-cache`, para que
+    # a revalidação do navegador seja respondida por 304 sem executar o handler
+    # (logo sem tocar no repositório/BigQuery). Assets ficam de fora: são
+    # imutáveis por nome com hash e mantêm o próprio `Cache-Control`.
+    app.add_middleware(
+        HttpCacheMiddleware,
+        cache_control=CACHE_CONTROL_PAGINA,
+        prefix=PREFIXO_WEB,
+        app_build=True,
+        exclude_prefix=f"{PREFIXO_WEB}/static/",
+        match_root=True,
+    )
     # gzip do HTML/CSS do front e das páginas de erro (egress, plano §3).
     # Restrito a `/app`: `/v1` é contrato público e não pode ganhar headers novos.
     # Fica fora da camada do cache: o LRU guarda o corpo cru e cada requisição

@@ -5,13 +5,14 @@ from __future__ import annotations
 import re
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from panorama_api.contract import CONTRACT_VERSION_DEFAULT
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9_-]+$")
-_DATA_VERSION = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+#: Vocabulário aceito para as versões que entram em `ETag`/chave de cache.
+_VERSAO = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 
 #: Teto canônico por consulta (decisão D2, card `t_63f0a522`): 256 MB, via
 #: `API_BQ_MAX_BYTES_BILLED`. 100 MB ficou abaixo do pior caso medido (ver a
@@ -42,6 +43,10 @@ class Settings(BaseSettings):
     #: Versão dos dados publicados (run de publicação). Entra no ETag e na chave
     #: do LRU: trocar o valor no deploy invalida o cache HTTP sem varrer nada.
     data_version: str = Field(default="dev", alias="DATA_VERSION")
+    #: Versão do código do front (`/app`). Entra no `ETag` das páginas porque o
+    #: HTML muda a cada deploy mesmo sem dado novo (plano §5, card F2). Tem o
+    #: mesmo vocabulário de `DATA_VERSION` e também falha fechada no boot.
+    app_build: str = Field(default="dev", alias="APP_BUILD")
 
     @field_validator("bq_project", "bq_dataset")
     @classmethod
@@ -59,14 +64,15 @@ class Settings(BaseSettings):
             raise ValueError("API_BQ_MAX_BYTES_BILLED deve ser positivo")
         return value
 
-    @field_validator("data_version")
+    @field_validator("data_version", "app_build")
     @classmethod
-    def _version(cls, value: str) -> str:
-        # Entra no ETag: precisa ser estável e sem caracteres de controle.
+    def _version(cls, value: str, info: ValidationInfo) -> str:
+        # Entram no ETag: precisam ser estáveis e sem caracteres de controle.
+        campo = (info.field_name or "versão").upper()
         value = value.strip()
-        if not _DATA_VERSION.match(value):
+        if not _VERSAO.match(value):
             raise ValueError(
-                f"DATA_VERSION inválido: {value!r} (use letras, números, '.', '_' ou '-')"
+                f"{campo} inválido: {value!r} (use letras, números, '.', '_' ou '-')"
             )
         return value
 
