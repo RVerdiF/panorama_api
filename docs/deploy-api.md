@@ -142,7 +142,9 @@ Parâmetros em `infra/cloud-run/service.yaml` (fonte única, guardado por
 | porta | `8080` (via `$PORT`) | — |
 
 `env` do manifesto: `BQ_PROJECT`, `BQ_DATASET`, `BQ_LOCATION`,
-`API_BQ_MAX_BYTES_BILLED` (256 MB, decisão D2), `DATA_VERSION`.
+`API_BQ_MAX_BYTES_BILLED` (256 MB, decisão D2), `DATA_VERSION`,
+`APP_ANOS_DISPONIVEIS` (anos do seletor das telas de mercado, CSV crescente; o
+maior é o padrão e ausência/invalidade derruba o boot — card F5).
 
 **Autenticação:** o serviço sobe **sem** acesso público. Não há binding
 `allUsers`/`roles/run.invoker` para `allUsers` e o deploy não usa

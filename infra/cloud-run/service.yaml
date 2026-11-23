@@ -53,3 +53,8 @@ spec:
             # Invalida o cache HTTP (ETag/LRU) a cada publicação nova.
             - name: DATA_VERSION
               value: "${DATA_VERSION}"
+            # Anos do seletor das telas de mercado (card F5). Obrigatório: sem
+            # esta variável o app falha no boot (mesma política de DATA_VERSION).
+            # Só anos publicados; o maior é o padrão da tela.
+            - name: APP_ANOS_DISPONIVEIS
+              value: "2021,2022,2023,2024,2025"
