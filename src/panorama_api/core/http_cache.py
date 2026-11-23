@@ -325,11 +325,15 @@ def _pertence(caminho: str, prefixo: str, *, aceita_raiz: bool = False) -> bool:
     que é o contrato histórico do `/v1`: o caminho exato ``/v1`` nunca foi
     cacheado. ``aceita_raiz=True`` (páginas ``/app``) inclui o próprio prefixo,
     porque ``/app`` é uma página de verdade.
+
+    O casamento é **por segmento**: ``/apple`` não pertence a ``/app``. Um
+    ``startswith`` cru trataria ``/apple``, ``/app-x`` e ``/appfoo`` como
+    páginas do app.
     """
-    if caminho.startswith(prefixo):
-        return True
     raiz = prefixo.rstrip("/")
-    return aceita_raiz and caminho == raiz
+    if aceita_raiz and caminho == raiz:
+        return True
+    return caminho.startswith(raiz + "/")
 
 
 def _vetoed(

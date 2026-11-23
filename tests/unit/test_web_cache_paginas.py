@@ -18,6 +18,8 @@ que o critério de aceite pede.
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 from fastapi import Request
 from fastapi.responses import HTMLResponse
@@ -361,3 +363,31 @@ def test_raiz_do_v1_com_if_none_match_forjado_continua_404_sem_cache():
     assert "etag" not in resposta.headers
     assert "cache-control" not in resposta.headers
     assert repo.calls == []
+
+
+# -- regressão: caminhos fora do segmento /app não são páginas ---------------
+
+
+@pytest.mark.parametrize("caminho", ["/apple", "/app-x", "/appfoo"])
+def test_vizinho_do_prefixo_nao_e_tratado_como_pagina(caminho, caplog):
+    """`/apple`, `/app-x` e `/appfoo` não pertencem a `/app`.
+
+    Regressão do review: o casamento do prefixo precisa ser por segmento
+    (`/app/`), não `startswith("/app")`. Um `If-None-Match` forjado com a
+    chave desses caminhos devolvia 304 com ETag e `private, no-cache`, e um
+    GET comum passava a gravar uma linha `http_cache` que antes não existia.
+    """
+    app, repo = _app()
+    etag_forjado = etag_for(cache_key("2026.11.17", caminho, [], app_build="build-a"))
+    with caplog.at_level(logging.INFO, logger="panorama_api"):
+        with TestClient(app) as client:
+            forjado = client.get(caminho, headers={"If-None-Match": etag_forjado})
+            comum = client.get(caminho)
+
+    for resposta in (forjado, comum):
+        assert resposta.status_code == 404
+        assert resposta.headers["content-type"].startswith("application/problem+json")
+        assert "etag" not in resposta.headers
+        assert "cache-control" not in resposta.headers
+    assert repo.calls == []
+    assert not [r for r in caplog.records if r.getMessage().startswith("http_cache")]
