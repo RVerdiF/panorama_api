@@ -46,7 +46,13 @@
   <h1>{{ escola.no_entidade | fmt_nulo }}</h1>
   <p class="subtitulo">
     Escola <code>{{ escola.co_entidade }}</code> ·
-    {{ escola.no_municipio | fmt_nulo }} (código IBGE <code>{{ escola.co_municipio | fmt_nulo }}</code>)
+    {# Município é link para o mercado municipal; o código IBGE fica ao lado. #}
+    {% if escola.co_municipio %}
+    <a href="{{ app_prefix }}/mercados/{{ escola.co_municipio }}">{{ escola.no_municipio | fmt_nulo }}</a>
+    {% else %}
+    {{ escola.no_municipio | fmt_nulo }}
+    {% endif %}
+    (código IBGE <code>{{ escola.co_municipio | fmt_nulo }}</code>)
   </p>
 
   {% if recente %}
@@ -229,6 +235,9 @@
         <dd>{{ competicao.n_com_matricula | fmt_nulo }}</dd>
         <dt>Líder do município (maior matrícula observada)</dt>
         <dd>
+          {# Sem link: `Competicao` expõe apenas `lider_no_entidade`, não o
+             `co_entidade` do líder — e nome de escola não é chave única.
+             Para linkar seria preciso um campo novo no contrato `/v1`. #}
           {{ competicao.lider | fmt_nulo }}
           {% if competicao.lider_matricula is not none %}({{ competicao.lider_matricula | fmt_nulo }} matrículas){% endif %}
         </dd>

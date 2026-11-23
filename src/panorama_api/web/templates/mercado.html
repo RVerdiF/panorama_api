@@ -71,6 +71,10 @@
     Município <code>{{ municipio }}</code>
     {%- if mercado and mercado.no_municipio %} · {{ mercado.no_municipio }}{% endif %}
   </p>
+  {# Atalho para a busca já filtrada por este município (mantém o recorte). #}
+  <p class="nota">
+    <a href="{{ app_prefix }}/?co_municipio={{ municipio }}">Ver escolas deste município</a>
+  </p>
 
   {{ seletor() }}
 
@@ -230,7 +234,12 @@
           <tr>
             <th scope="row">{{ linha.posicao }}.º</th>
             <td>
+              {# O nome é o link da ficha; o código INEP continua em `<code>`. #}
+              {% if linha.id_entidade %}
+              <a href="{{ app_prefix }}/escolas/{{ linha.id_entidade }}">{{ linha.no_entidade | fmt_nulo }}</a>
+              {% else %}
               {{ linha.no_entidade | fmt_nulo }}
+              {% endif %}
               {% if linha.is_abaixo_porte %}<span class="nota">IS_ABAIXO_PORTE</span>{% endif %}
             </td>
             <td><code>{{ linha.id_entidade }}</code></td>
