@@ -96,10 +96,10 @@ para `/v1/*` e para `/app`:
 
 Ambos os valores são validados no boot com o vocabulário
 `[A-Za-z0-9._-]{1,64}` (`DATA_VERSION` e `APP_BUILD` em `Settings`); vazio ou com
-caractere estranho derruba o boot (falha fechada). O manifesto
-`infra/cloud-run/service.yaml` ainda **não** declara `APP_BUILD`: até o deploy do
-card F8 o valor em produção é o default `dev` (as superfícies continuam
-corretas; o que falta é só a invalidação automática a cada deploy de código).
+caractere estranho derruba o boot (falha fechada). Desde o card F8 o manifesto
+`infra/cloud-run/service.yaml` declara `APP_BUILD` e `infra/cloud-run/deploy.sh`
+exige a variável e a substitui no `replace`: o valor padrão é o identificador do
+deploy de código (o sha curto do commit, por exemplo), não mais o default `dev`.
 
 ### Invalidação por `DATA_VERSION`
 

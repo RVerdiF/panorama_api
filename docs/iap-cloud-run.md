@@ -1,5 +1,12 @@
 # IAP no Cloud Run: declaração, guarda e setup
 
+> **Status (2026-11-23, card F8):** este runbook está **suspenso no staging**. O
+> dono revisou a decisão D2 — não há login por enquanto — e o staging é privado
+> por **IAM** (`roles/run.invoker` por pessoa, sem `allUsers`). O manifesto
+> `infra/cloud-run/service.yaml` **não** declara `run.googleapis.com/iap-enabled`
+> e `deploy.sh` não tem guarda de IAP. Este documento volta a valer na fase de
+> publicação, com público externo.
+
 Card `t_3c7efbc0` (F7 do plano `/home/rafael/hermes/docs/panorama-frontend/plano.md`, decisão D2).
 
 O front é servido pelo **mesmo** serviço `panorama-api` (card F1, D1=A). O IAP é
