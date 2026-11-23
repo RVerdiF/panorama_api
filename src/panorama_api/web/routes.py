@@ -28,12 +28,14 @@ from panorama_api.contract import (
     FONTE_ORGAO,
     UNIVERSO_ESCOLAS_MG,
 )
-from panorama_api.core.errors import ErrorCode, ProblemError
+from panorama_api.core.errors import ErrorCode, ProblemError, ano_fora_do_contrato
 from panorama_api.web import PREFIXO_WEB, dados
 from panorama_api.web.assets import CACHE_CONTROL_ASSET, AssetRegistry
 from panorama_api.web.conteudo import (
     DEFINICAO_CONCORRENCIA,
     DEFINICOES,
+    ETAPAS_ROTULOS,
+    ETAPA_PADRAO_MERCADO,
     ROTULO_RETENCAO,
     UNIVERSOS,
     rotulo_etapa,
@@ -45,6 +47,7 @@ from panorama_api.web.escola import (
     pertence_ao_universo_privado,
 )
 from panorama_api.web.filters import fmt_ano, fmt_gap_lider, fmt_nulo, fmt_oferta
+from panorama_api.web.mercado import contexto_mercado
 from panorama_api.web.municipios import municipios_mg
 from panorama_api.web.paginacao import montar as montar_paginacao
 
@@ -332,6 +335,112 @@ def _secao_opcional(consulta: Any) -> tuple[Any | None, bool]:
         if erro.code is not ErrorCode.NAO_ENCONTRADO:
             raise
         return None, True
+
+
+@router.get(
+    "/mercados/{co_municipio}",
+    response_class=HTMLResponse,
+    name="web_mercado",
+    summary="Visão de mercado municipal: tamanho, composição e share",
+)
+def mercado(
+    co_municipio: str,
+    request: Request,
+    ano: int | None = None,
+    etapa: str | None = None,
+    offset: int | None = None,
+) -> Response:
+    """Tela de mercado do município (card F5).
+
+    * o ano sai de `APP_ANOS_DISPONIVEIS` (setting validado no boot); sem `ano`,
+      o padrão é o **maior** ano da lista, nunca o ano corrente inventado;
+    * `ANO_FORA_DO_CONTRATO` (ano fora da lista ou sem linha em `mart_mercado`)
+      responde ``404`` com o seletor de outro ano — o recorte é substituível
+      pelo usuário, não é erro de sistema;
+    * share é sempre de **uma** etapa (`bas` quando não informada) e paginado
+      (`limit=50`, só `page.has_more`); ``items: []`` é estado legítimo da tela.
+    """
+    settings = _settings(request)
+    anos = settings.anos_disponiveis
+    etapa_ref = (etapa or "").strip() or ETAPA_PADRAO_MERCADO
+    filtros_pagina = {"ano": "", "etapa": etapa_ref}
+
+    contexto: dict[str, Any] = {
+        **contexto_base(request),
+        "municipio": co_municipio,
+        "anos_disponiveis": list(anos),
+        "ano_selecionado": None,
+        "etapa_selecionada": etapa_ref,
+        "etapa_rotulo": rotulo_etapa(etapa_ref),
+        "etapas_disponiveis": ETAPAS_ROTULOS,
+        "href_base": f"{PREFIXO_WEB}/mercados/{co_municipio}",
+        "sem_dados_ano": False,
+    }
+
+    try:
+        ano_ref = _ano_do_seletor(ano, anos)
+        filtros_pagina["ano"] = str(ano_ref)
+        # A composição por etapa é a tela inteira: sem recorte de etapa.
+        resposta_mercado = dados.mercado(
+            request, co_municipio=co_municipio, ano=ano_ref, etapa=None
+        )
+        resposta_share = dados.share_mercado(
+            request,
+            co_municipio=co_municipio,
+            ano=ano_ref,
+            etapa=etapa_ref,
+            entidade_tipo="escola",
+            limit=dados.LIMITE_SHARE_PADRAO,
+            offset=offset,
+        )
+    except ProblemError as erro:
+        if erro.code is not ErrorCode.ANO_FORA_DO_CONTRATO:
+            raise
+        # Recorte de ano/etapa substituível pelo usuário: a página responde 404
+        # e mostra o seletor, sem consultar nada mais e sem cache.
+        contexto.update(
+            sem_dados_ano=True,
+            ano_selecionado=ano if ano is not None else max(anos),
+            detalhe=erro.detail,
+            codigo=erro.code.value,
+            pagina_erro_titulo=_PAGINAS_ERRO[erro.code][0],
+        )
+        return templates().TemplateResponse(
+            request,
+            "mercado.html",
+            contexto,
+            status_code=erro.status,
+            headers={"Cache-Control": CACHE_CONTROL_ERRO},
+        )
+
+    contexto.update(
+        contexto_mercado(
+            mercado=resposta_mercado,
+            share=resposta_share,
+            anos_disponiveis=anos,
+            caminho=f"{PREFIXO_WEB}/mercados/{co_municipio}",
+            filtros_pagina=filtros_pagina,
+            montar_paginacao=montar_paginacao,
+        )
+    )
+    return templates().TemplateResponse(request, "mercado.html", contexto)
+
+
+def _ano_do_seletor(ano: int | None, anos: tuple[int, ...]) -> int:
+    """Resolve o ano pedido contra `APP_ANOS_DISPONIVEIS`.
+
+    Ausente → maior ano da lista. Presente mas fora da lista → ``404``
+    `ANO_FORA_DO_CONTRATO` (o seletor oferece os anos válidos). O `int` da
+    query já é validado por `dados.mercado`; aqui só a pertença ao seletor.
+    """
+    if ano is None:
+        return max(anos)
+    if ano not in anos:
+        raise ano_fora_do_contrato(
+            f"ano {ano} fora de APP_ANOS_DISPONIVEIS "
+            f"({', '.join(str(item) for item in anos)})"
+        )
+    return ano
 
 
 @router.get(

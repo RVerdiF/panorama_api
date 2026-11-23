@@ -60,6 +60,24 @@ MOTIVO_SECAO_COMPETIDORES = (
     "matrícula da educação básica observada no município e ano."
 )
 
+#: Estado legítimo da tela de mercado: a mart não tem linha de share para a
+#: etapa, ou seja, nenhuma escola privada do recorte tem matrícula observada.
+#: **Não** é ausência de mercado nem share de 0% para as escolas ausentes.
+MOTIVO_SEM_PRIVADAS = "mercado sem escolas privadas com matrícula"
+
+#: `n_escolas_entraram`/`n_escolas_ativas_com_baseline`/`n_escolas_sairam` são
+#: NULL no primeiro ano da série (não há baseline anterior). Ausência de dado,
+#: nunca zero.
+MOTIVO_ENTRADA_SAIDA = (
+    "No primeiro ano da série não há baseline anterior: entrada, base comparável "
+    "e saída de escolas aparecem como sem dado — nunca como zero."
+)
+
+#: Nome de exibição da etapa que o seletor mostra quando não foi informada:
+#: `bas` é o total oficial do Censo (a leitura municipal padrão), não a soma das
+#: subetapas (`docs/api-v1.md`).
+ETAPA_PADRAO_MERCADO = "bas"
+
 #: Nome de exibição de cada etapa. `bas` é o total oficial, não a soma das
 #: subetapas (`docs/api-v1.md`).
 ETAPAS_ROTULOS: dict[Etapa, str] = {
@@ -118,9 +136,12 @@ __all__ = [
     "DEFINICAO_CONCORRENCIA",
     "DEFINICOES",
     "ETAPAS_ROTULOS",
+    "ETAPA_PADRAO_MERCADO",
+    "MOTIVO_ENTRADA_SAIDA",
     "MOTIVO_FORA_DO_UNIVERSO_PRIVADO",
     "MOTIVO_SECAO_COMPETIDORES",
     "MOTIVO_SECAO_INDICADORES",
+    "MOTIVO_SEM_PRIVADAS",
     "NAO_SE_APLICA",
     "ROTULO_RETENCAO",
     "UNIVERSOS",

@@ -39,7 +39,8 @@ Camada hermética — não acessa BigQuery, rede nem dataset:
 ## Executar
 
 ```bash
-.venv/bin/uvicorn panorama_api.main:app --host 0.0.0.0 --port 8080
+APP_ANOS_DISPONIVEIS=2021,2022,2023,2024,2025 \
+  .venv/bin/uvicorn panorama_api.main:app --host 0.0.0.0 --port 8080
 ```
 
 Variáveis de ambiente:
@@ -52,6 +53,7 @@ Variáveis de ambiente:
 | `API_BQ_MAX_BYTES_BILLED` | `268435456` (256 MB) | teto canônico de bytes por consulta |
 | `API_VALIDATE_SCHEMA_ON_STARTUP` | `true` | validação nome+tipo das colunas no boot |
 | `API_CONTRACT_VERSION` | `mvp-1` | versão do contrato exposta em `meta` |
+| `APP_ANOS_DISPONIVEIS` | **obrigatória** (sem default) | CSV de anos do seletor das telas de mercado (`2021,2022,2023,2024,2025`); só anos do contrato, sem repetição — ausência ou valor inválido derruba o boot |
 
 A autenticação no BigQuery usa Application Default Credentials. A identidade
 dedicada da API (IAM mínimo, sem chave JSON) está em

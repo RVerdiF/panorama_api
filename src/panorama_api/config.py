@@ -9,10 +9,14 @@ from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from panorama_api.contract import CONTRACT_VERSION_DEFAULT
+from panorama_api.core.validation import ANO_MAX, ANO_MIN
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9_-]+$")
 #: Vocabulário aceito para as versões que entram em `ETag`/chave de cache.
 _VERSAO = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
+#: Ano do seletor do front: 4 dígitos ASCII (o `\d` do Python aceita dígitos
+#: Unicode, que `int()` recusa e deixariam escapar `ValueError` no boot).
+_ANO = re.compile(r"^[0-9]{4}$")
 
 #: Teto canônico por consulta (decisão D2, card `t_63f0a522`): 256 MB, via
 #: `API_BQ_MAX_BYTES_BILLED`. 100 MB ficou abaixo do pior caso medido (ver a
@@ -54,6 +58,12 @@ class Settings(BaseSettings):
     #: valor é livre (não entra em ETag/URL), por isso não tem validador de
     #: vocabulário — só não pode ir para o log.
     obs_user_hash_salt: str = Field(default="", alias="API_OBS_USER_HASH_SALT")
+    #: Anos do seletor das telas de mercado (card F5), em CSV — ex.
+    #: `2021,2022,2023,2024,2025`. Obrigatório: o front não inventa recorte de
+    #: ano, e um deploy sem esta variável falha no boot (mesma política de
+    #: `DATA_VERSION`, plano §5). Só anos do contrato (`ANO_MIN..ANO_MAX`), sem
+    #: repetição; guardado canonicamente (crescente, sem espaço).
+    app_anos_disponiveis: str = Field(alias="APP_ANOS_DISPONIVEIS")
 
     @field_validator("bq_project", "bq_dataset")
     @classmethod
@@ -82,6 +92,41 @@ class Settings(BaseSettings):
                 f"{campo} inválido: {value!r} (use letras, números, '.', '_' ou '-')"
             )
         return value
+
+    @field_validator("app_anos_disponiveis")
+    @classmethod
+    def _anos_disponiveis(cls, value: str) -> str:
+        """Valida o CSV do seletor de ano e o guarda canonicamente.
+
+        Falha fechada no boot (mesma política de `DATA_VERSION`): vazio, item
+        não numérico, ano fora de `ANO_MIN..ANO_MAX` ou repetido levantam. A
+        saída é crescente e sem espaço, para que o valor do manifesto seja
+        também a forma exibida.
+        """
+        brutos = [item.strip() for item in value.split(",")]
+        if not brutos or any(not item for item in brutos):
+            raise ValueError(
+                f"APP_ANOS_DISPONIVEIS inválido: {value!r} "
+                "(use anos de 4 dígitos separados por vírgula, ex. 2021,2022)"
+            )
+        anos: list[int] = []
+        for item in brutos:
+            if not _ANO.match(item):
+                raise ValueError(f"APP_ANOS_DISPONIVEIS inválido: {item!r} não é um ano")
+            ano = int(item)
+            if not ANO_MIN <= ano <= ANO_MAX:
+                raise ValueError(
+                    f"APP_ANOS_DISPONIVEIS inválido: {ano} fora de {ANO_MIN}..{ANO_MAX}"
+                )
+            if ano in anos:
+                raise ValueError(f"APP_ANOS_DISPONIVEIS inválido: ano repetido {ano}")
+            anos.append(ano)
+        return ",".join(str(ano) for ano in sorted(anos))
+
+    @property
+    def anos_disponiveis(self) -> tuple[int, ...]:
+        """Anos do seletor do front, crescentes (validados no boot)."""
+        return tuple(int(ano) for ano in self.app_anos_disponiveis.split(","))
 
 
 @lru_cache

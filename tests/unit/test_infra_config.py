@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from panorama_api.config import Settings
 from panorama_api.config import DEFAULT_MAX_BYTES_BILLED as SETTINGS_MAX_BYTES
@@ -111,6 +112,61 @@ def test_settings_carrega_os_valores_do_manifesto(template_spec, monkeypatch):
     assert settings.max_bytes_billed == 268435456
     # DATA_VERSION do deploy é o que invalida ETag/LRU.
     assert settings.data_version == "2026.11.17"
+
+
+# -- seletor de ano do front (card F5) --------------------------------------
+
+
+def test_manifesto_declara_app_anos_disponiveis(template_spec):
+    """O seletor de ano do front depende desta env no mesmo manifesto."""
+    env = _manifest_env(template_spec)
+
+    assert "APP_ANOS_DISPONIVEIS" in env
+    anos = [int(item) for item in env["APP_ANOS_DISPONIVEIS"].split(",")]
+    assert anos == sorted(anos)
+    assert len(set(anos)) == len(anos)
+
+
+def test_manifesto_sem_app_anos_disponiveis_falha_no_boot(template_spec, monkeypatch):
+    """Falha fechada: ausente → `Settings` não constrói (o app não sobe)."""
+    env = _manifest_env(template_spec)
+    monkeypatch.delenv("APP_ANOS_DISPONIVEIS", raising=False)
+    for nome, valor in env.items():
+        if nome != "APP_ANOS_DISPONIVEIS":
+            monkeypatch.setenv(nome, "2026.11.17" if valor == "${DATA_VERSION}" else valor)
+
+    with pytest.raises(ValidationError) as excinfo:
+        Settings()
+
+    assert "APP_ANOS_DISPONIVEIS" in str(excinfo.value)
+
+
+@pytest.mark.parametrize(
+    "valor",
+    [
+        "",
+        " ",
+        "2021,,2022",
+        "abc",
+        "2021, 20x2",
+        "1999",
+        "2101",
+        "2021,2021",
+        "2021;2022",
+        "0000",
+    ],
+)
+def test_settings_recusa_anos_disponiveis_invalidos(valor):
+    """Mesma política de `DATA_VERSION`: valor inválido não vira default."""
+    with pytest.raises(ValidationError):
+        Settings(app_anos_disponiveis=valor)
+
+
+def test_settings_guarda_anos_disponiveis_canonicamente():
+    settings = Settings(app_anos_disponiveis="2025, 2021 ,2023")
+
+    assert settings.anos_disponiveis == (2021, 2023, 2025)
+    assert settings.app_anos_disponiveis == "2021,2023,2025"
 
 
 # -- script de deploy ------------------------------------------------------
