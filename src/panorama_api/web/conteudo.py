@@ -14,7 +14,7 @@ Proibições que este módulo materializa:
 from __future__ import annotations
 
 from panorama_api.contract import DEFINICAO_RETENCAO, Etapa
-from panorama_api.services.schools import DESCRICAO_COMPETIDORES
+from panorama_api.web.dados import DESCRICAO_COMPETIDORES
 
 #: Rótulo canônico do proxy de retenção (contrato 2b R4). A métrica se chama
 #: "proxy de retenção líquida"; o complemento existe para impedir que o número
