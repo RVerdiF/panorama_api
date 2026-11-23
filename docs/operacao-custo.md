@@ -26,15 +26,22 @@ Cache-Control: public, max-age=86400, stale-while-revalidate=604800
 ETag: "<32 hex>"
 ```
 
-- `ETag = sha256(DATA_VERSION + caminho + query canônica)` truncado em 32 hex.
-  A query é ordenada por chave/valor, então `?a=1&b=2` e `?b=2&a=1` produzem o
-  mesmo `ETag`.
+- `ETag = sha256(DATA_VERSION + APP_BUILD + caminho + query canônica)` truncado
+  em 32 hex. A query é ordenada por chave/valor, então `?a=1&b=2` e `?b=2&a=1`
+  produzem o mesmo `ETag`.
+- `APP_BUILD` entra na chave pela mesma razão das páginas (card F9, decisão
+  D7): o corpo do `/v1` também depende do código — um deploy que muda formato,
+  serialização ou a ordem dos campos muda a representação sem trocar dado. Sem
+  ele, o cliente reusaria o JSON antigo por até 1 dia (mais 7 de
+  `stale-while-revalidate`). Trocar `DATA_VERSION` **ou** `APP_BUILD` muda todos
+  os `ETag`; nenhum `Cache-Control`, status ou formato de resposta muda.
 - `If-None-Match` igual (aceita `W/"..."` e listas) devolve **304** sem
   corpo, com o mesmo `ETag`/`Cache-Control`. O 304 é decidido pelo hash, não
   pela presença no LRU — vale inclusive numa instância fria (scale-to-zero),
-  que é onde ele mais economiza consulta. Premissa: dentro de uma
-  `DATA_VERSION` a representação é imutável — publicar dados exige subir a
-  versão (ver abaixo).
+  que é onde ele mais economiza consulta. Premissa: dentro de um par
+  (`DATA_VERSION`, `APP_BUILD`) a representação é imutável — publicar dados
+  exige subir a `DATA_VERSION` e deployar código novo que muda a saída exige
+  subir o `APP_BUILD` (ver abaixo).
 - `If-None-Match: *` só devolve 304 quando a representação **existe**
   (RFC 9110): o middleware não responde 304 antes de o handler confirmar o
   recurso, então um caminho que daria 404 continua 404.
@@ -70,32 +77,36 @@ ETag: "<32 hex>"
   imutáveis por nome com hash e mantêm
   `Cache-Control: public, max-age=31536000, immutable` (o handler de asset não
   é cacheado nem revalidado; a URL muda quando o conteúdo muda).
-- `/v1` **não muda**: continua `public, max-age=86400, stale-while-revalidate=604800`
-  com `ETag` só de `DATA_VERSION`. Incluir `APP_BUILD` no `/v1` é o card opcional
-  F9 (decisão D7), não este.
+- `/v1` mantém `Cache-Control: public, max-age=86400, stale-while-revalidate=604800`
+  e, desde o card F9 (decisão D7), usa a **mesma** chave de `ETag`/LRU das
+  páginas: `DATA_VERSION + APP_BUILD + caminho + query`. O `/v1` não ganhou
+  campo `app_build` na linha de log (contrato de log preservado).
 
-### Invalidação das páginas (`DATA_VERSION` e `APP_BUILD`)
+### Invalidação (`DATA_VERSION` e `APP_BUILD`) — ambas as superfícies
 
-Valem as mesmas regras do `/v1`, com uma versão a mais:
+Desde o card F9 as duas superfícies usam a mesma chave, então as regras valem
+para `/v1/*` e para `/app`:
 
 1. **Publicar dados** → subir o serviço com `DATA_VERSION` novo: `ETag` de todas
-   as páginas muda e o navegador recebe `200` com o HTML atualizado.
-2. **Deploy de código** (template, CSS de layout, filtro de formatação) → subir
-   com `APP_BUILD` novo: mesmo efeito, sem precisar republicar dados.
+   as respostas muda e o cliente recebe `200` com o corpo atualizado.
+2. **Deploy de código** que altera a representação (formato/serialização do JSON,
+   template, CSS de layout, filtro de formatação) → subir com `APP_BUILD` novo:
+   mesmo efeito, sem precisar republicar dados.
 3. As entradas antigas do LRU param de ser consultadas e saem pela política LRU.
 
 Ambos os valores são validados no boot com o vocabulário
 `[A-Za-z0-9._-]{1,64}` (`DATA_VERSION` e `APP_BUILD` em `Settings`); vazio ou com
 caractere estranho derruba o boot (falha fechada). O manifesto
 `infra/cloud-run/service.yaml` ainda **não** declara `APP_BUILD`: até o deploy do
-card F8 o valor em produção é o default `dev` (as páginas continuam corretas; o
-que falta é só a invalidação automática a cada deploy de código).
+card F8 o valor em produção é o default `dev` (as superfícies continuam
+corretas; o que falta é só a invalidação automática a cada deploy de código).
 
 ### Invalidação por `DATA_VERSION`
 
 `DATA_VERSION` é variável de ambiente do serviço (no manifesto). A chave do
-cache e o `ETag` incluem esse valor; publicar dados novos = subir o serviço com
-`DATA_VERSION` novo. Não existe varredura nem TTL explícito:
+cache e o `ETag` de **todas** as superfícies incluem esse valor; publicar dados
+novos = subir o serviço com `DATA_VERSION` novo. Não existe varredura nem TTL
+explícito:
 
 1. o `ETag` muda e todo cliente revalida (recebe 200 com corpo novo);
 2. as entradas antigas do LRU deixam de ser consultadas e saem pela própria
