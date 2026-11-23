@@ -24,6 +24,7 @@ from typing import Any, Sequence
 from panorama_api.schemas.markets import MarketItem, MarketsResponse, ShareResponse
 from panorama_api.web.conteudo import (
     DEFINICAO_CONCORRENCIA,
+    MOTIVO_ALEM_DO_FIM,
     MOTIVO_ENTRADA_SAIDA,
     MOTIVO_SEM_PRIVADAS,
     UNIVERSOS,
@@ -103,18 +104,30 @@ def contexto_mercado(
     caminho: str,
     filtros_pagina: dict[str, str],
     montar_paginacao: Any,
+    url_lista: Any,
 ) -> dict[str, Any]:
     """Contexto completo do template a partir das respostas (já obtidas) do `/v1`.
 
     `mercado` é consultado **sem** recorte de etapa: a composição por etapa é o
-    conteúdo da tela. O share é sempre de uma etapa (o `/v1` exige `etapa`);
-    `share.data.items` vazio é estado legítimo — "mercado sem escolas privadas
-    com matrícula" —, não erro.
+    conteúdo da tela. O share é sempre de uma etapa (o `/v1` exige `etapa`).
+
+    `share.data.items` vazio é estado legítimo e tem **dois** significados que a
+    tela não pode confundir (card `t_3ea9454f`, achado C2):
+
+    * `offset == 0` → o município não tem escola privada com matrícula nesta
+      etapa: "mercado sem escolas privadas com matrícula";
+    * `offset > 0` → o `offset` passou do fim da lista (o mercado tem escolas;
+      só não nesta página): "não há mais escolas nesta página" + volta à 1ª.
+
+    O contrato não tem `total`, então `items: []` com `offset > 0` **nunca**
+    prova ausência de mercado — só prova que a página está além do fim.
     """
     itens = list(mercado.data.items)
     etapas = _linhas_por_etapa(itens)
     selecionada = share.data.etapa
     denominadores = share.data.mercado
+    vazia = not share.data.items
+    alem_do_fim = vazia and share.page.offset > 0
 
     return {
         "mercado": mercado.data,
@@ -130,8 +143,18 @@ def contexto_mercado(
         "etapas_disponiveis": {linha["etapa"]: linha["rotulo"] for linha in etapas},
         "item_etapa": _linha_da_etapa(etapas, selecionada),
         "linhas_share": _linhas_share(share),
-        "sem_privadas": not share.data.items,
+        # Página além do fim e mercado sem privadas são estados distintos: a
+        # mensagem de ausência só vale na 1ª página (offset == 0).
+        "sem_privadas": vazia and not alem_do_fim,
+        "alem_do_fim": alem_do_fim,
         "motivo_sem_privadas": MOTIVO_SEM_PRIVADAS,
+        "motivo_alem_do_fim": MOTIVO_ALEM_DO_FIM,
+        # Mesmo ano e etapa, sem `offset`: a URL canônica da 1ª página. Só é
+        # calculada quando faz falta (página além do fim) — o link não existe em
+        # nenhuma outra situação da tela.
+        "url_primeira_pagina": (
+            url_lista(caminho, filtros_pagina, offset=0) if alem_do_fim else None
+        ),
         "motivo_entrada_saida": MOTIVO_ENTRADA_SAIDA,
         "denominadores": {
             "n_escolas_privadas": denominadores.n_escolas_privadas,

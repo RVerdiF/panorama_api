@@ -55,18 +55,25 @@ def montar(
             else None
         ),
         url_anterior=(
-            _url(caminho, filtros, offset=max(0, page.offset - page.limit))
+            url(caminho, filtros, offset=max(0, page.offset - page.limit))
             if page.offset > 0
             else None
         ),
         url_proxima=(
-            _url(caminho, filtros, offset=proximo_offset) if proxima_permitida else None
+            url(caminho, filtros, offset=proximo_offset) if proxima_permitida else None
         ),
         refinar=page.has_more and not proxima_permitida,
     )
 
 
-def _url(caminho: str, filtros: Mapping[str, str], *, offset: int) -> str:
+def url(caminho: str, filtros: Mapping[str, str], *, offset: int = 0) -> str:
+    """URL de uma página da lista: caminho + filtros não vazios + `offset`.
+
+    Valor vazio não entra na query — a mesma lista sem o filtro é a URL sem
+    aquela chave — e `offset=0` (a primeira página) também não: a URL canônica
+    da tela é sem `offset`. É a fonte dos links de paginação **e** do "voltar à
+    1ª página" das telas que recebem `offset` além do fim (card `t_3ea9454f`).
+    """
     parametros = {chave: valor for chave, valor in filtros.items() if valor}
     if offset:
         parametros["offset"] = str(offset)
@@ -74,4 +81,4 @@ def _url(caminho: str, filtros: Mapping[str, str], *, offset: int) -> str:
     return f"{caminho}?{consulta}" if consulta else caminho
 
 
-__all__ = ["MAX_OFFSET", "Paginacao", "SEPARADOR_INTERVALO", "montar"]
+__all__ = ["MAX_OFFSET", "Paginacao", "SEPARADOR_INTERVALO", "montar", "url"]

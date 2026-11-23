@@ -171,6 +171,18 @@
     {% endif %}
     {% elif resposta %}
     <p class="sem-dado">Nenhuma escola encontrada para esta busca.</p>
+    {#- Estado vazio com próximo passo: o critério pode estar escondendo o
+        resultado, e a página não pode ser um beco sem saída (achado C4). -#}
+    <div class="cartao--vazio">
+      <h3>O que tentar</h3>
+      <ul class="lista-regras">
+        {% for sugestao in sugestoes_vazio %}
+        <li>
+          {% if sugestao.href %}<a href="{{ sugestao.href }}">{{ sugestao.lead }}</a>{% else %}<strong>{{ sugestao.lead }}</strong>{% endif %} — {{ sugestao.motivo }}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
     {% else %}
     <p class="sem-dado">
       Nenhuma escola listada ainda: informe o nome da escola ou escolha um município.

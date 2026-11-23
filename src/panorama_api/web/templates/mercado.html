@@ -222,7 +222,12 @@
       aparece como <em>sem dado</em>.
     </p>
 
-    {% if sem_privadas %}
+    {% if alem_do_fim %}
+    <p class="sem-dado">{{ motivo_alem_do_fim }}</p>
+    <p>
+      <a class="paginacao__link" href="{{ url_primeira_pagina }}">Voltar à primeira página</a>
+    </p>
+    {% elif sem_privadas %}
     <p class="sem-dado">{{ motivo_sem_privadas }}.</p>
     {% else %}
     <p class="paginacao__contagem">Mostrando {{ paginacao.mostrando }}.</p>

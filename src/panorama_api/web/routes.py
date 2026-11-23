@@ -28,6 +28,7 @@ from panorama_api.contract import (
     FONTE_ORGAO,
     UNIVERSO_ESCOLAS_MG,
 )
+from panorama_api.core import validation
 from panorama_api.core.errors import ErrorCode, ProblemError, ano_fora_do_contrato
 from panorama_api.web import PREFIXO_WEB, dados
 from panorama_api.web.assets import CACHE_CONTROL_ASSET, AssetRegistry
@@ -50,6 +51,7 @@ from panorama_api.web.filters import fmt_ano, fmt_gap_lider, fmt_nulo, fmt_ofert
 from panorama_api.web.mercado import contexto_mercado
 from panorama_api.web.municipios import municipios_mg
 from panorama_api.web.paginacao import montar as montar_paginacao
+from panorama_api.web.paginacao import url as url_lista
 
 DIRETORIO = Path(__file__).resolve().parent
 TEMPLATES_DIR = DIRETORIO / "templates"
@@ -93,6 +95,15 @@ _PAGINAS_ERRO: Mapping[ErrorCode, tuple[str, str | None]] = {
 RETRY_AFTER_SEGUNDOS = 300
 #: Erro nunca é cacheado — inclui o 503, que também não leva `ETag`.
 CACHE_CONTROL_ERRO = "no-store"
+
+#: 404 de endereço que não é recurso de dados (rota inexistente): dizer
+#: "recorte de Minas Gerais" seria falso — a página nem chegou a consultar dado
+#: (achado C5 do card `t_3ea9454f`). Título e volta mandam o usuário para a
+#: entrada do front.
+TITULO_PAGINA_INEXISTENTE = "Página não encontrada"
+SUGESTAO_PAGINA_INEXISTENTE = (
+    "Confira o endereço digitado: ele não corresponde a nenhuma página deste site."
+)
 
 
 @lru_cache
@@ -146,29 +157,55 @@ def pagina_erro(
     problem: ProblemError,
     *,
     retry_after: int | None = None,
+    titulo: str | None = None,
+    sugestao: str | None = None,
+    acao: Mapping[str, str] | None = None,
 ) -> Response:
     """Renderiza a página HTML de erro com o status e o cache corretos.
 
     Regras (plano §5): erro nunca é cacheado; ``503`` leva ``Retry-After``;
     nenhuma página de erro mostra stack trace ou SQL.
+
+    ``titulo``/``sugestao``/``acao`` sobrescrevem o texto da tabela por código:
+    só o 404 de **endereço** inexistente precisa de outra mensagem (ver
+    :func:`pagina_inexistente`). ``acao`` é ``{"href", "rotulo"}``.
     """
-    titulo, sugestao = _PAGINAS_ERRO.get(problem.code, ("Erro", None))
+    titulo_padrao, sugestao_padrao = _PAGINAS_ERRO.get(problem.code, ("Erro", None))
     contexto = {
         **contexto_base(request),
         "status": problem.status,
-        "titulo": titulo,
+        "titulo": titulo or titulo_padrao,
         "detalhe": problem.detail,
         "codigo": problem.code.value,
         "erros": problem.errors,
         "instancia": request.url.path,
         "retry_after": retry_after,
-        "sugestao": sugestao,
+        "sugestao": sugestao or sugestao_padrao,
+        "acao": acao,
     }
     cabecalhos = {"Cache-Control": CACHE_CONTROL_ERRO}
     if retry_after:
         cabecalhos["Retry-After"] = str(retry_after)
     return templates().TemplateResponse(
         request, "erro.html", contexto, status_code=problem.status, headers=cabecalhos
+    )
+
+
+def pagina_inexistente(request: Request, problem: ProblemError) -> Response:
+    """404 de endereço que não existe — sem prometer recorte de dado nenhum.
+
+    Rota inexistente não é busca de escola ou município: a página diz "Página
+    não encontrada" e oferece a entrada do front, em vez de "Não encontrado no
+    recorte de Minas Gerais" (achado C5 do card `t_3ea9454f`). Esse segundo
+    texto continua valendo para escola e município, que são recursos do recorte
+    MG e chegam aqui por `ProblemError` de `NAO_ENCONTRADO`.
+    """
+    return pagina_erro(
+        request,
+        problem,
+        titulo=TITULO_PAGINA_INEXISTENTE,
+        sugestao=SUGESTAO_PAGINA_INEXISTENTE,
+        acao={"href": f"{PREFIXO_WEB}/", "rotulo": "Ir para a busca de escolas"},
     )
 
 
@@ -179,6 +216,68 @@ def _settings(request: Request) -> Settings:
 #: Router do front. O prefixo `/app` está no próprio router para que `url_for`
 #: resolva os nomes `web_*` sem depender do registro em `main.create_app`.
 router = APIRouter(prefix=PREFIXO_WEB, include_in_schema=False)
+
+
+def _sugestoes_busca_vazia(
+    *,
+    termo: str,
+    municipio: str,
+    apenas_ativas: bool,
+    filtros_pagina: Mapping[str, str],
+) -> list[dict[str, str]]:
+    """Próximos passos do resultado vazio da busca (achado C4).
+
+    Cada item é ``{"lead", "href", "motivo"}``; ``href`` vazio significa dica
+    de texto (sem link). Todo link é a **mesma** busca com um filtro a menos —
+    nunca uma URL que devolveria outra página vazia ou um ``422``:
+
+    * "menos letras" é texto quando há `q`; sem `q` a dica é informar o nome,
+      porque reduzir letras de um termo inexistente não muda nada;
+    * sem município: só quando há `q`; removê-lo sem `q` cairia na busca sem
+      critério, que o próprio `/v1` recusa;
+    * sem o filtro de ativas: sempre que ele está ligado, porque `q` e/ou
+      `co_municipio` continuam na URL.
+    """
+    caminho = f"{PREFIXO_WEB}/"
+    sugestoes: list[dict[str, str]] = []
+    if termo:
+        sugestoes.append(
+            {
+                "lead": "Use menos letras",
+                "href": "",
+                "motivo": "um trecho do começo do nome costuma bastar.",
+            }
+        )
+    else:
+        sugestoes.append(
+            {
+                "lead": "Informe o nome da escola",
+                "href": "",
+                "motivo": (
+                    "trecho de 3 a 100 caracteres, combinado ou não com o município."
+                ),
+            }
+        )
+    if municipio and termo:
+        sugestoes.append(
+            {
+                "lead": "Buscar sem o filtro de município",
+                "href": url_lista(caminho, {**filtros_pagina, "co_municipio": ""}),
+                "motivo": "restrita a um município, a busca não vê escolas de outro.",
+            }
+        )
+    if apenas_ativas:
+        sugestoes.append(
+            {
+                "lead": "Incluir escolas inativas",
+                "href": url_lista(caminho, {**filtros_pagina, "apenas_ativas": ""}),
+                "motivo": (
+                    "o filtro de situação esconde escolas que já encerraram as "
+                    "atividades."
+                ),
+            }
+        )
+    return sugestoes
 
 
 @router.get(
@@ -205,9 +304,14 @@ def busca(
       qualquer acesso ao repositório — a validação é a mesma do `/v1`;
     * paginação é decidida só por ``page.has_more`` (o contrato não tem
       `total`) e o offset nunca passa do teto do contrato.
+
+    O `offset` é validado **antes** do atalho de busca vazia: com critério e sem
+    critério, o mesmo valor fora de ``0..1000`` responde ``422`` (achado C7 do
+    card `t_3ea9454f` — antes `?offset=2000` sozinho devolvia ``200``).
     """
     termo = (q or "").strip()
     municipio = (co_municipio or "").strip()
+    deslocamento = validation.offset(offset)
     # Filtros preservados nos links de paginação; vazio não entra na URL.
     filtros_pagina = {
         "q": termo,
@@ -237,6 +341,16 @@ def busca(
         # especial `ano_referencia`, que sairia como "sem dado" e passaria a
         # impressão de base faltando (achado A3).
         "houve_consulta": bool(termo or municipio),
+        # Sugestões do estado vazio (achado C4): cada uma é um próximo passo
+        # concreto. O link "sem o município" só existe quando sobra outro
+        # critério (`q`) — removê-lo sem `q` cairia na busca vazia, que é outro
+        # beco sem saída.
+        "sugestoes_vazio": _sugestoes_busca_vazia(
+            termo=termo,
+            municipio=municipio,
+            apenas_ativas=apenas_ativas,
+            filtros_pagina=filtros_pagina,
+        ),
     }
 
     if not termo and not municipio:
@@ -250,7 +364,7 @@ def busca(
         co_municipio=municipio or None,
         apenas_ativas=apenas_ativas,
         limit=dados.LIMITE_BUSCA_PADRAO,
-        offset=offset,
+        offset=deslocamento,
     )
     meta = resposta.meta
     contexto.update(
@@ -435,6 +549,7 @@ def mercado(
             caminho=f"{PREFIXO_WEB}/mercados/{co_municipio}",
             filtros_pagina=filtros_pagina,
             montar_paginacao=montar_paginacao,
+            url_lista=url_lista,
         )
     )
     return templates().TemplateResponse(request, "mercado.html", contexto)
@@ -462,11 +577,15 @@ def _ano_do_seletor(ano: int | None, anos: tuple[int, ...]) -> int:
     name="web_static",
     summary="Assets do front (nome com hash de conteúdo)",
 )
-def asset(caminho: str) -> Response:
-    """Serve um asset imutável; caminho fora do registro é 404."""
+def asset(caminho: str, request: Request) -> Response:
+    """Serve um asset imutável; caminho fora do registro é 404 de endereço."""
     encontrado = assets().get(caminho)
     if encontrado is None:
-        raise ProblemError(ErrorCode.NAO_ENCONTRADO, "asset não encontrado")
+        # Nome de asset inválido é endereço quebrado (link antigo, hash errado),
+        # não recurso do recorte MG: mesma página do 404 de rota.
+        return pagina_inexistente(
+            request, ProblemError(ErrorCode.NAO_ENCONTRADO, "asset não encontrado")
+        )
     return Response(
         content=encontrado.corpo,
         media_type=encontrado.media_type,
@@ -478,10 +597,13 @@ __all__ = [
     "CACHE_CONTROL_ERRO",
     "META_BUSCA",
     "RETRY_AFTER_SEGUNDOS",
+    "SUGESTAO_PAGINA_INEXISTENTE",
     "TEMPLATES_DIR",
+    "TITULO_PAGINA_INEXISTENTE",
     "assets",
     "contexto_base",
     "pagina_erro",
+    "pagina_inexistente",
     "router",
     "templates",
 ]
