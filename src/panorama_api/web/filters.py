@@ -59,13 +59,36 @@ def fmt_ano(valor: Any, motivo: str | None = None) -> str:
     """
     if valor is None or valor == "":
         return _sem_dado(motivo)
-    if isinstance(valor, bool) or not isinstance(valor, (int, str)):
-        return str(valor)
-    return str(valor).strip() or _sem_dado(motivo)
+    if isinstance(valor, bool):  # bool é subclasse de int: não é ano
+        return fmt_nulo(valor)
+    if isinstance(valor, (int, str)):
+        return str(valor).strip() or _sem_dado(motivo)
+    return str(valor)
+
+
+def fmt_gap_lider(valor: Any) -> str:
+    """Saldo de matrícula para o líder do município (plano §1).
+
+    ``gap_mat_bas_para_lider = 0`` é **medição válida**: a própria escola é a
+    líder, não ausência de dado. Por isso o texto é "a escola lidera" em vez de
+    "0" — que na tabela seria lido como "sem matrícula".
+    """
+    if valor is None:
+        return SEM_DADO
+    if valor == 0:
+        return "a escola lidera"
+    return fmt_nulo(valor)
 
 
 def _sem_dado(motivo: str | None) -> str:
     return f"{SEM_DADO} ({motivo})" if motivo else SEM_DADO
 
 
-__all__ = ["OFERTA_DESCONHECIDA", "SEM_DADO", "fmt_ano", "fmt_nulo", "fmt_oferta"]
+__all__ = [
+    "OFERTA_DESCONHECIDA",
+    "SEM_DADO",
+    "fmt_ano",
+    "fmt_gap_lider",
+    "fmt_nulo",
+    "fmt_oferta",
+]

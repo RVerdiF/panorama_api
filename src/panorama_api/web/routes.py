@@ -1,9 +1,10 @@
 """Router do front SSR sob `/app` e montagem do ambiente de templates.
 
 Esta é a fundação (card F1): layout base, assets versionados por hash,
-`/app/metodologia` e as páginas de erro HTML. As telas de busca, escola e
-mercado entram nos cards F3–F5 e reutilizam este mesmo ambiente — por isso os
-filtros, o registro de assets e as definições ficam num único módulo.
+`/app/metodologia` e as páginas de erro HTML. A tela da escola vive aqui
+desde o card F4; busca (F3) e mercado (F5) reutilizam o mesmo ambiente —
+por isso os filtros, o registro de assets e as definições ficam num único
+módulo.
 
 `/v1/*` não é tocado aqui: nenhum handler deste módulo serve JSON de dados.
 """
@@ -25,9 +26,7 @@ from panorama_api.contract import (
     CONTRACT,
     FONTE_BASE,
     FONTE_ORGAO,
-    UNIVERSO_ESCOLAS_ATIVAS_MG,
     UNIVERSO_ESCOLAS_MG,
-    UNIVERSO_PRIVADAS_ATIVAS_MG,
 )
 from panorama_api.core.errors import ErrorCode, ProblemError
 from panorama_api.web import PREFIXO_WEB, dados
@@ -36,23 +35,22 @@ from panorama_api.web.conteudo import (
     DEFINICAO_CONCORRENCIA,
     DEFINICOES,
     ROTULO_RETENCAO,
+    UNIVERSOS,
     rotulo_etapa,
     traduzir_avisos,
 )
-from panorama_api.web.filters import fmt_ano, fmt_nulo, fmt_oferta
+from panorama_api.web.escola import (
+    contexto_escola,
+    item_mais_recente,
+    pertence_ao_universo_privado,
+)
+from panorama_api.web.filters import fmt_ano, fmt_gap_lider, fmt_nulo, fmt_oferta
 from panorama_api.web.municipios import municipios_mg
 from panorama_api.web.paginacao import montar as montar_paginacao
 
 DIRETORIO = Path(__file__).resolve().parent
 TEMPLATES_DIR = DIRETORIO / "templates"
 STATIC_DIR = DIRETORIO / "static"
-
-#: Universo de cada tela, traduzido para leitura humana (contrato 2b R1).
-UNIVERSOS: Mapping[str, str] = {
-    UNIVERSO_ESCOLAS_MG: "Todas as escolas do recorte (inclui inativas).",
-    UNIVERSO_PRIVADAS_ATIVAS_MG: "Escolas privadas ativas no ano de referência.",
-    UNIVERSO_ESCOLAS_ATIVAS_MG: "Escolas ativas no ano de referência.",
-}
 
 #: Recorte fixo da tela de busca — o mesmo de `GET /v1/schools` (`dim_escola`,
 #: MG, etapa BAS). Usado quando ainda não houve consulta: a tela declara de onde
@@ -111,6 +109,7 @@ def _templates() -> Jinja2Templates:
     ambiente.env.filters["fmt_nulo"] = fmt_nulo
     ambiente.env.filters["fmt_oferta"] = fmt_oferta
     ambiente.env.filters["fmt_ano"] = fmt_ano
+    ambiente.env.filters["fmt_gap_lider"] = fmt_gap_lider
     return ambiente
 
 
@@ -271,6 +270,68 @@ def metodologia(request: Request) -> Response:
         "universos": UNIVERSOS,
     }
     return templates().TemplateResponse(request, "metodologia.html", contexto)
+
+
+@router.get(
+    "/escolas/{co_entidade}",
+    response_class=HTMLResponse,
+    name="web_escola",
+    summary="Visão da escola: série, oferta, rendimento e posição municipal",
+)
+def escola(co_entidade: str, request: Request) -> Response:
+    """Tela da escola (card F4).
+
+    A série de `history` é obrigatória. Indicadores e comparação municipal só
+    são consultados quando o item mais recente da série diz **privada ativa**:
+    pública, inativa ou com dependência não informada não gasta cota nem
+    fabrica seção. Um 404 residual de universo nessas duas consultas vira
+    seção "não se aplica" na própria página (200); qualquer outro erro (503,
+    422, 500) sobe para o handler global, e a página inteira vira a página de
+    erro — nunca uma renderização parcial.
+    """
+    historico = dados.historico_escola(request, co_entidade=co_entidade)
+
+    indicadores = concorrentes = None
+    nao_se_aplica: list[str] = []
+    if pertence_ao_universo_privado(item_mais_recente(historico.data.items)):
+        indicadores, ausente = _secao_opcional(
+            lambda: dados.indicadores_escola(request, co_entidade=co_entidade)
+        )
+        if ausente:
+            nao_se_aplica.append("indicadores")
+        concorrentes, ausente = _secao_opcional(
+            lambda: dados.concorrentes_escola(request, co_entidade=co_entidade)
+        )
+        if ausente:
+            nao_se_aplica.append("competidores")
+
+    contexto = {
+        **contexto_base(request),
+        **contexto_escola(
+            historico=historico,
+            indicadores=indicadores,
+            concorrentes=concorrentes,
+            nao_se_aplica=nao_se_aplica,
+        ),
+    }
+    return templates().TemplateResponse(request, "escola.html", contexto)
+
+
+def _secao_opcional(consulta: Any) -> tuple[Any | None, bool]:
+    """Executa uma consulta que pode não se aplicar à escola.
+
+    Só ``404 NAO_ENCONTRADO`` é absorvido (estado legítimo de universo: a seção
+    "não se aplica"). ``503`` e demais códigos sobem — página inteira de erro.
+    O ``detail`` do 404 não vai para a tela: é diagnóstico da API, e a
+    explicação exibida é texto fixo de `web/conteudo.py`. A tupla devolvida é
+    ``(resposta, nao_se_aplica)``.
+    """
+    try:
+        return consulta(), False
+    except ProblemError as erro:
+        if erro.code is not ErrorCode.NAO_ENCONTRADO:
+            raise
+        return None, True
 
 
 @router.get(
