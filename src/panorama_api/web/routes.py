@@ -23,20 +23,25 @@ from panorama_api import __version__
 from panorama_api.config import Settings
 from panorama_api.contract import (
     CONTRACT,
+    FONTE_BASE,
+    FONTE_ORGAO,
     UNIVERSO_ESCOLAS_ATIVAS_MG,
     UNIVERSO_ESCOLAS_MG,
     UNIVERSO_PRIVADAS_ATIVAS_MG,
 )
 from panorama_api.core.errors import ErrorCode, ProblemError
-from panorama_api.web import PREFIXO_WEB
+from panorama_api.web import PREFIXO_WEB, dados
 from panorama_api.web.assets import CACHE_CONTROL_ASSET, AssetRegistry
 from panorama_api.web.conteudo import (
     DEFINICAO_CONCORRENCIA,
     DEFINICOES,
     ROTULO_RETENCAO,
+    rotulo_etapa,
     traduzir_avisos,
 )
-from panorama_api.web.filters import fmt_nulo, fmt_oferta
+from panorama_api.web.filters import fmt_ano, fmt_nulo, fmt_oferta
+from panorama_api.web.municipios import municipios_mg
+from panorama_api.web.paginacao import montar as montar_paginacao
 
 DIRETORIO = Path(__file__).resolve().parent
 TEMPLATES_DIR = DIRETORIO / "templates"
@@ -47,6 +52,16 @@ UNIVERSOS: Mapping[str, str] = {
     UNIVERSO_ESCOLAS_MG: "Todas as escolas do recorte (inclui inativas).",
     UNIVERSO_PRIVADAS_ATIVAS_MG: "Escolas privadas ativas no ano de referência.",
     UNIVERSO_ESCOLAS_ATIVAS_MG: "Escolas ativas no ano de referência.",
+}
+
+#: Recorte fixo da tela de busca — o mesmo de `GET /v1/schools` (`dim_escola`,
+#: MG, etapa BAS). Usado quando ainda não houve consulta: a tela declara de onde
+#: virão ano, etapa, universo, fonte e avisos em vez de omitir o recorte.
+META_BUSCA: Mapping[str, Any] = {
+    "ano_referencia": None,
+    "etapa": "bas",
+    "universo": UNIVERSO_ESCOLAS_MG,
+    "fonte": {"orgao": FONTE_ORGAO, "base": FONTE_BASE, "tabela": "dim_escola"},
 }
 
 #: Metadados de página para cada `ErrorCode`: (título da página, ação sugerida).
@@ -95,6 +110,7 @@ def _templates() -> Jinja2Templates:
     ambiente = Jinja2Templates(directory=str(TEMPLATES_DIR))
     ambiente.env.filters["fmt_nulo"] = fmt_nulo
     ambiente.env.filters["fmt_oferta"] = fmt_oferta
+    ambiente.env.filters["fmt_ano"] = fmt_ano
     return ambiente
 
 
@@ -111,6 +127,8 @@ def contexto_base(request: Request) -> dict[str, Any]:
         # Links do front em caminho relativo: `url_for` devolve URL absoluta
         # (com host), o que não é desejável dentro do HTML servido.
         "href_metodologia": f"{PREFIXO_WEB}/metodologia",
+        # Busca é a página inicial do front (caminho relativo, sem `url_for`).
+        "href_busca": f"{PREFIXO_WEB}/",
     }
 
 
@@ -155,6 +173,85 @@ router = APIRouter(prefix=PREFIXO_WEB, include_in_schema=False)
 
 
 @router.get(
+    "/",
+    response_class=HTMLResponse,
+    name="web_busca",
+    summary="Busca de escolas por nome ou município",
+)
+def busca(
+    request: Request,
+    q: str | None = None,
+    co_municipio: str | None = None,
+    apenas_ativas: bool = False,
+    offset: int | None = None,
+) -> Response:
+    """Busca de escolas (= ``GET /v1/schools``) por nome, município ou ambos.
+
+    Regras do card F3:
+
+    * sem critério não há consulta: a página responde ``200`` com a mensagem de
+      "nenhuma escola" e o repositório **não** é chamado;
+    * parâmetro inválido (`q` com menos de 3 caracteres, município fora de
+      ``^31\\d{5}$``, `offset` fora de ``0..1000``) vira ``422`` **antes** de
+      qualquer acesso ao repositório — a validação é a mesma do `/v1`;
+    * paginação é decidida só por ``page.has_more`` (o contrato não tem
+      `total`) e o offset nunca passa do teto do contrato.
+    """
+    termo = (q or "").strip()
+    municipio = (co_municipio or "").strip()
+    # Filtros preservados nos links de paginação; vazio não entra na URL.
+    filtros_pagina = {
+        "q": termo,
+        "co_municipio": municipio,
+        "apenas_ativas": "true" if apenas_ativas else "",
+    }
+
+    contexto: dict[str, Any] = {
+        **contexto_base(request),
+        "filtros": {
+            "q": termo,
+            "co_municipio": municipio,
+            "apenas_ativas": apenas_ativas,
+        },
+        "municipios": municipios_mg(),
+        "resposta": None,
+        "escolas": [],
+        "paginacao": None,
+        "meta": META_BUSCA,
+        "etapa_rotulo": rotulo_etapa(META_BUSCA["etapa"]),
+        "universo_descricao": UNIVERSOS[UNIVERSO_ESCOLAS_MG],
+        "avisos": None,
+    }
+
+    if not termo and not municipio:
+        # Busca vazia: nada de scan da mart (o `/v1` responderia 400). A tela
+        # apenas anuncia que ainda não há escola listada.
+        return templates().TemplateResponse(request, "busca.html", contexto)
+
+    resposta = dados.buscar_escolas(
+        request,
+        q=termo or None,
+        co_municipio=municipio or None,
+        apenas_ativas=apenas_ativas,
+        limit=dados.LIMITE_BUSCA_PADRAO,
+        offset=offset,
+    )
+    meta = resposta.meta
+    contexto.update(
+        resposta=resposta,
+        escolas=resposta.data,
+        meta=meta,
+        etapa_rotulo=rotulo_etapa(meta.etapa),
+        universo_descricao=UNIVERSOS.get(meta.universo, ""),
+        avisos=traduzir_avisos(meta.avisos),
+        paginacao=montar_paginacao(
+            resposta.page, caminho=f"{PREFIXO_WEB}/", filtros=filtros_pagina
+        ),
+    )
+    return templates().TemplateResponse(request, "busca.html", contexto)
+
+
+@router.get(
     "/metodologia",
     response_class=HTMLResponse,
     name="web_metodologia",
@@ -195,6 +292,7 @@ def asset(caminho: str) -> Response:
 
 __all__ = [
     "CACHE_CONTROL_ERRO",
+    "META_BUSCA",
     "RETRY_AFTER_SEGUNDOS",
     "TEMPLATES_DIR",
     "assets",

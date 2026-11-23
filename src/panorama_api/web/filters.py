@@ -50,8 +50,22 @@ def fmt_oferta(valor: Any) -> str:
     return "Sim" if valor else "Não"
 
 
+def fmt_ano(valor: Any, motivo: str | None = None) -> str:
+    """Ano de referência: `2025`, não `2.025`.
+
+    Ano é identificador, não quantidade — separador de milhar aqui inventaria
+    um número que não existe. Ausência continua "sem dado", com o motivo quando
+    a base informa a flag.
+    """
+    if valor is None or valor == "":
+        return _sem_dado(motivo)
+    if isinstance(valor, bool) or not isinstance(valor, (int, str)):
+        return str(valor)
+    return str(valor).strip() or _sem_dado(motivo)
+
+
 def _sem_dado(motivo: str | None) -> str:
     return f"{SEM_DADO} ({motivo})" if motivo else SEM_DADO
 
 
-__all__ = ["OFERTA_DESCONHECIDA", "SEM_DADO", "fmt_nulo", "fmt_oferta"]
+__all__ = ["OFERTA_DESCONHECIDA", "SEM_DADO", "fmt_ano", "fmt_nulo", "fmt_oferta"]
