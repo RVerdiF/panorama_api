@@ -16,6 +16,7 @@ teste manda (e a divergência é bug).
 | Router | `web/routes.py` | rotas `/app/*`, ambiente Jinja2, páginas de erro |
 | Fachada de dados | `web/dados.py` | **único** caminho do front para dados |
 | Regras de exibição | `web/filters.py`, `web/conteudo.py` | formatação de valor e vocabulário |
+| Regras de tela | `web/escola.py` | universo/classificação, série e contexto de cada tela |
 | Templates | `web/templates/` | layout, macros, telas |
 | Assets | `web/static/` | CSS versionado por hash de conteúdo |
 | Dados estáticos | `web/data/` | apoio de tela (ex.: municípios), sem BigQuery |
