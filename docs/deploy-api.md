@@ -148,6 +148,12 @@ Parâmetros em `infra/cloud-run/service.yaml` (fonte única, guardado por
 `allUsers`/`roles/run.invoker` para `allUsers` e o deploy não usa
 `--allow-unauthenticated`. Abrir ao público é decisão do dono, não default.
 
+O front sob `/app` usa **IAP habilitado direto no Cloud Run** (decisão D2 do
+plano): a anotação `run.googleapis.com/iap-enabled: "true"` está declarada em
+`infra/cloud-run/service.yaml` e `deploy.sh` aborta se ela sumir. Setup do OAuth
+client "External", allowlist de pilotos e remoção de `allUsers`:
+[`iap-cloud-run.md`](iap-cloud-run.md).
+
 ```bash
 IMAGE=us-central1-docker.pkg.dev/panorama-escola-staging/panorama-api/api:<sha> \
 DATA_VERSION=<run de publicação> \

@@ -6,12 +6,21 @@
 #   * CPU só durante a requisição (cpu-throttling), 1 vCPU / 512 MiB.
 # Região: `us-central1`, fixada em `deploy.sh` — o manifesto não carrega região.
 # É a mesma região do dataset `panorama_serving` e do Artifact Registry.
+
+# Guarda do gate de IAP (card `t_3c7efbc0`): o manifesto passa a DECLARAR IAP no
+# nível do serviço. É a mesma anotação que `gcloud run deploy --iap` grava
+# (`IAP_ANNOTATION` em `googlecloudsdk/api_lib/run/service.py`), e precisa ficar
+# em `metadata.annotations` do Service — no template ela é ignorada.
+#
+# Declarar não aplica: `deploy.sh` valida e o replace aplica. Aplicar OAuth
+# client, allowlist e remoção de `allUsers` é o card F8 (`docs/iap-cloud-run.md`).
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
   name: panorama-api
   annotations:
     run.googleapis.com/ingress: all
+    run.googleapis.com/iap-enabled: "true"
     # Autenticação exigida (sem `allUsers`/`--allow-unauthenticated`): a policy
     # de IAM do serviço é o gate e não é tocada pelo manifesto.
 spec:
