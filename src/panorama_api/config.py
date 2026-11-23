@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     #: HTML muda a cada deploy mesmo sem dado novo (plano §5, card F2). Tem o
     #: mesmo vocabulário de `DATA_VERSION` e também falha fechada no boot.
     app_build: str = Field(default="dev", alias="APP_BUILD")
+    #: Salt do `user_hash` da linha `page_view` (card F6). O e-mail do piloto
+    #: nunca é logado: só `sha256(salt + email)[:16]`. Sem salt o hash seria
+    #: reversível por dicionário (e-mails corporativos são poucos), então a
+    #: ausência degrada `user_hash` para `anon` em vez de hashear sem salt. O
+    #: valor é livre (não entra em ETag/URL), por isso não tem validador de
+    #: vocabulário — só não pode ir para o log.
+    obs_user_hash_salt: str = Field(default="", alias="API_OBS_USER_HASH_SALT")
 
     @field_validator("bq_project", "bq_dataset")
     @classmethod

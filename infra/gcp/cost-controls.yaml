@@ -58,3 +58,32 @@ alerts:
     condition: instâncias ativas iguais a max_instances por 10 min sem parar
     threshold: 3 instâncias
     window: 10 min
+  # Front `/app` + `/v1` (card F6, plano §7): o modo de falha mais provável é
+  # cota/teto de bytes do BigQuery estourado — que a API já converte em 503
+  # (`FONTE_INDISPONIVEL`, com `Retry-After`). Cinco 503 em 15 min não é ruído
+  # de uma instância fria: é sinal de que a fonte está recusando consultas.
+  - name: http_503_acima_de_5_em_15min
+    condition: pelo menos 5 respostas 503 em /app ou /v1 na janela
+    threshold: ">= 5 ocorrências"
+    window: 15 min
+    source: log
+    metric: http_503_por_rota
+
+# Métricas derivadas dos logs estruturados (uma linha JSON por registro no
+# stdout, lidas pelo Cloud Logging como `jsonPayload`). Não há RUM/telemetria
+# JS e não há uptime check no MVP (plano §7.3): o IAP bloqueia sonda anônima e
+# uma sonda que chame página com BigQuery gastaria cota sem usuário real.
+log_metrics:
+  - name: page_view_por_rota
+    description: uso do front agregado por template de rota e piloto
+    filter: jsonPayload.message="page_view"
+    fields: [route, status, cache, ms, data_version, app_build, user_hash]
+    group_by: [route, data_version, app_build]
+  - name: http_503_por_rota
+    description: respostas 503 (cota/teto de bytes estourado) por superfície
+    filter: jsonPayload.message="http_cache" AND jsonPayload.status=503
+    fields: [status, path, cache, data_version]
+    group_by: [path]
+    # A base do alerta `http_503_acima_de_5_em_15min`. O campo `path` separa
+    # `/app/*` de `/v1/*`; ambos contam para o mesmo limite.
+    alerts: [http_503_acima_de_5_em_15min]
