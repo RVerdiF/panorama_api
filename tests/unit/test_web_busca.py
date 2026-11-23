@@ -21,6 +21,8 @@ from types import ModuleType
 
 import pytest
 
+from panorama_api.core.http_cache import HttpCacheMiddleware
+from panorama_api.web import PREFIXO_WEB
 from panorama_api.web import municipios as modulo_municipios
 from tests.unit.conftest import school_row
 
@@ -50,6 +52,34 @@ def _payload_ibge(total: int) -> list[dict]:
     return [
         {"id": 3100000 + i, "nome": f"Município Teste {i:03d}"} for i in range(total)
     ]
+
+
+def _limpar_cache_de_paginas(client) -> None:
+    """Esvazia o LRU das páginas `/app` do app em teste.
+
+    A chave do LRU é ``DATA_VERSION + APP_BUILD + caminho + query`` — contrato
+    do card do cache de páginas (`t_68bd7615`), que **não** inclui a fonte de
+    dados. Cada caso aqui troca o repositório fake: sem limpar, a página do
+    caso anterior seria servida como *hit* e a asserção falharia por dado
+    obsoleto. O `/app` real é cacheado por desenho; o isolamento é do teste.
+    """
+    pilha = client.app.middleware_stack
+    while pilha is not None:
+        if (
+            isinstance(pilha, HttpCacheMiddleware)
+            and pilha.prefix == PREFIXO_WEB
+            and pilha.app_build
+        ):
+            pilha.cache.clear()
+            return
+        pilha = getattr(pilha, "app", None)
+    raise AssertionError("cache de páginas /app não encontrado no stack")
+
+
+def _get(client, **kwargs):
+    """``GET /app/`` com o cache de páginas limpo antes da requisição."""
+    _limpar_cache_de_paginas(client)
+    return client.request("GET", BUSCA, **kwargs)
 
 
 def _carregar_script_gerador() -> ModuleType:
@@ -135,7 +165,7 @@ def test_package_data_inclui_o_json_de_municipios():
 def test_busca_vazia_responde_200_nenhuma_escola_sem_consultar_repositorio(
     client, repository, params
 ):
-    resposta = client.get(BUSCA, params=params)
+    resposta = _get(client, params=params)
 
     assert resposta.status_code == 200
     assert resposta.headers["content-type"].startswith("text/html")
@@ -157,7 +187,7 @@ def test_busca_vazia_responde_200_nenhuma_escola_sem_consultar_repositorio(
 def test_parametro_invalido_responde_422_sem_consultar_repositorio(
     client, repository, params
 ):
-    resposta = client.get(BUSCA, params=params)
+    resposta = _get(client, params=params)
 
     assert resposta.status_code == 422
     assert resposta.headers["content-type"].startswith("text/html")
@@ -168,7 +198,7 @@ def test_parametro_invalido_responde_422_sem_consultar_repositorio(
 def test_busca_sem_resultado_responde_200_nenhuma_escola(client, repository):
     repository.schools = []
 
-    resposta = client.get(BUSCA, params={"q": "escola inexistente"})
+    resposta = _get(client, params={"q": "escola inexistente"})
 
     assert resposta.status_code == 200
     assert "nenhuma escola" in resposta.text.lower()
@@ -182,7 +212,7 @@ def test_busca_por_municipio_renderiza_a_escola_e_o_recorte_obrigatorio(
 ):
     repository.schools = [school_row()]
 
-    resposta = client.get(BUSCA, params={"co_municipio": "3106200"})
+    resposta = _get(client, params={"co_municipio": "3106200"})
     html = resposta.text
 
     assert resposta.status_code == 200
@@ -203,8 +233,8 @@ def test_busca_por_municipio_renderiza_a_escola_e_o_recorte_obrigatorio(
 def test_busca_envia_limit_20_e_os_filtros_ao_repositorio(client, repository):
     repository.schools = [school_row()]
 
-    client.get(
-        BUSCA,
+    _get(
+        client,
         params={"co_municipio": "3106200", "apenas_ativas": "true"},
     )
 
@@ -220,7 +250,7 @@ def test_busca_envia_limit_20_e_os_filtros_ao_repositorio(client, repository):
 def test_busca_por_nome_chega_ao_repositorio_como_q(client, repository):
     repository.schools = [school_row()]
 
-    client.get(BUSCA, params={"q": "modelo"})
+    _get(client, params={"q": "modelo"})
 
     ((_nome, kwargs),) = _consultas_de_escola(repository)
     assert kwargs["q"] == "modelo"
@@ -228,7 +258,7 @@ def test_busca_por_nome_chega_ao_repositorio_como_q(client, repository):
 
 
 def test_select_de_municipio_usa_a_lista_versionada_de_853(client, repository):
-    html = client.get(BUSCA).text
+    html = _get(client).text
 
     assert html.count('<option value="31') == 853
     assert '<option value="3106200"' in html
@@ -248,7 +278,7 @@ def test_valor_ausente_sai_como_sem_dado_e_oferta_desconhecida(
         )
     ]
 
-    html = client.get(BUSCA, params={"co_municipio": "3106200"}).text
+    html = _get(client, params={"co_municipio": "3106200"}).text
 
     assert "sem dado" in html
     # `oferta.bas = null` é "Desconhecido", nunca "Não" nem 0.
@@ -259,7 +289,7 @@ def test_valor_ausente_sai_como_sem_dado_e_oferta_desconhecida(
 def test_busca_nao_usa_termos_geograficos_proibidos(client, repository):
     repository.schools = _escolas(3)
 
-    html = client.get(BUSCA, params={"q": "modelo"}).text.lower()
+    html = _get(client, params={"q": "modelo"}).text.lower()
 
     for termo in TERMOS_PROIBIDOS:
         assert termo not in html, f"termo proibido na tela de busca: {termo!r}"
@@ -270,12 +300,12 @@ def test_busca_nao_usa_termos_geograficos_proibidos(client, repository):
 
 def test_proxima_so_aparece_quando_ha_mais_resultados(client, repository):
     repository.schools = _escolas(20)
-    html = client.get(BUSCA, params={"q": "modelo"}).text
+    html = _get(client, params={"q": "modelo"}).text
     assert "Próxima" not in html
     assert "Mostrando 1–20" in html
 
     repository.schools = _escolas(21)
-    html = client.get(BUSCA, params={"q": "modelo"}).text
+    html = _get(client, params={"q": "modelo"}).text
     assert "Próxima" in html
     assert "offset=20" in html
 
@@ -283,10 +313,10 @@ def test_proxima_so_aparece_quando_ha_mais_resultados(client, repository):
 def test_anterior_so_aparece_com_offset_positivo(client, repository):
     repository.schools = _escolas(45)
 
-    primeira = client.get(BUSCA, params={"q": "modelo"}).text
+    primeira = _get(client, params={"q": "modelo"}).text
     assert "Anterior" not in primeira
 
-    terceira = client.get(BUSCA, params={"q": "modelo", "offset": 40}).text
+    terceira = _get(client, params={"q": "modelo", "offset": 40}).text
     assert "Anterior" in terceira
     assert "offset=20" in terceira
     assert "Próxima" not in terceira
@@ -295,8 +325,8 @@ def test_anterior_so_aparece_com_offset_positivo(client, repository):
 def test_links_de_paginacao_preservam_os_filtros(client, repository):
     repository.schools = _escolas(45)
 
-    html = client.get(
-        BUSCA, params={"co_municipio": "3106200", "apenas_ativas": "true"}
+    html = _get(
+        client, params={"co_municipio": "3106200", "apenas_ativas": "true"}
     ).text
 
     assert "co_municipio=3106200" in html
@@ -307,7 +337,7 @@ def test_links_de_paginacao_preservam_os_filtros(client, repository):
 def test_offset_no_teto_esconde_proxima_e_pede_para_refinar(client, repository):
     repository.schools = _escolas(1025)
 
-    html = client.get(BUSCA, params={"q": "modelo", "offset": 1000}).text
+    html = _get(client, params={"q": "modelo", "offset": 1000}).text
 
     assert "Próxima" not in html
     assert "refine a busca" in html.lower()
@@ -317,7 +347,7 @@ def test_offset_no_teto_esconde_proxima_e_pede_para_refinar(client, repository):
 def test_ultimo_offset_permitido_ainda_tem_proxima(client, repository):
     repository.schools = _escolas(1025)
 
-    html = client.get(BUSCA, params={"q": "modelo", "offset": 980}).text
+    html = _get(client, params={"q": "modelo", "offset": 980}).text
 
     assert "Próxima" in html
     assert "offset=1000" in html
@@ -336,7 +366,7 @@ def test_ultimo_offset_permitido_ainda_tem_proxima(client, repository):
 def test_html_nunca_mostra_o_total_de_resultados(client, repository, params):
     repository.schools = _escolas(1025)
 
-    html = client.get(BUSCA, params=params).text
+    html = _get(client, params=params).text
 
     assert not TEXTO_DE_TOTAL.search(html)
     assert "total de resultados" not in html.lower()
