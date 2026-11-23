@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block titulo %}Metodologia — Panorama Escola{% endblock %}
+
+{% block conteudo %}
+<article class="cartao">
+  <h1>Metodologia</h1>
+  <p class="subtitulo">
+    De onde vem cada número do Panorama Escola, de que ano, e com que limitações.
+    Todas as telas mostram o mesmo recorte: <strong>Minas Gerais</strong>, Censo Escolar (INEP).
+  </p>
+
+  <section aria-labelledby="versao">
+    <h2 id="versao">Versão dos dados</h2>
+    <dl class="lista-definicoes">
+      <dt>Dados publicados (DATA_VERSION)</dt>
+      <dd><code>{{ data_version }}</code></dd>
+      <dt>Contrato de serving</dt>
+      <dd><code>{{ contract }} / {{ contract_version }}</code></dd>
+      <dt>Ano de referência</dt>
+      <dd>Informado em cada tela (varia por consulta)</dd>
+    </dl>
+  </section>
+
+  <section aria-labelledby="regras">
+    <h2 id="regras">Regras de leitura dos números</h2>
+    <ul class="lista-regras">
+      <li>
+        <strong>Ausência de dado não é zero.</strong> Quando a base não informa um valor,
+        a tela mostra <em>sem dado</em> — e o motivo, quando a base registra a flag
+        <code>is_*_missing</code>. Nenhuma tela preenche lacuna com <code>0</code>
+        nem deixa célula vazia ambígua.
+      </li>
+      <li>
+        <strong>Oferta por etapa é tri-estado.</strong> <em>Sim</em> significa matrícula
+        maior que zero; <em>Não</em> significa zero declarado; <em>Desconhecido</em>
+        significa que a base não informou a oferta daquela etapa.
+        <code>is_oferta_desconhecida</code> não significa "não oferta".
+      </li>
+      <li>
+        <strong>{{ rotulo_retencao }}.</strong>
+        {{ definicao_retencao }}
+      </li>
+      <li>
+        <strong>Comparação de concorrência é municipal.</strong>
+        {{ definicao_concorrencia }}. Não há comparação por distância.
+      </li>
+      <li>
+        <strong>Educação básica é total oficial.</strong> A etapa
+        <em>Educação básica</em> (<code>bas</code>) é o total publicado pelo Censo;
+        nunca é obtida somando as subetapas.
+      </li>
+    </ul>
+  </section>
+
+  <section aria-labelledby="definicoes">
+    <h2 id="definicoes">Definições semânticas</h2>
+    {% if definicoes %}
+    <dl class="lista-definicoes">
+      {% for chave, texto in definicoes.items() %}
+      <dt><code>{{ chave }}</code></dt>
+      <dd>{{ texto }}</dd>
+      {% endfor %}
+    </dl>
+    {% else %}
+    <p class="sem-dado">sem dado</p>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="avisos">
+    <h2 id="avisos">Avisos que podem aparecer nas telas</h2>
+    {% if avisos_conhecidos %}
+    <ul class="lista-regras">
+      {% for codigo, texto in avisos_conhecidos.items() %}
+      <li><code>{{ codigo }}</code> — {{ texto }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="sem-dado">sem dado</p>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="universo">
+    <h2 id="universo">Universos e fontes</h2>
+    <dl class="lista-definicoes">
+      {% for universo, descricao in universos.items() %}
+      <dt><code>{{ universo }}</code></dt>
+      <dd>{{ descricao }}</dd>
+      {% endfor %}
+    </dl>
+  </section>
+</article>
+{% endblock %}
