@@ -169,6 +169,14 @@ A descrição canônica fica em `infra/gcp/cost-controls.yaml`:
 | latência p95 | p95 das requisições > 2 s | 5 min |
 | erros 5xx | > 1% das respostas | 5 min |
 | instâncias no teto | instâncias ativas = `max-instances` sem parar | 10 min |
+| `503` em `/app` ou `/v1` | ≥ 5 respostas 503 no front ou na API | 15 min |
+
+O alerta de `503` é o do front (card F6, plano §7): o modo de falha mais
+provável com IAP e piloto é cota/teto de bytes do BigQuery estourado, que a API
+converte em `503 FONTE_INDISPONIVEL` com `Retry-After: 300`. A métrica que o
+alimenta, e a do `page_view`, estão em `infra/gcp/cost-controls.yaml`
+(`log_metrics`); a linha por requisição de página está descrita em
+[`observabilidade-front.md`](observabilidade-front.md).
 
 ## Logs estruturados
 

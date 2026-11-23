@@ -45,6 +45,12 @@ DEFAULT_MAX_ENTRIES = 1000
 _CACHEABLE_METHOD = "GET"
 _CACHEABLE_PATH_PREFIX = "/v1/"
 _CACHEABLE_STATUS = 200
+
+#: Chave de `request.scope` onde a decisão desta requisição é publicada
+#: (``hit``/``miss``) para a linha `page_view` do front
+#: (`web/observability.py`). Sem isso o observador teria de reimplementar a
+#: decisão do cache — e as duas implementações divergiriam.
+CACHE_SCOPE_KEY = "http_cache"
 #: Cabeçalhos que o endpoint pode usar para vetar o cache da própria resposta.
 _FORBIDDEN_CACHE_CONTROL = ("no-store", "private")
 #: Nas páginas o único veto aceito é `no-store`: `private, no-cache` é a própria
@@ -364,7 +370,13 @@ def _log_access(
 
     As páginas `/app` acrescentam `app_build`; a linha do `/v1` continua com
     exatamente os mesmos campos de antes (contrato de log preservado).
+
+    A decisão também é publicada em ``request.scope`` para que a linha
+    `page_view` (`web/observability.py`) a reaproveite: quem sabe se a resposta
+    veio do LRU ou do handler é este middleware, não o observador.
     """
+    scope = request.scope
+    scope[CACHE_SCOPE_KEY] = cache
     extra: dict[str, object] = {
         "cache": cache,
         "status": status,

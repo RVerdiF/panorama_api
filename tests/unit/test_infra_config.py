@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -197,6 +199,117 @@ def test_deploy_nao_deixa_placeholder_sem_substituir():
     assert "grep -q '\\${' \"$MANIFEST\"" in script
 
 
+# -- IAP declarado no manifesto (card `t_3c7efbc0`) -------------------------
+
+IAP_ANOTACAO = "run.googleapis.com/iap-enabled"
+
+
+def test_iap_esta_declarado_no_nivel_do_servico(service):
+    """IAP é anotação do Service, não do template: no template ela é ignorada.
+
+    É a mesma anotação que `gcloud run deploy --iap` grava (`IAP_ANNOTATION`
+    = `'run.googleapis.com/iap-enabled'`, valor `'true'`) em
+    `googlecloudsdk/api_lib/run/service.py`.
+    """
+    anotacoes_do_servico = service["metadata"]["annotations"]
+    anotacoes_do_template = service["spec"]["template"]["metadata"].get("annotations", {})
+
+    assert anotacoes_do_servico.get(IAP_ANOTACAO) == "true"
+    # Anotação é mapa de strings: `true` booleano é outro tipo de erro.
+    assert isinstance(anotacoes_do_servico[IAP_ANOTACAO], str)
+    # Declarar IAP no template não habilita nada — o erro silencioso a evitar.
+    assert IAP_ANOTACAO not in anotacoes_do_template
+
+
+def _rodar_deploy(tmp_path: Path, manifesto: str) -> tuple[subprocess.CompletedProcess, Path]:
+    """Roda `deploy.sh` em dry-run sobre um manifesto temporário.
+
+    Copia o script para `tmp_path` (o checkout não muda) e põe um `gcloud`
+    falso no PATH: se o script invocar o CLI, aparece o arquivo marcador.
+    """
+    destino = tmp_path / "cloud-run"
+    destino.mkdir()
+    (destino / "deploy.sh").write_text(DEPLOY_SH.read_text(encoding="utf-8"), encoding="utf-8")
+    (destino / "service.yaml").write_text(manifesto, encoding="utf-8")
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    marcador = tmp_path / "gcloud-invocado"
+    falso = bin_dir / "gcloud"
+    falso.write_text(f'#!/bin/sh\ntouch "{marcador}"\nexit 99\n', encoding="utf-8")
+    falso.chmod(0o755)
+
+    resultado = subprocess.run(
+        ["bash", str(destino / "deploy.sh")],
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env={
+            "PATH": os.pathsep.join([str(bin_dir), "/usr/bin", "/bin"]),
+            "IMAGE": "us-central1-docker.pkg.dev/p/ar/api@sha256:" + "0" * 64,
+            "DATA_VERSION": "2026.11.18",
+            "DRY_RUN": "1",
+        },
+    )
+    return resultado, marcador
+
+
+def test_deploy_em_dry_run_passa_com_iap_declarado(tmp_path):
+    resultado, marcador = _rodar_deploy(
+        tmp_path, SERVICE_YAML.read_text(encoding="utf-8")
+    )
+
+    assert resultado.returncode == 0, resultado.stderr
+    assert "dry-run" in resultado.stdout
+    # Critério de aceite: guarda exercitada sem invocar o CLI do GCP.
+    assert not marcador.exists(), "deploy.sh chamou gcloud com DRY_RUN=1"
+
+
+def test_deploy_falha_fechado_quando_anotacao_de_iap_some(tmp_path):
+    """A guarda impede publicar um serviço aberto sem ninguém notar."""
+    manifesto = SERVICE_YAML.read_text(encoding="utf-8")
+    sem_iap = "".join(
+        linha
+        for linha in manifesto.splitlines(keepends=True)
+        if IAP_ANOTACAO not in linha
+    )
+    assert IAP_ANOTACAO not in sem_iap, "sanidade: mutação não removida"
+
+    resultado, marcador = _rodar_deploy(tmp_path, sem_iap)
+
+    assert resultado.returncode == 1
+    assert "IAP ausente no manifesto" in resultado.stderr
+    assert not marcador.exists()
+
+
+def test_deploy_falha_fechado_com_iap_no_template(tmp_path):
+    """Anotação no lugar errado é o falso positivo mais provável do IAP."""
+    manifesto = SERVICE_YAML.read_text(encoding="utf-8")
+    fora_do_servico = manifesto.replace(f"    {IAP_ANOTACAO}: \"true\"\n", "", 1).replace(
+        '        run.googleapis.com/cpu-throttling: "true"\n',
+        '        run.googleapis.com/cpu-throttling: "true"\n'
+        f'        {IAP_ANOTACAO}: "true"\n',
+        1,
+    )
+    assert fora_do_servico != manifesto, "sanidade: mutação não aplicada"
+
+    resultado, _ = _rodar_deploy(tmp_path, fora_do_servico)
+
+    assert resultado.returncode == 1
+    assert "IAP ausente no manifesto" in resultado.stderr
+
+
+def test_deploy_falha_fechado_com_iap_desligado(tmp_path):
+    manifesto = SERVICE_YAML.read_text(encoding="utf-8").replace(
+        f'{IAP_ANOTACAO}: "true"', f'{IAP_ANOTACAO}: "false"', 1
+    )
+
+    resultado, _ = _rodar_deploy(tmp_path, manifesto)
+
+    assert resultado.returncode == 1
+    assert "IAP ausente no manifesto" in resultado.stderr
+
+
 # -- cota, budget e alertas ------------------------------------------------
 
 
@@ -253,12 +366,53 @@ def test_alertas_descrevem_as_cinco_condicoes_do_card(costs):
         "latencia_p95_acima_2s",
         "erros_5xx_acima_1pct",
         "instancias_no_teto_por_10min",
+        "http_503_acima_de_5_em_15min",
     }
     assert "10 GB" in alertas["bigquery_bytes_acima_10gb_dia"]["condition"]
     assert "bytesBilledLimitExceeded" in alertas["bigquery_bytes_billed_limit_exceeded"]["condition"]
     assert "p95" in alertas["latencia_p95_acima_2s"]["condition"]
     assert "5xx" in alertas["erros_5xx_acima_1pct"]["condition"]
     assert "max_instances" in alertas["instancias_no_teto_por_10min"]["condition"]
+
+
+def test_alerta_de_503_do_front_e_de_15_min_com_limite_5(costs):
+    """Card F6 (plano §7.2): 503 em `/app` **ou** `/v1` ≥ 5 em 15 min."""
+    alerta = {item["name"]: item for item in costs["alerts"]}["http_503_acima_de_5_em_15min"]
+
+    assert "/app" in alerta["condition"] and "/v1" in alerta["condition"]
+    assert "503" in alerta["condition"]
+    assert alerta["threshold"] == ">= 5 ocorrências"
+    assert alerta["window"] == "15 min"
+    assert alerta["source"] == "log"
+
+
+def test_metricas_de_log_declaradas_tem_filtro_e_alertas_existentes(costs):
+    """Fonte única: alerta de log aponta para métrica, métrica para alerta."""
+    alertas = {item["name"] for item in costs["alerts"]}
+    metricas = {item["name"]: item for item in costs["log_metrics"]}
+
+    assert set(metricas) == {"page_view_por_rota", "http_503_por_rota"}
+    for metrica in metricas.values():
+        assert metrica["filter"].startswith("jsonPayload.message=")
+        assert metrica["fields"]
+
+    assert metricas["http_503_por_rota"]["alerts"] == ["http_503_acima_de_5_em_15min"]
+    for nome in metricas["http_503_por_rota"]["alerts"]:
+        assert nome in alertas
+    # A base do `page_view` é a linha de mesmo nome emitida pelo front, com os
+    # sete campos do plano §7.1.
+    campo = metricas["page_view_por_rota"]
+    assert campo["filter"] == 'jsonPayload.message="page_view"'
+    assert set(campo["fields"]) == {
+        "route",
+        "status",
+        "cache",
+        "ms",
+        "data_version",
+        "app_build",
+        "user_hash",
+    }
+    assert campo["group_by"] == ["route", "data_version", "app_build"]
 
 
 def test_alertas_sao_aviso_e_nao_corte(costs):
