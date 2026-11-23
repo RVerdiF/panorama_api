@@ -284,13 +284,21 @@ def test_lru_rejeita_tamanho_invalido():
 
 
 def test_chave_canonica_inclui_data_version_e_ordena_params():
-    primeira = cache_key("v1", "/v1/schools", [("b", "2"), ("a", "1")])
-    segunda = cache_key("v1", "/v1/schools", [("a", "1"), ("b", "2")])
-    outra_versao = cache_key("v2", "/v1/schools", [("a", "1"), ("b", "2")])
+    primeira = cache_key("v1", "/v1/schools", [("b", "2"), ("a", "1")], app_build="b0")
+    segunda = cache_key("v1", "/v1/schools", [("a", "1"), ("b", "2")], app_build="b0")
+    outra = cache_key("v2", "/v1/schools", [("a", "1"), ("b", "2")], app_build="b0")
 
     assert primeira == segunda
-    assert outra_versao != primeira
-    assert etag_for(primeira) != etag_for(outra_versao)
+    assert outra != primeira
+    assert etag_for(primeira) != etag_for(outra)
+
+
+def test_chave_canonica_inclui_app_build():
+    """F9/D7: o build do código também identifica a representação de `/v1`."""
+    base = cache_key("v1", "/v1/schools", [], app_build="b0")
+
+    assert cache_key("v1", "/v1/schools", [], app_build="b1") != base
+    assert cache_key("v1", "/v1/schools", [], app_build="b0") == base
 
 
 def test_etag_matches_tolera_espacos_e_tags_fracas():
