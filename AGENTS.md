@@ -27,7 +27,8 @@ Estas regras são obrigatórias independentemente do agente, modelo ou CLI usado
 3. **Uma tarefa = um escopo explícito + um workspace isolado + um responsável.**
 4. **Implementação e revisão são responsabilidades separadas.**
 5. **Nenhuma implementação é considerada concluída sem evidências verificáveis.**
-6. **O reviewer aprova ou rejeita; nunca integra.**
+6. **O reviewer aprova ou rejeita e, em `APPROVED`, integra** (merge + push na
+   `main`). Quem implementou nunca integra o próprio trabalho.
 7. Em caso de conflito entre conveniência e rastreabilidade, **priorizar
    rastreabilidade**.
 
@@ -263,8 +264,7 @@ Responsável por:
 
 - coordenação técnica;
 - ownership do fluxo de implementação;
-- resolução de integração;
-- merge pós-aprovação;
+- resolução de integração em conflito (quando o reviewer não consegue mergear);
 - decisões técnicas que atravessem múltiplos cards/workspaces.
 
 Pode atuar como executor quando isso for explicitamente apropriado.
@@ -284,20 +284,26 @@ Não pode declarar o próprio trabalho aprovado.
 
 ### `reviewer`
 
-Responsável exclusivamente pelo quality gate.
+Responsável pelo quality gate **e pela integração no review limpo**.
 
 Pode:
 
 - aprovar;
 - solicitar mudanças;
-- bloquear por dependência externa real.
+- bloquear por dependência externa real;
+- **em `APPROVED`, mergear o PR e fazer push na `main`** (via
+  `scripts/merge_aprovado.sh`), rodando a sanidade pós-merge e registrando o
+  merge commit no card antes de `kanban_complete`.
 
 **Nunca pode:**
 
 - aprovar baseado apenas no relato do executor;
 - corrigir silenciosamente a implementação para poder aprová-la;
-- fazer merge;
-- empurrar alterações diretamente para `main`.
+- empurrar alterações de código diretamente para `main` (merge de PR aprovado
+  não é "alteração direta": é integração do que já foi revisado);
+- mergear PR que não esteja `MERGEABLE`/`CLEAN` — nesse caso devolve ao
+  executor com `CHANGES_REQUESTED` pedindo rebase, porque não consegue
+  integrar.
 
 Correções identificadas pelo reviewer devem retornar ao executor responsável,
 salvo instrução explícita em contrário.
@@ -690,17 +696,17 @@ somente quando o quality gate tiver sido satisfeito.
 
 **Semântica do status `done` (máquina de estados):**
 
-- `kanban_complete` pelo reviewer significa **qualidade aprovada** — o card
-  passa a `done` no Kanban. Isso **não** significa que o trabalho está na
-  `main`.
-- A **integração** (merge + push) é etapa posterior, responsabilidade do
-  gateway `code` (§11). Após a aprovação, o card fica em `done` com a branch
-  do PR **aguardando integração**.
+- `kanban_complete` pelo reviewer significa **qualidade aprovada E integrada**:
+  o reviewer mergeia o PR antes de completar (§11), então `done` implica o
+  trabalho na `main`.
+- A **integração** (merge + push) é feita pelo **próprio reviewer** neste
+  ato, via `scripts/merge_aprovado.sh`; a sanidade pós-merge roda dentro do
+  script e o merge commit é registrado no card.
+- Só não há merge quando o PR não está `MERGEABLE`/`CLEAN`: aí o veredito é
+  `CHANGES_REQUESTED` (rebase ao executor), não `APPROVED`.
 - O monitor de integração (§13) deve tratar `card.status == done` **com**
   branch `wt/*` possuindo commits próprios fora da main (`ahead > 0`) como
-  **"aprovada aguardando integração"** — não como conclusão final.
-- Um card só é **efetivamente concluído** quando a integração estiver na
-  `main` E no remote (ver §12).
+  **divergência** (integração anunciada e não feita) — alarme, não estado normal.
 
 #### `CHANGES_REQUESTED`
 
@@ -736,26 +742,27 @@ Exemplos:
 
 ## 11. Integração
 
-Após `APPROVED`, a integração é responsabilidade do gateway `code` ou do
-executor explicitamente responsável pelo trecho em conflito.
+Em `APPROVED`, **a integração é do reviewer** e acontece no mesmo ato do
+veredito.
 
 Fluxo:
 
-1. confirmar aprovação;
-2. confirmar estado do PR;
-3. integrar na `main`;
-4. resolver conflitos preservando o escopo aprovado;
-5. executar validação pós-merge quando necessária;
-6. fazer:
+1. confirmar aprovação (veredito final `APPROVED`);
+2. rodar `scripts/merge_aprovado.sh <pr>` — ele recusa PR não `MERGEABLE`,
+   não `CLEAN`, e roda a sanidade hermética na `main` após o merge;
+3. em sucesso: registrar `metadata.merge_commit` e a linha de trilha no card
+   (`kanban_comment`), e só então `kanban_complete`;
+4. em recusa (exit 1/2/3): **não** aprovar — `kanban_request_changes` ao
+   executor pedindo rebase/ajuste;
+5. em falha de sanidade (exit 4): hotfix imediato é do gateway `code`, com
+   card próprio se necessário; o card aprovado **não** fica `done` com a main
+   quebrada.
 
-```bash
-git push origin main
-```
+**Exceção — o gateway `code` integra quando:**
 
-7. confirmar que remote e local refletem a integração;
-8. remover worktree integrada quando não for mais necessária.
-
-**Reviewer nunca faz merge.**
+- o PR foi escrito pelo próprio `code` (não há executor para revisar/devolver);
+- o reviewer não consegue mergear por conflito e o `code` assume a resolução;
+- o dono pede explicitamente.
 
 Se a resolução de conflitos modificar materialmente o diff aprovado, o
 resultado deve voltar para review antes de ser considerado concluído.
@@ -773,8 +780,9 @@ Uma implementação só está efetivamente concluída quando:
 - [ ] PR/MR existe;
 - [ ] testes e evidências estão registrados;
 - [ ] reviewer aprovou;
-- [ ] alterações foram integradas na `main`;
+- [ ] reviewer integrou (merge commit registrado no card);
 - [ ] `origin/main` contém a implementação aprovada;
+- [ ] sanidade hermética verde na `main` após o merge;
 - [ ] estado final do card é consistente com o estado real do repositório.
 
 `done` no Kanban sem integração real não deve ser interpretado como prova
@@ -811,8 +819,6 @@ O monitor deve distinguir claramente:
 - branch sem trabalho;
 - implementação em andamento;
 - aguardando review;
-- aprovada aguardando integração (card `done` + branch com `ahead > 0` e PR aberto);
-- integrada;
 - divergência entre Kanban e Git.
 
 A verificação de integração pode ser feita com git local, sem depender de
