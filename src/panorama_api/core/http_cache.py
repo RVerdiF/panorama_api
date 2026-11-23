@@ -1,14 +1,20 @@
-"""Cache HTTP e LRU em memória das respostas `GET /v1/*`.
+"""Cache HTTP e LRU em memória das respostas `GET` de `/v1/*` e das páginas `/app`.
 
-Decisão do card ``t_817a670c`` (2026-11-17):
+Decisão do card ``t_817a670c`` (2026-11-17) para o `/v1`:
 
 * ``Cache-Control: public, max-age=86400, stale-while-revalidate=604800``;
 * ``ETag`` = hash de ``DATA_VERSION`` + caminho + query canônica — trocar a
   versão dos dados invalida tudo sem precisar varrer o cache;
-* LRU em memória com 1000 entradas (sem Redis; cada instância tem o seu);
+* LRU em memória com 1000 entradas (sem Redis; cada instância tem a sua);
 * erro **nunca** é cacheado nem recebe ``ETag``/``Cache-Control``.
 
-O cache guarda o corpo já serializado (JSON), então um *hit* não chama o
+O card ``t_68bd7615`` (F2) reaproveita exatamente a mesma mecânica para as
+páginas SSR sob ``/app``, mudando só a política: ``ETag`` inclui também
+``APP_BUILD`` (o HTML muda a cada deploy de código) e ``Cache-Control`` é
+``private, no-cache`` — o navegador revalida sempre e quem responde é o 304, que
+é decidido pelo hash antes do handler, sem tocar no repositório/BigQuery.
+
+O cache guarda o corpo já serializado (JSON ou HTML), então um *hit* não chama o
 repositório nem o BigQuery.
 """
 
@@ -29,6 +35,11 @@ logger = logging.getLogger(__name__)
 
 #: Decisão do card 2d.3: 1 dia de frescor + 7 dias de revalidação em background.
 CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=604800"
+#: Páginas `/app` (card F2): o HTML depende do deploy, então o navegador
+#: revalida sempre. Quem evita o trabalho é o 304 por `ETag`, decidido antes do
+#: handler — `no-cache` não significa "não guardar", significa "revalidar antes
+#: de usar". `private` porque a resposta é por usuário/piloto (IAP), não CDN.
+CACHE_CONTROL_PAGINA = "private, no-cache"
 DEFAULT_MAX_ENTRIES = 1000
 
 _CACHEABLE_METHOD = "GET"
@@ -36,6 +47,9 @@ _CACHEABLE_PATH_PREFIX = "/v1/"
 _CACHEABLE_STATUS = 200
 #: Cabeçalhos que o endpoint pode usar para vetar o cache da própria resposta.
 _FORBIDDEN_CACHE_CONTROL = ("no-store", "private")
+#: Nas páginas o único veto aceito é `no-store`: `private, no-cache` é a própria
+#: política do middleware e não pode ser lida como "não cachear".
+_FORBIDDEN_CACHE_CONTROL_PAGINA = ("no-store",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,10 +116,20 @@ def canonical_query(query: Iterable[tuple[str, str]]) -> str:
 
 
 def cache_key(
-    data_version: str, path: str, query: Iterable[tuple[str, str]]
+    data_version: str,
+    path: str,
+    query: Iterable[tuple[str, str]],
+    *,
+    app_build: str | None = None,
 ) -> str:
-    """Chave canônica: ``DATA_VERSION`` + caminho + query ordenada."""
-    return f"{data_version}\x00{path}\x00{canonical_query(query)}"
+    """Chave canônica: ``DATA_VERSION`` (+ ``APP_BUILD``) + caminho + query.
+
+    ``app_build=None`` reproduz exatamente a chave do `/v1` (contrato público
+    preservado byte a byte); as páginas `/app` passam o build do código porque o
+    HTML muda a cada deploy mesmo sem dado novo.
+    """
+    versao = data_version if app_build is None else f"{data_version}\x00{app_build}"
+    return f"{versao}\x00{path}\x00{canonical_query(query)}"
 
 
 def etag_for(key: str) -> str:
@@ -138,7 +162,18 @@ def _opaque(tag: str) -> str:
 
 
 class HttpCacheMiddleware(BaseHTTPMiddleware):
-    """Aplica cache HTTP às respostas ``GET /v1/*`` bem-sucedidas."""
+    """Aplica cache HTTP às respostas ``GET`` bem-sucedidas de um prefixo.
+
+    Uma instância por superfície, cada uma com a sua política:
+
+    * ``prefix="/v1/"`` (default, ``app_build=False``): o contrato público, com
+      ``ETag`` de ``DATA_VERSION`` + caminho + query e ``Cache-Control`` de 1 dia;
+    * ``prefix="/app"``, ``app_build=True``, ``exclude_prefix="/app/static/"``:
+      as páginas SSR, com ``APP_BUILD`` no ``ETag`` e
+      ``Cache-Control: private, no-cache`` (revalidação sempre, respondida por
+      304 sem executar o handler). Os assets ficam de fora porque já são
+      imutáveis pelo nome com hash e trazem o próprio ``Cache-Control``.
+    """
 
     def __init__(
         self,
@@ -146,10 +181,16 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         *,
         cache: LruCache | None = None,
         cache_control: str = CACHE_CONTROL,
+        prefix: str = _CACHEABLE_PATH_PREFIX,
+        app_build: bool = False,
+        exclude_prefix: str | None = None,
     ) -> None:
         super().__init__(app)
         self.cache = cache if cache is not None else LruCache()
         self.cache_control = cache_control
+        self.prefix = prefix
+        self.app_build = app_build
+        self.exclude_prefix = exclude_prefix
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
@@ -157,16 +198,23 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         if not self._cacheable(request):
             return await call_next(request)
 
-        data_version = _data_version(request)
+        settings = getattr(request.app.state, "settings", None)
+        data_version = getattr(settings, "data_version", "dev")
+        build = getattr(settings, "app_build", "dev") if self.app_build else None
         key = cache_key(
-            data_version, request.url.path, request.query_params.multi_items()
+            data_version,
+            request.url.path,
+            request.query_params.multi_items(),
+            app_build=build,
         )
         etag = etag_for(key)
 
         if etag_matches(
             request.headers.get("if-none-match"), etag, allow_star=False
         ):
-            _log_access(request, cache="hit", status=304, data_version=data_version)
+            _log_access(
+                request, cache="hit", status=304, data_version=data_version, build=build
+            )
             return _not_modified(self._headers(etag))
 
         cached = self.cache.get(key)
@@ -175,10 +223,16 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
             # (logo, existe) — RFC 9110.
             if etag_matches(request.headers.get("if-none-match"), etag):
                 _log_access(
-                    request, cache="hit", status=304, data_version=data_version
+                    request,
+                    cache="hit",
+                    status=304,
+                    data_version=data_version,
+                    build=build,
                 )
                 return _not_modified(self._headers(etag))
-            _log_access(request, cache="hit", status=200, data_version=data_version)
+            _log_access(
+                request, cache="hit", status=200, data_version=data_version, build=build
+            )
             return Response(
                 content=cached.body,
                 status_code=200,
@@ -187,7 +241,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
             )
 
         response = await call_next(request)
-        if response.status_code != _CACHEABLE_STATUS or _vetoed(response):
+        if response.status_code != _CACHEABLE_STATUS or _vetoed(response, self._vetos):
             # Erro (ou resposta que o endpoint marcou como não cacheável):
             # fica sem ETag/Cache-Control e nunca entra no LRU.
             _log_access(
@@ -195,6 +249,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
                 cache="miss",
                 status=response.status_code,
                 data_version=data_version,
+                build=build,
             )
             return response
 
@@ -208,19 +263,33 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         # (RFC 9110). Aqui o handler respondeu 200, então 304 é o correto —
         # ao contrário do short-circuit acima, que não sabe se o recurso existe.
         if etag_matches(request.headers.get("if-none-match"), etag):
-            _log_access(request, cache="hit", status=304, data_version=data_version)
+            _log_access(
+                request, cache="hit", status=304, data_version=data_version, build=build
+            )
             return _not_modified(self._headers(etag))
-        _log_access(request, cache="miss", status=200, data_version=data_version)
+        _log_access(
+            request, cache="miss", status=200, data_version=data_version, build=build
+        )
         headers.update(self._headers(etag))
         return Response(
             content=body, status_code=200, media_type=media_type, headers=headers
         )
 
     def _cacheable(self, request: Request) -> bool:
-        return (
-            request.method == _CACHEABLE_METHOD
-            and request.url.path.startswith(_CACHEABLE_PATH_PREFIX)
-        )
+        if request.method != _CACHEABLE_METHOD:
+            return False
+        caminho = request.url.path
+        if self.exclude_prefix is not None and _pertence(caminho, self.exclude_prefix):
+            return False
+        return _pertence(caminho, self.prefix)
+
+    @property
+    def _vetos(self) -> tuple[str, ...]:
+        # Nas páginas, `private` é a política do próprio middleware — só
+        # `no-store` veta a resposta.
+        if self.app_build:
+            return _FORBIDDEN_CACHE_CONTROL_PAGINA
+        return _FORBIDDEN_CACHE_CONTROL
 
     def _headers(self, etag: str) -> dict[str, str]:
         return {"ETag": etag, "Cache-Control": self.cache_control}
@@ -247,32 +316,46 @@ def _not_modified(headers: dict[str, str]) -> Response:
     return response
 
 
-def _vetoed(response: Response) -> bool:
+def _pertence(caminho: str, prefixo: str) -> bool:
+    """Um caminho está sob o prefixo (o próprio prefixo ou algo abaixo dele)."""
+    raiz = prefixo.rstrip("/")
+    return caminho == raiz or caminho.startswith(raiz + "/")
+
+
+def _vetoed(
+    response: Response, vetoes: tuple[str, ...] = _FORBIDDEN_CACHE_CONTROL
+) -> bool:
     cache_control = response.headers.get("cache-control", "").lower()
-    return any(token in cache_control for token in _FORBIDDEN_CACHE_CONTROL)
-
-
-def _data_version(request: Request) -> str:
-    settings = getattr(request.app.state, "settings", None)
-    return getattr(settings, "data_version", "dev")
+    return any(token in cache_control for token in vetoes)
 
 
 def _log_access(
-    request: Request, *, cache: str, status: int, data_version: str
+    request: Request,
+    *,
+    cache: str,
+    status: int,
+    data_version: str,
+    build: str | None = None,
 ) -> None:
-    logger.info(
-        "http_cache",
-        extra={
-            "cache": cache,
-            "status": status,
-            "path": request.url.path,
-            "data_version": data_version,
-        },
-    )
+    """Linha `http_cache` (JSON no stdout) consumida pelos alertas de custo.
+
+    As páginas `/app` acrescentam `app_build`; a linha do `/v1` continua com
+    exatamente os mesmos campos de antes (contrato de log preservado).
+    """
+    extra: dict[str, object] = {
+        "cache": cache,
+        "status": status,
+        "path": request.url.path,
+        "data_version": data_version,
+    }
+    if build is not None:
+        extra["app_build"] = build
+    logger.info("http_cache", extra=extra)
 
 
 __all__ = [
     "CACHE_CONTROL",
+    "CACHE_CONTROL_PAGINA",
     "DEFAULT_MAX_ENTRIES",
     "CachedResponse",
     "HttpCacheMiddleware",
