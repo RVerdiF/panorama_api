@@ -151,9 +151,10 @@ Antes de solicitar review:
 2. commits enviados ao remote;
 3. branch atualizada de forma segura com a base necessária;
 4. critérios de aceite verificados;
-5. testes relevantes executados;
-6. evidências coletadas;
-7. PR/MR aberto:
+5. `bash scripts/test_hermetic.sh` verde (gate hermético local — §7.4);
+6. testes relevantes executados;
+7. evidências coletadas;
+8. PR/MR aberto:
 
 ```text
 wt/<task_id> -> main
@@ -562,6 +563,30 @@ Registrar:
 
 Teste não executado deve ser informado como **não executado**, nunca inferido
 como sucesso.
+
+### 7.4. Gate hermético local (pré-merge obrigatório)
+
+Antes de abrir PR é **obrigatório** rodar:
+
+```bash
+bash scripts/test_hermetic.sh
+```
+
+e registrar no handoff o comando, o exit status e as contagens
+`passed/failed/skipped`.
+
+- O script roda a camada hermética (§7.2) e verifica que o checkout permanece
+  limpo. Ele **é** o gate de pré-merge: **o GitHub Actions está desabilitado
+  neste repositório por decisão do dono**. Os workflows versionados em
+  `.github/workflows/` não são executados e não são o caminho de aprovação.
+- O script provisiona o `.venv` do próprio workspace via
+  `scripts/bootstrap_env.sh`, **sempre com Python 3.11** — nunca com o
+  `python3` do PATH — e neutraliza `PYTHONPATH`/`PYTHONHOME` herdados do
+  worker para não contaminar a instalação do venv.
+- `TMPDIR`/`TEMP`/`TMP` do ambiente são legítimos: os testes usam
+  `tempfile.gettempdir()`, nunca o literal `/tmp`.
+- Reabilitar o Actions, criar hook de pre-push ou alterar workflows é decisão
+  do dono — fora do escopo do gate.
 
 ---
 
