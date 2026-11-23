@@ -1,0 +1,53 @@
+# Build e publicação da imagem da API no Artifact Registry (decisão D1,
+# card `t_cab24513`). Disparo **manual**, separado do pipeline de dados:
+#
+#     bash infra/cloud-run/build.sh          # calcula o SHA curto e dispara
+#
+# ou, equivalentemente:
+#
+#     gcloud builds submit --config cloudbuild.yaml --project panorama-escola-staging \
+#       --substitutions=_TAG=$(git rev-parse --short=7 HEAD)
+#
+# Um único destino de imagem: `<host>/<projeto>/<repo>/<imagem>:<tag>`.
+
+substitutions:
+  _AR_HOST: us-central1-docker.pkg.dev
+  _AR_PROJECT: panorama-escola-staging
+  _AR_REPOSITORY: panorama-api
+  _IMAGE: api
+  #: SHA curto do commit. Sem default de propósito: tag implícita é ambígua.
+  _TAG: ""
+
+options:
+  # Máquina default: o build cabe na franquia de 120 min/dia.
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: true
+
+steps:
+  # Falha fechado: sem tag explícita o passo de push gravaria algo indizível.
+  - id: valida-tag
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: bash
+    args:
+      - -ceu
+      - |
+        if [ -z "${_TAG}" ]; then
+          echo "_TAG vazia: chame com --substitutions=_TAG=<sha curto>" >&2
+          exit 1
+        fi
+        printf 'build da imagem %s:%s\n' "${_IMAGE}" "${_TAG}"
+
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - --tag=${_AR_HOST}/${_AR_PROJECT}/${_AR_REPOSITORY}/${_IMAGE}:${_TAG}
+      - --tag=${_AR_HOST}/${_AR_PROJECT}/${_AR_REPOSITORY}/${_IMAGE}:latest
+      - .
+
+images:
+  - ${_AR_HOST}/${_AR_PROJECT}/${_AR_REPOSITORY}/${_IMAGE}:${_TAG}
+  - ${_AR_HOST}/${_AR_PROJECT}/${_AR_REPOSITORY}/${_IMAGE}:latest
+
+# O push usa a identidade do Cloud Build do projeto; nada de credencial aqui.
+timeout: 1200s

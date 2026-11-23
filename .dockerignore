@@ -1,0 +1,31 @@
+# Contexto de build da imagem da API (card `t_cab24513`).
+# Só `pyproject.toml`, `README.md` e `src/` são necessários para `pip install .`.
+# Sem dataset, sem testes e sem histórico Git: a imagem é mínima e reprodutível.
+.git
+.gitignore
+.github
+.worktrees
+.venv
+.pytest_cache
+.mypy_cache
+.ruff_cache
+__pycache__
+*.py[cod]
+
+# Código e artefatos que não entram no pacote Python.
+tests
+data
+evidence
+docs
+infra
+scripts
+
+# Configuração e segredos locais.
+.env
+.env.*
+!.env.example
+
+# Build local.
+Dockerfile
+.dockerignore
+cloudbuild.yaml

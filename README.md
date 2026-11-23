@@ -59,6 +59,19 @@ dedicada da API (IAM mínimo, sem chave JSON) está em
 `infra/gcp/api-runtime-sa.yaml` e aplicação/verificação em
 `scripts/gcp_api_runtime_sa.py`.
 
+## Imagem e deploy
+
+```bash
+docker build -t panorama-api:local .                          # imagem local
+bash infra/artifact-registry/ensure.sh --yes                  # repo AR + política
+bash infra/cloud-run/build.sh                                 # build no Cloud Build
+bash infra/cloud-run/deploy.sh                                # Cloud Run (staging)
+```
+
+Runbook completo (imagem, Artifact Registry, Cloud Build, parâmetros do serviço
+e autenticação): [`docs/deploy-api.md`](docs/deploy-api.md). Todos os comandos
+que tocam GCP são manuais e exigem autorização do dono.
+
 ## Estrutura
 
 ```text
@@ -71,6 +84,8 @@ src/panorama_api/
 
 tests/unit/          # Suíte hermética (repositório fake)
 tests/integration/   # (vazio — integração com BQ fica fora da v1)
-scripts/             # bootstrap_env.sh
+scripts/             # bootstrap_env.sh, gcp_api_runtime_sa.py
+infra/cloud-run/     # Manifesto do serviço, deploy.sh, build.sh
+infra/artifact-registry/  # Criação do repo AR + política de limpeza
 docs/                # Documentação técnica
 ```
