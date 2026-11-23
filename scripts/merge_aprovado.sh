@@ -10,9 +10,15 @@
 #   3 mergeStateStatus != CLEAN (BEHIND,
 #     DIRTY, UNSTABLE, BLOCKED...)         -> exit 3
 #   4 suíte hermética falhou após o merge  -> exit 4  (regressão pós-merge)
+#   5 merge commit não apareceu em origin/main -> exit 5
+#  64 uso inválido                         -> exit 64
 #
 # Saída: imprime o merge commit e a linha de trilha para registrar no card.
 set -euo pipefail
+
+# Ancorar na raiz do repo: o script mexe em `git fetch`/`worktree` e não deve
+# depender do diretório de onde o reviewer o invocou.
+cd "$(git rev-parse --show-toplevel)"
 
 PR="${1:-}"
 DRY_RUN=0

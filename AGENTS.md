@@ -752,8 +752,9 @@ Fluxo:
    não `CLEAN`, e roda a sanidade hermética na `main` após o merge;
 3. em sucesso: registrar `metadata.merge_commit` e a linha de trilha no card
    (`kanban_comment`), e só então `kanban_complete`;
-4. em recusa (exit 1/2/3): **não** aprovar — `kanban_request_changes` ao
-   executor pedindo rebase/ajuste;
+4. em recusa (exit 1/2/3 — e exit 5 se o merge commit não aparecer em
+   `origin/main`): **não** aprovar — `kanban_request_changes` ao executor
+   pedindo rebase/ajuste;
 5. em falha de sanidade (exit 4): hotfix imediato é do gateway `code`, com
    card próprio se necessário; o card aprovado **não** fica `done` com a main
    quebrada.
