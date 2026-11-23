@@ -50,20 +50,20 @@ def fmt_oferta(valor: Any) -> str:
     return "Sim" if valor else "Não"
 
 
-def fmt_ano(valor: Any) -> str:
-    """Ano censitário: sem separador de milhar e sem `0` para ausência.
+def fmt_ano(valor: Any, motivo: str | None = None) -> str:
+    """Ano de referência: `2025`, não `2.025`.
 
-    `fmt_nulo` formata números com milhar (``2.025``), o que está errado para
-    ano. Aqui o ano sai como ``2025`` e a ausência continua ``sem dado``.
+    Ano é identificador, não quantidade — separador de milhar aqui inventaria
+    um número que não existe. Ausência continua "sem dado", com o motivo quando
+    a base informa a flag.
     """
-    if valor is None:
-        return SEM_DADO
+    if valor is None or valor == "":
+        return _sem_dado(motivo)
     if isinstance(valor, bool):  # bool é subclasse de int: não é ano
         return fmt_nulo(valor)
-    if isinstance(valor, int):
-        return str(valor)
-    texto = str(valor).strip()
-    return texto or SEM_DADO
+    if isinstance(valor, (int, str)):
+        return str(valor).strip() or _sem_dado(motivo)
+    return str(valor)
 
 
 def fmt_gap_lider(valor: Any) -> str:
