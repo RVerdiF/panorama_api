@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+{% from "partials/breadcrumb.html" import breadcrumb with context %}
+
+{% block titulo %}
+{%- if duas -%}
+{{ escolas[0].rotulo }} × {{ escolas[1].rotulo }} · {{ titulo_secao }} — Panorama Escola
+{%- else -%}
+{{ titulo_secao }} — Panorama Escola
+{%- endif -%}
+{% endblock %}
+
+{#
+  Comparação lado a lado (card C4, `t_58f9adbb`): rota SSR, sem JS.
+
+  * dois ids: série de matrículas (SVG + tabela Ano | A | B) cobrindo a **união
+    dos intervalos** e oferta/matrícula por etapa do ano mais recente **comum**
+    às duas. Ano ausente em uma das escolas é "sem dado (motivo)", nunca zero.
+  * um id: a escola A e o formulário de busca que leva à segunda escola, cujos
+    resultados linkam para a URL canônica `?escolas=A,B`.
+
+  O SVG é decorativo (`aria-hidden`) e se distingue **também sem cor** (barra
+  sólida × barra de contorno tracejado); o equivalente acessível é a tabela.
+#}
+{% block conteudo %}
+<article class="cartao">
+  {{ breadcrumb(migalhas) }}
+  <h1>{{ titulo_secao }}</h1>
+
+  {% if duas %}
+  <p class="subtitulo">
+    Matrícula da educação básica das duas escolas, ano a ano, e a oferta por
+    etapa no ano mais recente que as duas têm em comum. Indicadores e
+    comparação municipal continuam nas fichas de cada escola.
+  </p>
+
+  {% if aviso_municipios %}
+  <p class="aviso">{{ aviso_municipios }}</p>
+  {% endif %}
+
+  <dl class="lista-definicoes">
+    {% for escola in escolas %}
+    <dt>{{ escola.rotulo }} — escola <code>{{ escola.co_entidade }}</code></dt>
+    <dd>
+      {{ escola.no_municipio | fmt_nulo }}
+      · <a href="{{ escola.href }}">Ver a ficha</a>
+    </dd>
+    {% endfor %}
+  </dl>
+
+  <section aria-labelledby="serie">
+    <h2 id="serie">Série de matrículas</h2>
+    <p class="subtitulo">
+      Matrícula da educação básica (total oficial do Censo, não a soma das
+      subetapas) por ano censitário. Ano sem valor aparece como
+      <em>sem dado</em> — nunca como zero.
+    </p>
+    <figure class="serie-figura">
+      {% if serie.svg %}
+      {{ serie.svg }}
+      <figcaption>
+        Barra sólida: {{ escolas[0].rotulo }}. Barra apenas de contorno
+        tracejado: {{ escolas[1].rotulo }}. O traço curto na base marca um ano
+        sem dado daquela escola. A tabela abaixo traz os mesmos valores com a
+        origem de cada ausência.
+      </figcaption>
+      {% else %}
+      <p class="sem-dado">sem dado</p>
+      <figcaption>
+        Nenhuma das duas escolas tem matrícula observada na série.
+      </figcaption>
+      {% endif %}
+    </figure>
+    {% if serie.pontos %}
+    <div class="tabela-rolavel" role="region" aria-label="Série de matrículas por ano, comparada (tabela com rolagem)" tabindex="0">
+      <table>
+        <caption>Série de matrículas por ano censitário — comparação</caption>
+        <thead>
+          <tr>
+            <th scope="col">Ano</th>
+            <th scope="col">{{ escolas[0].rotulo }}</th>
+            <th scope="col">{{ escolas[1].rotulo }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ponto in serie.pontos %}
+          <tr>
+            <th scope="row">{{ ponto.ano | fmt_ano }}</th>
+            <td>{{ ponto.a.valor | fmt_contagem(ponto.a.motivo) }}</td>
+            <td>{{ ponto.b.valor | fmt_contagem(ponto.b.motivo) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="oferta">
+    <h2 id="oferta">
+      Oferta e matrícula por etapa{% if ano_comum %} ({{ ano_comum | fmt_ano }}){% endif %}
+    </h2>
+    {% if etapas %}
+    <p class="subtitulo">
+      Ano mais recente comum às duas escolas. Oferta é tri-estado: <em>Sim</em>
+      (matrícula maior que zero), <em>Não</em> (zero declarado) e
+      <em>Desconhecido</em> (a base não informou). As linhas estão agrupadas
+      pela natureza do número: total oficial, etapas que somam e
+      modalidades/subconjuntos que <strong>não</strong> somam ao total.
+    </p>
+    <div class="tabela-rolavel" role="region" aria-label="Oferta e matrícula por etapa, comparada (tabela com rolagem)" tabindex="0">
+      <table>
+        <caption>Oferta e matrícula por etapa em {{ ano_comum | fmt_ano }} — comparação</caption>
+        <thead>
+          <tr>
+            <th rowspan="2" scope="col">Etapa</th>
+            <th colspan="2" scope="colgroup">{{ escolas[0].rotulo }}</th>
+            <th colspan="2" scope="colgroup">{{ escolas[1].rotulo }}</th>
+          </tr>
+          <tr>
+            <th scope="col">Oferta</th>
+            <th scope="col">Matrícula</th>
+            <th scope="col">Oferta</th>
+            <th scope="col">Matrícula</th>
+          </tr>
+        </thead>
+        {% for grupo in etapas %}
+        <tbody>
+          <tr class="grupo-etapas">
+            <th colspan="5" scope="rowgroup">{{ grupo.titulo }} — {{ grupo.nota }}</th>
+          </tr>
+          {% for linha in grupo.linhas %}
+          <tr>
+            <th scope="row">{{ linha.rotulo }}</th>
+            <td>{{ linha.oferta_a | fmt_oferta }}</td>
+            <td>{{ linha.matricula_a | fmt_celula }}</td>
+            <td>{{ linha.oferta_b | fmt_oferta }}</td>
+            <td>{{ linha.matricula_b | fmt_celula }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        {% endfor %}
+      </table>
+    </div>
+    {% elif motivo_sem_ano_comum %}
+    <p class="sem-dado">sem dado — {{ motivo_sem_ano_comum }}</p>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="recorte-comparacao">
+    <h2 id="recorte-comparacao">Recorte da comparação</h2>
+    <dl class="lista-definicoes recorte">
+      <dt>Universo</dt>
+      <dd>
+        <code>{{ recorte.universo }}</code>
+        {%- if recorte.universo_texto %} — {{ recorte.universo_texto }}{% endif %}
+      </dd>
+      <dt>Fonte</dt>
+      <dd>{{ recorte.orgao }} — {{ recorte.base }}, tabela <code>{{ recorte.tabela }}</code></dd>
+      <dt>Avisos</dt>
+      <dd>
+        {% if recorte.avisos %}
+        <ul class="lista-regras">
+          {% for aviso in recorte.avisos %}
+          <li>{{ aviso }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        nenhum aviso para este recorte
+        {% endif %}
+      </dd>
+    </dl>
+  </section>
+
+  {% else %}
+  <section aria-labelledby="escola-a">
+    <h2 id="escola-a">{{ escolas[0].rotulo }}</h2>
+    <p class="subtitulo">
+      Escola <code>{{ escolas[0].co_entidade }}</code> ·
+      {%- if escolas[0].co_municipio %}
+      <a href="{{ app_prefix }}/mercados/{{ escolas[0].co_municipio }}">{{ escolas[0].no_municipio | fmt_nulo }}</a>
+      {%- else %}
+      {{ escolas[0].no_municipio | fmt_nulo }}
+      {%- endif %}
+      · <a href="{{ escolas[0].href }}">Ver a ficha completa</a>
+    </p>
+
+    {% if escola_unica.recente %}
+    <dl class="lista-definicoes">
+      <dt>Dependência administrativa (código INEP)</dt>
+      <dd>
+        <code>{{ escola_unica.recente.tp_dependencia | fmt_nulo }}</code> — {{ escola_unica.dependencia_rotulo }}
+      </dd>
+      <dt>Situação de funcionamento (código INEP)</dt>
+      <dd>
+        <code>{{ escola_unica.recente.tp_situacao_funcionamento | fmt_nulo }}</code> — {{ escola_unica.situacao_rotulo }}
+      </dd>
+    </dl>
+    {% endif %}
+
+    <figure class="serie-figura">
+      {% if escola_unica.serie.svg %}
+      {{ escola_unica.serie.svg }}
+      <figcaption>
+        Cada barra é a matrícula de um ano; o traço tracejado marca um ano sem
+        dado. A tabela abaixo traz os mesmos valores com a origem de cada
+        ausência.
+      </figcaption>
+      {% else %}
+      <p class="sem-dado">sem dado</p>
+      <figcaption>Nenhum ano da série tem matrícula observada.</figcaption>
+      {% endif %}
+    </figure>
+    {% if escola_unica.serie.pontos %}
+    <div class="tabela-rolavel" role="region" aria-label="Série de matrículas por ano (tabela com rolagem)" tabindex="0">
+      <table>
+        <caption>Série de matrículas por ano censitário</caption>
+        <thead>
+          <tr>
+            <th scope="col">Ano</th>
+            <th scope="col">Matrícula — educação básica</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ponto in escola_unica.serie.pontos %}
+          <tr>
+            <th scope="row">{{ ponto.ano | fmt_ano }}</th>
+            <td>{{ ponto.valor | fmt_contagem(ponto.motivo) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="escolher">
+    <h2 id="escolher">Escolher a segunda escola</h2>
+    <p class="subtitulo">
+      Busque pelo nome da escola que você quer colocar ao lado desta. O link
+      "{{ texto_comparar_com_esta }}" abre a comparação das duas.
+    </p>
+    <form class="formulario" method="get" action="{{ caminho_comparar }}" role="search">
+      <input type="hidden" name="escolas" value="{{ escolas_param }}">
+      <div class="campo">
+        <label for="q">Nome da escola</label>
+        <input
+          type="search"
+          id="q"
+          name="q"
+          value="{{ filtros.q }}"
+          minlength="3"
+          maxlength="100"
+          autocomplete="off"
+          aria-describedby="q-dica">
+        <p class="dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
+      </div>
+      <div class="campo campo--acao">
+        <button type="submit">Buscar escola</button>
+      </div>
+    </form>
+
+    {% if filtros.q %}
+    {% if resultados %}
+    <div class="tabela-rolavel" role="region" aria-label="Escolas encontradas para comparar (tabela com rolagem)" tabindex="0">
+      <table class="tabela">
+        <caption class="visualmente-oculto">Escolas encontradas para comparar</caption>
+        <thead>
+          <tr>
+            <th scope="col">Escola</th>
+            <th scope="col">Código INEP</th>
+            <th scope="col">Município</th>
+            <th scope="col">Comparar</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for resultado in resultados %}
+          <tr>
+            <td>
+              {% if resultado.escola.co_entidade %}
+              <a href="{{ app_prefix }}/escolas/{{ resultado.escola.co_entidade }}">{{ resultado.escola.no_entidade | fmt_nulo }}</a>
+              {% else %}
+              {{ resultado.escola.no_entidade | fmt_nulo }}
+              {% endif %}
+            </td>
+            <td><code>{{ resultado.escola.co_entidade | fmt_nulo }}</code></td>
+            <td>{{ resultado.escola.no_municipio | fmt_nulo }}</td>
+            <td>
+              {% if resultado.href_comparar %}
+              <a href="{{ resultado.href_comparar }}">{{ texto_comparar_com_esta }}</a>
+              {% else %}
+              <span class="nota">é a escola desta página</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if resultados_tem_mais %}
+    <p class="aviso">
+      Há mais escolas do que as listadas. Refine a busca — um nome mais
+      específico — para ver outras.
+    </p>
+    {% endif %}
+    {% else %}
+    <p class="sem-dado">Nenhuma escola encontrada para esta busca.</p>
+    {% endif %}
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="recorte-comparacao">
+    <h2 id="recorte-comparacao">Recorte</h2>
+    <dl class="lista-definicoes recorte">
+      <dt>Universo</dt>
+      <dd>
+        <code>{{ recorte.universo }}</code>
+        {%- if recorte.universo_texto %} — {{ recorte.universo_texto }}{% endif %}
+      </dd>
+      <dt>Fonte</dt>
+      <dd>{{ recorte.orgao }} — {{ recorte.base }}, tabela <code>{{ recorte.tabela }}</code></dd>
+      <dt>Avisos</dt>
+      <dd>
+        {% if recorte.avisos %}
+        <ul class="lista-regras">
+          {% for aviso in recorte.avisos %}
+          <li>{{ aviso }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        nenhum aviso para este recorte
+        {% endif %}
+      </dd>
+    </dl>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}

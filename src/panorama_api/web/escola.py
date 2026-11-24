@@ -37,21 +37,25 @@ from panorama_api.web.conteudo import (
     EXPLICACAO_OFERTA_DESCONHECIDA,
     MOTIVO_ANO_AUSENTE,
     MOTIVO_FORA_DO_UNIVERSO_PRIVADO,
+    MOTIVO_MUNICIPIOS_DIFERENTES,
     MOTIVO_SECAO_COMPETIDORES,
     MOTIVO_SECAO_ESCOLA_INATIVA,
     MOTIVO_SECAO_ESCOLA_PUBLICA,
     MOTIVO_SECAO_INDICADORES,
+    MOTIVO_SEM_ANO_COMUM,
     MOTIVO_SEM_COMPARACAO,
     NAO_SE_APLICA,
     NOTA_GRUPO_ETAPAS,
     NOTA_GRUPO_MODALIDADES,
     NOTA_GRUPO_TOTAL,
+    ROTULO_COMPARAR_ENTRADA,
     ROTULO_POSICAO_CRESCIMENTO_MG,
     ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO,
     ROTULO_RETENCAO,
     ROTULO_VISAO_GERAL,
     TEXTO_NESTA_PAGINA,
     TEXTO_VOLTAR_VISAO_GERAL,
+    TITULO_COMPARACAO,
     TITULO_GRUPO_ETAPAS,
     TITULO_GRUPO_MODALIDADES,
     TITULO_GRUPO_TOTAL,
@@ -59,6 +63,7 @@ from panorama_api.web.conteudo import (
     UNIVERSOS,
     rotulo_etapa,
     traduzir_aviso,
+    traduzir_avisos,
 )
 from panorama_api.web.filters import SEM_DADO, fmt_nulo
 
@@ -648,6 +653,12 @@ def contexto_visao_geral(*, historico: HistoryResponse) -> dict[str, Any]:
         "cabecalho": cabecalho,
         "sem_nome": SEM_DADO,
         "migalhas": _migalhas(cabecalho, href_escola=None, ultimo=None),
+        # Entrada da comparação lado a lado (card C4): a ficha já tem o id, e o
+        # destino é a página com **um** id, que oferece a busca da segunda.
+        "href_comparar": (
+            f"{PREFIXO_WEB}/comparar?escolas={cabecalho['co_entidade']}"
+        ),
+        "rotulo_comparar": ROTULO_COMPARAR_ENTRADA,
         "subnav_itens": itens_subnav(
             cabecalho=cabecalho,
             ativo=VISAO_GERAL,
@@ -779,14 +790,264 @@ def contexto_concorrencia_nao_se_aplica(
     }
 
 
+# -- comparação entre duas escolas (card C4, `t_58f9adbb`) --------------------
+#
+# A página `/app/comparar?escolas=A,B` reusa **as mesmas** respostas de
+# `history` da ficha (`dados.historico_escola`): série e oferta saem do mesmo
+# item, então o custo é o da ficha por escola e nunca há consulta nova. As
+# funções abaixo são puras, como as da ficha.
+
+
+def _celula_por_ano(itens: Sequence[HistoryItem]) -> dict[int, dict[str, Any]]:
+    """Matrícula BAS de cada ano da série, com a flag de ausência."""
+    return {
+        item.nu_ano_censo: {
+            "valor": item.qt_mat_bas,
+            "motivo": _motivo(item.is_qt_mat_bas_missing, "is_qt_mat_bas_missing"),
+        }
+        for item in itens
+    }
+
+
+def serie_comparada(
+    itens_a: Sequence[HistoryItem], itens_b: Sequence[HistoryItem]
+) -> dict[str, Any]:
+    """Série das duas escolas, ano a ano, cobrindo a **união dos intervalos**.
+
+    Cada ponto traz a célula de cada escola (``{"valor", "motivo"}``). Ano que
+    só uma delas tem vira ``sem dado (ano ausente na fonte)`` do outro lado —
+    nunca ``0`` —, e a lacuna fica visível nos dois sentidos (tabela e SVG).
+    Sem nenhum ano em nenhuma das séries, não há pontos nem gráfico.
+    """
+    registros_a = _celula_por_ano(itens_a)
+    registros_b = _celula_por_ano(itens_b)
+    anos = set(registros_a) | set(registros_b)
+    if not anos:
+        return {"pontos": [], "svg": None}
+
+    vazio = {"valor": None, "motivo": MOTIVO_ANO_AUSENTE}
+    pontos = [
+        {
+            "ano": ano,
+            "a": registros_a.get(ano, vazio),
+            "b": registros_b.get(ano, vazio),
+        }
+        for ano in range(min(anos), max(anos) + 1)
+    ]
+    return {"pontos": pontos, "svg": svg_serie_comparada(pontos)}
+
+
+def svg_serie_comparada(pontos: Sequence[dict[str, Any]]) -> Markup | None:
+    """Barras agrupadas por ano, duas séries, geradas no servidor (sem JS).
+
+    As duas séries se distinguem **também sem cor**: a de A é preenchimento
+    sólido (`.serie__barra`) e a de B é só contorno tracejado
+    (`.serie__barra--b`). A legenda textual fica na figura e o equivalente
+    acessível é a tabela; o SVG é decorativo (`aria-hidden`), como na ficha.
+    ``None`` quando nenhuma das escolas tem matrícula observada.
+    """
+    observados = [
+        int(celula["valor"])
+        for ponto in pontos
+        for celula in (ponto["a"], ponto["b"])
+        if celula["valor"] is not None
+    ]
+    if not observados:
+        return None
+
+    maximo = max(observados) or 1
+    margem_esq, margem_dir = 8, 8
+    margem_topo, margem_base = 18, 26
+    largura_util = LARGURA_SVG - margem_esq - margem_dir
+    altura_util = ALTURA_SVG - margem_topo - margem_base
+    passo = largura_util / max(len(pontos), 1)
+    largura_barra = max(min(22.0, passo * 0.26), 3.0)
+    base = margem_topo + altura_util
+
+    partes: list[str] = [
+        f'<line x1="{margem_esq}" y1="{base:.1f}" '
+        f'x2="{LARGURA_SVG - margem_dir}" y2="{base:.1f}" class="serie__eixo"/>'
+    ]
+    series = ((-0.62, "a", "serie__barra"), (0.62, "b", "serie__barra serie__barra--b"))
+    for indice, ponto in enumerate(pontos):
+        centro = margem_esq + passo * (indice + 0.5)
+        partes.append(
+            f'<text x="{centro:.1f}" y="{ALTURA_SVG - 8}" text-anchor="middle" '
+            f'class="serie__ano">{int(ponto["ano"])}</text>'
+        )
+        for deslocamento, chave, classe in series:
+            eixo_barra = centro + deslocamento * largura_barra
+            valor = ponto[chave]["valor"]
+            if valor is None:
+                # Lacuna: marca a ausência sem desenhar barra de altura zero.
+                partes.append(
+                    f'<line x1="{eixo_barra:.1f}" y1="{base:.1f}" '
+                    f'x2="{eixo_barra:.1f}" y2="{base - 6:.1f}" class="serie__ausente"/>'
+                )
+                continue
+            altura = max(altura_util * int(valor) / maximo, ALTURA_MINIMA_BARRA)
+            partes.append(
+                f'<rect x="{eixo_barra - largura_barra / 2:.1f}" '
+                f'y="{base - altura:.1f}" width="{largura_barra:.1f}" '
+                f'height="{altura:.1f}" class="{classe}"/>'
+            )
+
+    return Markup(
+        f'<svg class="serie" viewBox="0 0 {LARGURA_SVG} {ALTURA_SVG}" '
+        f'aria-hidden="true" xmlns="http://www.w3.org/2000/svg">'
+        f'{"".join(partes)}</svg>'
+    )
+
+
+def etapas_comparadas(escola_a: HistoryItem, escola_b: HistoryItem) -> list[dict[str, Any]]:
+    """Oferta e matrícula por etapa das duas escolas **no mesmo ano**.
+
+    Reusa `_linha_etapa` (a mesma leitura tri-estado da ficha) para cada lado e
+    mantém os grupos de `GRUPOS_ETAPAS`: total oficial, etapas que somam e
+    modalidades que não somam continuam separados — lado a lado, somar as nove
+    linhas somaria duas vezes.
+    """
+    grupos: list[dict[str, Any]] = []
+    for grupo in GRUPOS_ETAPAS:
+        linhas: list[dict[str, Any]] = []
+        for etapa in grupo.etapas:
+            campo = CAMPOS_MATRICULA[etapa]
+            linha_a = _linha_etapa(escola_a, campo)
+            linha_b = _linha_etapa(escola_b, campo)
+            linhas.append(
+                {
+                    "rotulo": linha_a["rotulo"],
+                    "oferta_a": linha_a["oferta"],
+                    "matricula_a": linha_a["matricula"],
+                    "oferta_b": linha_b["oferta"],
+                    "matricula_b": linha_b["matricula"],
+                }
+            )
+        grupos.append({"titulo": grupo.titulo, "nota": grupo.nota, "linhas": linhas})
+    return grupos
+
+
+def _escola_comparada(escola: Any) -> dict[str, Any]:
+    """Identificação de um lado da comparação (nome, município e link da ficha)."""
+    cabecalho = _campos_do_cabecalho(escola)
+    co_entidade = cabecalho["co_entidade"]
+    return {
+        **cabecalho,
+        "rotulo": cabecalho["no_entidade"] or f"Escola {co_entidade}",
+        "href": f"{PREFIXO_WEB}/escolas/{co_entidade}",
+    }
+
+
+def _recorte_comparacao(historicos: Sequence[HistoryResponse]) -> dict[str, Any]:
+    """Recorte da comparação: universo, fonte e avisos das duas respostas.
+
+    Não existe "ano de referência" único (cada série tem o seu), então o bloco
+    declara o recorte comum — universo, fonte e avisos, na ordem em que
+    aparecem — em vez de repetir um ano que valeria só para um dos lados.
+    """
+    meta = historicos[0].meta
+    avisos: list[str] = []
+    for historico in historicos:
+        for texto in traduzir_avisos(historico.meta.avisos):
+            if texto not in avisos:
+                avisos.append(texto)
+    return {
+        "universo": meta.universo,
+        "universo_texto": UNIVERSOS.get(meta.universo),
+        "orgao": meta.fonte.orgao,
+        "base": meta.fonte.base,
+        "tabela": meta.fonte.tabela,
+        "avisos": avisos,
+    }
+
+
+def _escola_unica(historico: HistoryResponse) -> dict[str, Any]:
+    """Escola A da página com um só id: identificação, série e leitura INEP."""
+    itens = list(historico.data.items)
+    recente = item_mais_recente(itens)
+    return {
+        "cabecalho": _campos_do_cabecalho(historico.data),
+        "recente": recente,
+        "itens": itens,
+        "serie": serie_matriculas(itens),
+        "dependencia_rotulo": (
+            _rotulo_dependencia(recente.tp_dependencia) if recente is not None else None
+        ),
+        "situacao_rotulo": (
+            _rotulo_situacao(recente.tp_situacao_funcionamento)
+            if recente is not None
+            else None
+        ),
+    }
+
+
+def contexto_comparacao(
+    *, historicos: Sequence[HistoryResponse]
+) -> dict[str, Any]:
+    """Contexto de `/app/comparar?escolas=` com um ou dois ids.
+
+    Com **dois** ids: série comparada (união dos intervalos), oferta por etapa
+    do ano mais recente **comum** às duas escolas e o aviso de municípios
+    diferentes. Com **um** id: a escola A (identificação + série) e nada de
+    comparação — quem escolhe a segunda escola é o formulário de busca da
+    própria página.
+    """
+    escolas = [_escola_comparada(historico.data) for historico in historicos]
+    contexto: dict[str, Any] = {
+        "escolas": escolas,
+        "duas": len(historicos) == 2,
+        "escola_unica": None,
+        "titulo_secao": TITULO_COMPARACAO,
+        "migalhas": [
+            {"rotulo": "Escolas", "href": f"{PREFIXO_WEB}/"},
+            {"rotulo": TITULO_COMPARACAO, "href": None},
+        ],
+        "recorte": _recorte_comparacao(historicos),
+        "aviso_municipios": None,
+        "serie": {"pontos": [], "svg": None},
+        "ano_comum": None,
+        "motivo_sem_ano_comum": None,
+        "etapas": [],
+    }
+    if len(historicos) == 1:
+        contexto["escola_unica"] = _escola_unica(historicos[0])
+        return contexto
+
+    itens_a = list(historicos[0].data.items)
+    itens_b = list(historicos[1].data.items)
+    contexto["serie"] = serie_comparada(itens_a, itens_b)
+
+    anos_a = {item.nu_ano_censo for item in itens_a}
+    anos_b = {item.nu_ano_censo for item in itens_b}
+    comuns = sorted(anos_a & anos_b)
+    if not comuns:
+        contexto["motivo_sem_ano_comum"] = MOTIVO_SEM_ANO_COMUM
+    else:
+        ano_comum = comuns[-1]
+        contexto["ano_comum"] = ano_comum
+        contexto["etapas"] = etapas_comparadas(
+            next(item for item in itens_a if item.nu_ano_censo == ano_comum),
+            next(item for item in itens_b if item.nu_ano_censo == ano_comum),
+        )
+
+    municipios = {escola["co_municipio"] for escola in escolas if escola["co_municipio"]}
+    if len(municipios) > 1:
+        contexto["aviso_municipios"] = MOTIVO_MUNICIPIOS_DIFERENTES
+    return contexto
+
+
 __all__ = [
     "CONCORRENCIA",
     "VISAO_GERAL",
+    "contexto_comparacao",
     "contexto_concorrencia",
     "contexto_concorrencia_nao_se_aplica",
     "contexto_visao_geral",
+    "etapas_comparadas",
     "item_mais_recente",
     "itens_subnav",
     "motivo_concorrencia_nao_se_aplica",
     "pertence_ao_universo_privado",
+    "serie_comparada",
+    "svg_serie_comparada",
 ]
