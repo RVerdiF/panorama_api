@@ -7,7 +7,7 @@ booleano simples.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 #: Texto único para ausência de dado. A palavra é a mesma em todas as telas.
 SEM_DADO = "sem dado"
@@ -36,6 +36,49 @@ def fmt_nulo(valor: Any, motivo: str | None = None) -> str:
         inteiro, _, decimal = f"{valor:,.1f}".partition(".")
         return f"{inteiro.replace(',', '.')},{decimal}"
     return str(valor)
+
+
+def fmt_contagem(valor: Any, motivo: str | None = None) -> str:
+    """Contagem (escolas, matrículas, posições): inteiro nunca sai com ``,0``.
+
+    A mart devolve alguns contadores como `float` (ex.: `n_escolas_entraram`,
+    `qt_mat_total`). Um float integral é uma contagem inteira, não uma medida
+    fracionária: exibir ``43,0`` sugere precisão que não existe e mistura
+    contagem com percentual na mesma tabela. Por isso:
+
+    - `float` integral → mesmo texto de `int` (``43``, ``172.322``);
+    - `float` fracionário → mantém a casa decimal (não trunca dado real);
+    - `None`/vazio → ``sem dado`` com o motivo, como em `fmt_nulo`;
+    - `bool` → ``Sim``/``Não`` (é subclasse de `int`, não é contagem).
+
+    Percentual **não** passa por aqui: continua em `fmt_nulo` com 1 casa.
+    """
+    if isinstance(valor, bool):
+        return fmt_nulo(valor, motivo)
+    if isinstance(valor, float) and valor.is_integer():
+        return fmt_nulo(int(valor), motivo)
+    return fmt_nulo(valor, motivo)
+
+
+def fmt_celula(celula: Mapping[str, Any]) -> str:
+    """Célula de tabela ``{valor, motivo, unidade}`` (as que `web/escola.py` monta).
+
+    A unidade decide a formatação: ``%`` é medida fracionária (1 casa, via
+    `fmt_nulo`); qualquer outra (inclusive vazia) é contagem e não mostra
+    ``,0`` (via `fmt_contagem`). A unidade só acompanha um valor presente:
+    ausência continua ``sem dado (motivo)``, sem sufixo — "sem dado%" não
+    existe.
+    """
+    valor = celula.get("valor")
+    motivo = celula.get("motivo")
+    unidade = celula.get("unidade") or ""
+    if unidade == "%":
+        texto = fmt_nulo(valor, motivo)
+    else:
+        texto = fmt_contagem(valor, motivo)
+    if valor is None or not unidade:
+        return texto
+    return f"{texto}{unidade}"
 
 
 def fmt_oferta(valor: Any) -> str:
@@ -88,6 +131,8 @@ __all__ = [
     "OFERTA_DESCONHECIDA",
     "SEM_DADO",
     "fmt_ano",
+    "fmt_celula",
+    "fmt_contagem",
     "fmt_gap_lider",
     "fmt_nulo",
     "fmt_oferta",
