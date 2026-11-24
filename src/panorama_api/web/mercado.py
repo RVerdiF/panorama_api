@@ -35,7 +35,10 @@ Decisões que moram neste módulo:
 
 from __future__ import annotations
 
+import math
 from typing import Any, Sequence
+
+from markupsafe import Markup
 
 from panorama_api.schemas.markets import MarketItem, MarketsResponse, ShareResponse
 from panorama_api.web.conteudo import (
@@ -143,6 +146,41 @@ def _item_da_etapa(items: Sequence[MarketItem], etapa: str) -> MarketItem | None
     return next((item for item in items if item.etapa == etapa), None)
 
 
+def _formatar_largura(valor: float) -> str:
+    """Largura do `<rect>`: determinística, sem zeros à direita e sem expoente.
+
+    ``37.5`` → ``37.5``, ``100.0`` → ``100``, ``0.0834`` → ``0.0834``. Quatro
+    casas bastam para o share (o menor passo do contrato é 0,0001 p.p.) e
+    evitam a notação científica que ``str(float)`` produziria para valores
+    ínfimos — o atributo só aceita número decimal.
+    """
+    return f"{valor:.4f}".rstrip("0").rstrip(".")
+
+
+def barra_share(pct: float | None) -> Markup | None:
+    """Barra decorativa do share em matrícula privada (SVG inline, sem JS).
+
+    Devolve ``None`` quando **não há share** (``None``, ``NaN``, ``inf``): a
+    ausência nunca vira zero (AGENTS.md §6) — a célula fica só com o número
+    "sem dado". Valor fora de 0..100 é limitado à faixa, porque a barra é uma
+    leitura visual e não pode estourar o `viewBox`.
+
+    O SVG é ``aria-hidden``/``focusable="false"``: o número em texto na célula
+    continua sendo a leitura acessível, a barra não duplica a informação.
+    Nada externo é interpolado além do número já limitado — por isso o
+    ``Markup`` pode ser usado sem abrir escape no template. Sem ``xmlns``: o SVG
+    é inline no HTML, onde o namespace já é o do documento (e o atributo
+    custaria ~38 B em cada linha do ranking).
+    """
+    if pct is None or not math.isfinite(pct):
+        return None
+    largura = _formatar_largura(min(max(float(pct), 0.0), 100.0))
+    return Markup(
+        '<svg class="barra-share" viewBox="0 0 100 8" aria-hidden="true" '
+        f'focusable="false"><rect width="{largura}" height="8"/></svg>'
+    )
+
+
 def _linhas_share(share: ShareResponse) -> list[dict[str, Any]]:
     """Ranking do share na página, com a posição explícita (o contrato não tem `total`)."""
     offset = share.page.offset
@@ -155,6 +193,9 @@ def _linhas_share(share: ShareResponse) -> list[dict[str, Any]]:
             "share_privado_pct": item.share_privado_pct,
             "share_total_pct": item.share_total_pct,
             "is_abaixo_porte": item.is_abaixo_porte,
+            # Barra decorativa ao lado do número (o número não muda): `None`
+            # quando o share é nulo, para a célula não ganhar um zero visual.
+            "barra_share": barra_share(item.share_privado_pct),
         }
         for indice, item in enumerate(share.data.items)
     ]
@@ -281,6 +322,7 @@ __all__ = [
     "MOVIMENTO",
     "ROTULO_ESCOLAS_MERCADO",
     "VISAO_GERAL",
+    "barra_share",
     "contexto_escolas_mercado",
     "contexto_visao_geral",
     "itens_subnav",

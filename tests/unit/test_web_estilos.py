@@ -266,3 +266,35 @@ def test_painel_do_submenu_fica_em_fluxo_e_nao_sobreposto():
     assert "position: absolute" not in painel
     assert "position" not in painel
     assert "border-left: 1px solid var(--cor-borda)" in painel
+
+
+# -- destaque da linha alvo do ranking (card t_e120b83b) ---------------------
+
+#: Fundo do destaque da linha alvo (`:target`) — tom de `--cor-destaque`.
+FUNDO_ALVO = "#eaf2f7"
+
+
+def test_destaque_da_linha_alvo_nao_depende_de_js_nem_de_cor():
+    """`:target` em CSS puro: fundo + marca de espessura, não só cor (WCAG 1.4.1).
+
+    O destaque tem de sobreviver a quem não distingue a cor do fundo: por isso
+    a primeira célula ganha uma marca não cromática (espessura de 4px). E a
+    linha não pode parar sob o topo de uma página rolada — `scroll-margin-top`.
+    """
+    alvo = _regra(".tabela tbody tr:target")
+    marca = _regra(".tabela tbody tr:target > *:first-child")
+
+    fundo = re.search(r"background:\s*(#[0-9a-fA-F]{6})", alvo)
+    assert fundo is not None and fundo.group(1).lower() == FUNDO_ALVO
+    margem = re.search(r"scroll-margin-top:\s*([\d.]+)rem", alvo)
+    assert margem is not None, "linha alvo sem scroll-margin-top"
+    assert float(margem.group(1)) >= 4
+
+    # Espessura explícita: a marca existe em escala de cinza, não é só cor.
+    espessura = re.search(r"(?:box-shadow|border-left)[^;]*?(\d+)px", marca)
+    assert espessura is not None, "marca do alvo sem espessura (box-shadow/border-left)"
+    assert int(espessura.group(1)) >= 4
+
+    destaque = _cor_da_variavel("cor-destaque")
+    assert _contraste(destaque, "#ffffff") >= CONTRASTE_MINIMO
+    assert _contraste(destaque, FUNDO_ALVO) >= CONTRASTE_MINIMO

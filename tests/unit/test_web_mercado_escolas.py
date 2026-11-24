@@ -33,8 +33,10 @@ from panorama_api.web.conteudo import (
     MOTIVO_ALEM_DO_FIM,
     MOTIVO_SEM_PRIVADAS,
 )
+from panorama_api.web.mercado import barra_share
 from tests.unit.conftest import (
     FakeRepository,
+    history_row,
     market_row,
     municipio_row,
     share_row,
@@ -47,8 +49,13 @@ ESCOLAS = f"{MERCADO}/escolas"
 ANOS = (2021, 2022, 2023, 2024, 2025)
 #: Nenhuma forma de total no HTML ("de 1.025 resultados", "de 20 resultados").
 TEXTO_DE_TOTAL = re.compile(r"\bde\s+[\d.]+\s+resultados?\b", re.IGNORECASE)
-#: Teto de peso pedido pelo card para o ranking (50 linhas).
-TETO_HTML_BYTES = 30 * 1024
+#: Teto de peso do ranking (50 linhas), medido no teste.
+#:
+#: A barra decorativa por linha (card `t_e120b83b`: SVG de 121 B por `<tr>`)
+#: acrescenta ~5,9 KB às 50 linhas: a página medida sai com ~32,6 KB brutos
+#: (3,4 KB em gzip). O teto sobe de 30 KB para 34 KB **sem** afrouxar o que ele
+#: protege: 50 linhas por página, sem consulta nova, sem JS.
+TETO_HTML_BYTES = 34 * 1024
 
 
 def _settings(*, anos: str = ",".join(str(ano) for ano in ANOS)) -> Settings:
@@ -455,3 +462,182 @@ def test_erro_nao_tratado_nao_vaza_stack(mercado_repo):
     assert resposta.headers["cache-control"] == "no-store"
     assert "Traceback" not in resposta.text
     assert "RuntimeError" not in resposta.text
+
+
+# -- âncora por INEP e barra de share por linha (card t_e120b83b) ------------
+
+
+def _corpo_da_tabela(html: str) -> str:
+    """Só o `<tbody>` do ranking: o `<thead>` não tem âncora nem barra."""
+    return html.split("<tbody>")[-1].split("</tbody>")[0]
+
+
+def _linhas_do_ranking(html: str) -> list[str]:
+    """`<tr>` do corpo do ranking, uma string por linha (sem `<thead>`)."""
+    return re.findall(r"<tr\b[^>]*>.*?</tr>", _corpo_da_tabela(html), re.DOTALL)
+
+
+def _linha_da_escola(html: str, id_entidade: str) -> str:
+    """`<tr>` de uma escola, isolado do resto do HTML (e não do HTML inteiro)."""
+    achado = re.search(
+        rf'<tr id="escola-{re.escape(id_entidade)}">.*?</tr>',
+        _corpo_da_tabela(html),
+        re.DOTALL,
+    )
+    assert achado is not None, f"linha sem âncora para {id_entidade}"
+    return achado.group(0)
+
+
+def test_linhas_do_ranking_tem_ancora_unica_por_id(mercado_repo):
+    """Cada linha tem `id="escola-<INEP>"`, sem repetir e sem `escola-None`."""
+    html = _html(_client(mercado_repo).get(f"{ESCOLAS}?etapa=bas"))
+
+    linhas = _linhas_do_ranking(html)
+    assert linhas
+    identificadores = []
+    for linha in linhas:
+        ancora = re.search(r'id="escola-([^"]+)"', linha)
+        assert ancora is not None, "linha sem âncora"
+        identificadores.append(ancora.group(1))
+    # Uma âncora por linha e nenhum id repetido na página.
+    assert len(identificadores) == len(linhas) == len(set(identificadores))
+    # O id é o INEP da própria linha (posição preservada).
+    assert 'id="escola-310000bas00"' in linhas[0]
+    assert 'id="escola-310000bas01"' in linhas[1]
+
+    # Sem código INEP a âncora não existe. O contrato (`ShareItem.id_entidade:
+    # str`) recusa `None` antes do template, então o valor sem conteúdo que
+    # chega até aqui é `""` — e a página não pode ganhar `id="escola-"` nem
+    # `id="escola-None"`.
+    mercado_repo.share = [
+        share_row(nu_ano_censo=2025, etapa="bas", id_entidade="")
+    ]
+    html = _html(_client(mercado_repo).get(f"{ESCOLAS}?etapa=bas"))
+
+    corpo = _corpo_da_tabela(html)
+    assert "escola-None" not in html
+    assert "escola-" not in corpo
+    assert "id=" not in _linhas_do_ranking(html)[0].split(">")[0]
+
+
+def test_share_nulo_nao_ganha_barra_e_share_presente_ganha(mercado_repo):
+    """Share nulo continua "sem dado" (sem barra); share presente ganha a barra."""
+    mercado_repo.share = [
+        share_row(
+            nu_ano_censo=2025,
+            etapa="bas",
+            id_entidade="31000001",
+            mat_entidade=None,
+            share_privado_pct=None,
+        ),
+        share_row(
+            nu_ano_censo=2025,
+            etapa="bas",
+            id_entidade="31000002",
+            share_privado_pct=37.5,
+        ),
+    ]
+
+    html = _html(_client(mercado_repo).get(f"{ESCOLAS}?etapa=bas"))
+
+    assert "<svg" not in _linha_da_escola(html, "31000001")
+    assert "sem dado" in _linha_da_escola(html, "31000001")
+    assert '<rect width="37.5"' in _linha_da_escola(html, "31000002")
+
+
+def test_barra_limita_share_fora_de_0_100(mercado_repo):
+    """A barra é leitura visual: fora de 0..100 satura, não estoura o viewBox."""
+    mercado_repo.share = [
+        share_row(
+            nu_ano_censo=2025,
+            etapa="bas",
+            id_entidade="31000003",
+            share_privado_pct=137.5,
+        ),
+        share_row(
+            nu_ano_censo=2025,
+            etapa="bas",
+            id_entidade="31000004",
+            share_privado_pct=-3.2,
+        ),
+    ]
+
+    html = _html(_client(mercado_repo).get(f"{ESCOLAS}?etapa=bas"))
+
+    linha_acima = _linha_da_escola(html, "31000003")
+    assert "<svg" in linha_acima
+    assert '<rect width="100"' in linha_acima
+
+    linha_abaixo = _linha_da_escola(html, "31000004")
+    assert "<svg" in linha_abaixo
+    assert '<rect width="0"' in linha_abaixo
+
+
+def test_barra_e_decorativa_e_nao_duplica_a_leitura(mercado_repo):
+    """O SVG é decorativo; o percentual continua em texto na célula."""
+    mercado_repo.share = [
+        share_row(
+            nu_ano_censo=2025,
+            etapa="bas",
+            id_entidade="31000005",
+            share_privado_pct=37.5,
+        )
+    ]
+
+    html = _html(_client(mercado_repo).get(f"{ESCOLAS}?etapa=bas"))
+
+    linha = _linha_da_escola(html, "31000005")
+    svg = re.search(r"<svg\b[^>]*>", linha)
+    assert svg is not None
+    assert 'aria-hidden="true"' in svg.group(0)
+    assert 'focusable="false"' in svg.group(0)
+    # A leitura acessível é o número em texto, antes da barra.
+    # A célula do share privado é o penúltimo `<td>` da linha.
+    celula = linha.split("<td>")[-2]
+    assert "37,5%" in celula
+    assert celula.index("37,5%") < celula.index("<svg")
+
+
+def test_barra_share_formata_e_limita_o_valor():
+    """`barra_share` é puro: `None`/não finito → sem barra; fora de 0..100 satura."""
+    assert barra_share(None) is None
+    assert barra_share(float("nan")) is None
+    assert barra_share(float("inf")) is None
+    # Largura determinística: sem zeros à direita e sem notação científica.
+    for pct, largura in (
+        (37.5, "37.5"),
+        (100.0, "100"),
+        (0, "0"),
+        (0.0834, "0.0834"),
+        (137.5, "100"),
+        (-3.2, "0"),
+    ):
+        assert f'<rect width="{largura}"' in str(barra_share(pct)), pct
+
+
+def test_custo_de_consultas_nao_muda_com_ancora_e_barra():
+    """A âncora e a barra são derivadas do que já veio: nenhuma consulta nova.
+    A ficha da escola custa 1 consulta (`get_school_history`) e o ranking custa
+    3 (`get_municipio`, `get_market`, `get_market_share`) — os mesmos números de
+    antes do card, medidos por rota no mesmo repositório fake.
+    """
+    repo = FakeRepository(
+        municipios=[municipio_row()],
+        markets=[market_row(nu_ano_censo=2025, etapa="bas")],
+        share=[
+            share_row(nu_ano_censo=2025, etapa="bas", id_entidade="31000001")
+        ],
+        history=[history_row()],
+    )
+    cliente = _client(repo)
+
+    _html(cliente.get("/app/escolas/31000001"))
+    assert [nome for nome, _ in repo.calls] == ["get_school_history"]
+
+    repo.calls.clear()
+    _html(cliente.get(ESCOLAS))
+    assert sorted(nome for nome, _ in repo.calls) == [
+        "get_market",
+        "get_market_share",
+        "get_municipio",
+    ]

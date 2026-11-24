@@ -67,7 +67,10 @@
         </thead>
         <tbody>
           {% for linha in linhas_share %}
-          <tr>
+          {# Âncora estável por código INEP: permite chegar direto a uma escola
+             do ranking por URL (`#escola-<INEP>`). Só existe quando o código
+             existe — sem `id="escola-None"` e sem id repetido na página. #}
+          <tr{% if linha.id_entidade %} id="escola-{{ linha.id_entidade }}"{% endif %}>
             <th scope="row">{{ linha.posicao }}.º</th>
             <td>
               {# O nome é o link da ficha; o código INEP continua em `<code>`. #}
@@ -80,7 +83,9 @@
             </td>
             <td><code>{{ linha.id_entidade }}</code></td>
             <td>{{ linha.mat_entidade | fmt_contagem }}</td>
-            <td>{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}</td>
+            <td>{# O número é a leitura acessível da célula; a barra ao lado é
+                  decorativa (SVG `aria-hidden`) e só existe quando há share —
+                  `sem dado` não ganha barra nem vira zero. #}{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}{% if linha.barra_share %}{{ linha.barra_share }}{% endif %}</td>
             <td>{{ linha.share_total_pct | fmt_nulo }}{% if linha.share_total_pct is not none %}%{% endif %}</td>
           </tr>
           {% endfor %}

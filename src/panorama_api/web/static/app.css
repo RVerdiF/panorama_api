@@ -391,6 +391,37 @@ button:hover {
   border-bottom: none;
 }
 
+/* Ranking de share: barra decorativa por linha (SVG do servidor) e destaque da
+   linha alvo. CSS puro — sem `<script>`, sem `style=` inline, sem JS. */
+.barra-share {
+  display: inline-block;
+  width: 5rem;
+  height: 8px;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  background: var(--cor-fundo);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.barra-share rect {
+  fill: var(--cor-destaque);
+}
+
+/* Linha alvo de `#escola-<INEP>`: `:target` não precisa de JS.
+   WCAG 1.4.1: fundo **e** marca não cromática de 4px à esquerda da primeira
+   célula (legível em escala de cinza); `scroll-margin-top` evita a linha sob o
+   topo. Medições: --cor-destaque 6,84:1 sobre branco, 6,04:1 sobre o fundo do
+   destaque; #1d1d1b sobre #eaf2f7 = 14,91:1. */
+.tabela tbody tr:target {
+  background: #eaf2f7;
+  scroll-margin-top: 5rem;
+}
+
+.tabela tbody tr:target > *:first-child {
+  box-shadow: inset 4px 0 0 var(--cor-destaque);
+}
+
 .paginacao {
   display: flex;
   flex-wrap: wrap;
