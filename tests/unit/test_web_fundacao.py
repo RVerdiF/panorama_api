@@ -187,6 +187,48 @@ def test_404_em_app_e_pagina_html_sem_stack(client):
     assert "select " not in html.lower()
 
 
+# -- 404 de rota inexistente ≠ recurso do recorte MG (C5) --------------------
+
+
+def test_404_de_rota_inexistente_usa_titulo_de_pagina_nao_encontrada(client):
+    resposta = client.get("/app/rota-inexistente")
+
+    html = _html(resposta)
+    titulo = re.search(r"<title>(.*?)</title>", html, flags=re.S)
+    assert resposta.status_code == 404
+    assert titulo is not None
+    assert "Página não encontrada" in titulo.group(1)
+    assert "recorte de Minas Gerais" not in html
+    # A página oferece a entrada do front.
+    assert 'href="/app/"' in html
+
+
+def test_404_de_escola_inexistente_mantem_titulo_do_recorte_mg(client):
+    resposta = client.get("/app/escolas/99999999")
+
+    html = _html(resposta)
+    assert resposta.status_code == 404
+    assert "Não encontrado no recorte de Minas Gerais" in html
+    assert "Página não encontrada" not in html
+
+
+def test_404_de_municipio_inexistente_mantem_titulo_do_recorte_mg(client):
+    resposta = client.get("/app/mercados/3199999")
+
+    html = _html(resposta)
+    assert resposta.status_code == 404
+    assert "Não encontrado no recorte de Minas Gerais" in html
+
+
+def test_404_de_asset_nao_e_tratado_como_recurso_do_recorte(client):
+    resposta = client.get("/app/static/000000000000-app.css")
+
+    html = _html(resposta)
+    assert resposta.status_code == 404
+    assert "Página não encontrada" in html
+    assert resposta.headers["cache-control"] == CACHE_CONTROL_ERRO
+
+
 def test_503_de_problem_error_em_app_devolve_retry_after_e_no_store(repository):
     app = create_app(settings=_settings(), repository=repository)
 

@@ -65,6 +65,13 @@ MOTIVO_SECAO_COMPETIDORES = (
 #: **Não** é ausência de mercado nem share de 0% para as escolas ausentes.
 MOTIVO_SEM_PRIVADAS = "mercado sem escolas privadas com matrícula"
 
+#: Página da lista de share além do fim (`offset > 0` com `items: []`). O
+#: contrato não tem `total`, então página vazia **não** prova ausência de
+#: mercado: só prova que não há mais linhas naquele offset. A tela oferece a
+#: volta à 1ª página em vez de afirmar que o município não tem escolas privadas
+#: (achado C2 do card `t_3ea9454f`).
+MOTIVO_ALEM_DO_FIM = "Não há mais escolas nesta página."
+
 #: `n_escolas_entraram`/`n_escolas_ativas_com_baseline`/`n_escolas_sairam` são
 #: NULL no primeiro ano da série (não há baseline anterior). Ausência de dado,
 #: nunca zero.
@@ -138,6 +145,7 @@ __all__ = [
     "ETAPAS_ROTULOS",
     "ETAPA_PADRAO_MERCADO",
     "MOTIVO_ENTRADA_SAIDA",
+    "MOTIVO_ALEM_DO_FIM",
     "MOTIVO_FORA_DO_UNIVERSO_PRIVADO",
     "MOTIVO_SECAO_COMPETIDORES",
     "MOTIVO_SECAO_INDICADORES",

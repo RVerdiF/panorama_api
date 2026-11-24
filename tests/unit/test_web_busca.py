@@ -76,10 +76,10 @@ def _limpar_cache_de_paginas(client) -> None:
     raise AssertionError("cache de páginas /app não encontrado no stack")
 
 
-def _get(client, **kwargs):
+def _get(client, path: str = BUSCA, **kwargs):
     """``GET /app/`` com o cache de páginas limpo antes da requisição."""
     _limpar_cache_de_paginas(client)
-    return client.request("GET", BUSCA, **kwargs)
+    return client.request("GET", path, **kwargs)
 
 
 def _carregar_script_gerador() -> ModuleType:
@@ -195,6 +195,35 @@ def test_parametro_invalido_responde_422_sem_consultar_repositorio(
     assert _consultas_de_escola(repository) == []
 
 
+@pytest.mark.parametrize("offsets", [{"offset": 1001}, {"offset": 2000}])
+def test_offset_invalido_sem_criterio_tambem_responde_422(
+    client, repository, offsets
+):
+    """Sem critério a busca é 200 — mas o `offset` inválido continua 422 (C7)."""
+    resposta = _get(client, params=offsets)
+
+    assert resposta.status_code == 422
+    assert resposta.headers["content-type"].startswith("text/html")
+    assert "offset" in resposta.text.lower()
+    assert _consultas_de_escola(repository) == []
+
+
+@pytest.mark.parametrize("params", [{"offset": -1}, {"offset": "abc"}])
+def test_offset_malformado_sem_criterio_responde_422(client, repository, params):
+    resposta = _get(client, params=params)
+
+    assert resposta.status_code == 422
+    assert _consultas_de_escola(repository) == []
+
+
+def test_offset_no_teto_sem_criterio_continua_200(client, repository):
+    """O teto é aceito: `?offset=1000` sozinho não é erro de parâmetro."""
+    resposta = _get(client, params={"offset": 1000})
+
+    assert resposta.status_code == 200
+    assert "nenhuma escola" in resposta.text.lower()
+
+
 def test_busca_sem_resultado_responde_200_nenhuma_escola(client, repository):
     repository.schools = []
 
@@ -202,6 +231,85 @@ def test_busca_sem_resultado_responde_200_nenhuma_escola(client, repository):
 
     assert resposta.status_code == 200
     assert "nenhuma escola" in resposta.text.lower()
+
+
+# -- estado vazio: sugestões de próximo passo (C4) ---------------------------
+
+
+def test_estado_vazio_sugere_menos_letras(client, repository):
+    repository.schools = []
+
+    html = _get(client, params={"q": "zzzxxyy"}).text
+
+    assert "Nenhuma escola encontrada" in html
+    assert "Use menos letras" in html
+
+
+def test_estado_vazio_sem_termo_sugere_informar_o_nome(client, repository):
+    """Sem `q` a dica é informar o nome — não "menos letras" de nada."""
+    repository.schools = []
+
+    html = _get(client, params={"co_municipio": "3106200"}).text
+
+    assert "Informe o nome da escola" in html
+    assert "Use menos letras" not in html
+
+
+def test_estado_vazio_oferece_busca_sem_o_filtro_de_municipio(client, repository):
+    """Com `q` + município, o link remove só o município."""
+    repository.schools = []
+
+    html = _get(
+        client, params={"q": "zzzxxyy", "co_municipio": "3106200"}
+    ).text
+
+    assert 'href="/app/?q=zzzxxyy"' in html
+
+
+def test_estado_vazio_nao_oferece_remover_municipio_sem_termo(client, repository):
+    """Sem `q`, remover o município cairia na busca sem critério (beco sem saída)."""
+    repository.schools = []
+
+    html = _get(client, params={"co_municipio": "3106200"}).text
+
+    assert "sem o filtro de município" not in html
+    # A busca vazia continua sendo renderizada (200), não um link morto.
+    assert "Nenhuma escola encontrada" in html
+
+
+def test_estado_vazio_oferece_incluir_escolas_inativas(client, repository):
+    repository.schools = []
+
+    html = _get(
+        client, params={"q": "zzzxxyy", "co_municipio": "3106200", "apenas_ativas": "true"}
+    ).text
+
+    assert 'href="/app/?q=zzzxxyy&amp;co_municipio=3106200"' in html
+    assert "Incluir escolas inativas" in html
+
+
+def test_estado_vazio_sem_filtros_so_sugere_menos_letras(client, repository):
+    repository.schools = []
+
+    html = _get(client, params={"q": "zzzxxyy"}).text
+
+    assert "sem o filtro de município" not in html
+    assert "Incluir escolas inativas" not in html
+
+
+def test_sugestoes_do_vazio_apontam_para_paginas_que_respondem_200(client, repository):
+    """Todo link sugerido é uma página real da busca (não o `/v1` nem 422)."""
+    repository.schools = []
+
+    html = _get(
+        client, params={"q": "zzzxxyy", "co_municipio": "3106200", "apenas_ativas": "true"}
+    ).text
+    hrefs = re.findall(r'href="(/app/\?[^"]+)"', html)
+    assert hrefs
+
+    for href in hrefs:
+        destino = href.replace("&amp;", "&")
+        assert _get(client, path=destino).status_code == 200, destino
 
 
 # -- resultados, recorte e filtros -------------------------------------------

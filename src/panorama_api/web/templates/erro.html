@@ -17,6 +17,10 @@
   <p class="aviso">{{ sugestao }}</p>
   {% endif %}
 
+  {% if acao %}
+  <p><a class="paginacao__link" href="{{ acao.href }}">{{ acao.rotulo }}</a></p>
+  {% endif %}
+
   {% if erros %}
   <section aria-labelledby="detalhes-erro">
     <h2 id="detalhes-erro">O que precisa ser corrigido</h2>

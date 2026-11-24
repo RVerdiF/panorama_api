@@ -34,7 +34,7 @@ from panorama_api.repositories.serving import ServingRepository
 from panorama_api.web import PREFIXO_WEB
 from panorama_api.web.middleware import WebGZipMiddleware
 from panorama_api.web.observability import PageViewMiddleware
-from panorama_api.web.routes import RETRY_AFTER_SEGUNDOS, pagina_erro
+from panorama_api.web.routes import RETRY_AFTER_SEGUNDOS, pagina_erro, pagina_inexistente
 from panorama_api.web.routes import router as web_router
 
 logger = logging.getLogger(__name__)
@@ -189,6 +189,11 @@ def _handle_http(request: Request, exc: Exception) -> Response:
             ErrorCode.ERRO_INTERNO, str(exc.detail), status=exc.status_code
         )
     if _is_web(request):
+        # 404 de **rota** não é recurso do recorte MG: a página diz "Página não
+        # encontrada" e oferece a busca. Escola/município inexistente chega por
+        # `ProblemError` (`_handle_problem`) e mantém o texto do recorte.
+        if exc.status_code == 404:
+            return pagina_inexistente(request, problem)
         return pagina_erro(
             request,
             problem,

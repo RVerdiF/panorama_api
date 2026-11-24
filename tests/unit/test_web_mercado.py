@@ -16,13 +16,18 @@ Cobre os critérios de aceite do card sobre o HTML renderizado de verdade
 from __future__ import annotations
 
 import re
+from html import unescape as desescapar
 
 import pytest
 from fastapi.testclient import TestClient
 
 from panorama_api.config import Settings
 from panorama_api.main import create_app
-from panorama_api.web.conteudo import MOTIVO_ENTRADA_SAIDA, MOTIVO_SEM_PRIVADAS
+from panorama_api.web.conteudo import (
+    MOTIVO_ALEM_DO_FIM,
+    MOTIVO_ENTRADA_SAIDA,
+    MOTIVO_SEM_PRIVADAS,
+)
 from tests.unit.conftest import (
     FakeRepository,
     concentracao_row,
@@ -166,7 +171,61 @@ def test_share_vazio_diz_mercado_sem_escolas_privadas_com_matricula(mercado_repo
     html = _html(_client(mercado_repo).get(MERCADO))
 
     assert MOTIVO_SEM_PRIVADAS in html
+    assert MOTIVO_ALEM_DO_FIM not in html
     assert "<table" not in html.split('aria-labelledby="share"')[-1][:1200]
+
+
+@pytest.mark.parametrize("params", ["?offset=0", "?etapa=bas&offset=0"])
+def test_share_vazio_com_offset_zero_mantem_a_mensagem_de_ausencia(
+    mercado_repo, params
+):
+    """Com `offset=0` a ausência é real: a mensagem atual não muda (C2)."""
+    mercado_repo.share = []
+
+    html = _html(_client(mercado_repo).get(f"{MERCADO}{params}"))
+
+    assert MOTIVO_SEM_PRIVADAS in html
+    assert MOTIVO_ALEM_DO_FIM not in html
+    assert "Voltar à primeira página" not in html
+
+
+# -- offset além do fim: NÃO é mercado sem privadas (C2) ---------------------
+
+
+def test_offset_alem_do_fim_nao_diz_que_o_mercado_nao_tem_privadas(mercado_repo):
+    """Página vazia com `offset > 0` não é ausência de mercado (BH tem 819)."""
+    resposta = _client(mercado_repo).get(f"{MERCADO}?etapa=bas&offset=1000")
+
+    html = _html(resposta)
+    assert MOTIVO_SEM_PRIVADAS not in html
+    assert MOTIVO_ALEM_DO_FIM in html
+    # A volta leva ao mesmo recorte (ano/etapa) na 1ª página, sem `offset`.
+    # `&amp;` é o `&` do href depois do escape do Jinja: o navegador vê a URL
+    # literal do critério de aceite.
+    assert (
+        f'href="{MERCADO}?ano=2025&etapa=bas"'
+        in desescapar(html)
+    )
+    # Página 200 de página vazia: a política de cache das páginas não muda.
+    assert resposta.headers["cache-control"] == "private, no-cache"
+
+
+def test_offset_alem_do_fim_preserva_ano_e_etapa_no_link_de_volta(mercado_repo):
+    html = desescapar(
+        _html(_client(mercado_repo).get(f"{MERCADO}?ano=2024&etapa=med&offset=1000"))
+    )
+
+    assert f'href="{MERCADO}?ano=2024&etapa=med"' in html
+    assert "offset=1000" not in html.split('aria-labelledby="share"')[-1]
+
+
+def test_offset_alem_do_fim_nao_pede_refinamento_nem_mostra_anterior(mercado_repo):
+    """A lista acabou: nem "Próxima" nem o aviso de teto de paginação."""
+    html = _html(_client(mercado_repo).get(f"{MERCADO}?offset=1000"))
+
+    secao = html.split('aria-labelledby="share"')[-1]
+    assert "Próxima" not in secao
+    assert "Limite de paginação atingido" not in secao
 
 
 def test_escola_ausente_do_share_nunca_aparece_como_zero_por_cento(mercado_repo):
