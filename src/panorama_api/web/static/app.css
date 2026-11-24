@@ -217,15 +217,10 @@ li {
   font-style: italic;
 }
 
-/* Entrada orientadora da busca (card t_0c84b91f): o bloco que diz o que é o
-   produto antes do formulário (a hierarquia já vem do `h1`). */
-.orientacao__atalhos {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
-  margin: 0.75rem 0 0;
-  padding: 0;
-  list-style: none;
+/* "O que você encontra" (card `t_2c2e564b`, spec §5): 3 colunas ≥ 48rem. */
+.encontra {
+  display: grid;
+  gap: 1.25rem;
 }
 
 /* Breadcrumb de escola/mercado: caminho de volta em uma linha, o último item
@@ -679,6 +674,10 @@ tbody th {
 
   .hero__busca .dica {
     display: none;
+  }
+
+  .encontra {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

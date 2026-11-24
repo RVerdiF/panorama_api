@@ -79,4 +79,50 @@
     <p class="recorte__fonte">Fonte: Censo Escolar da Educação Básica (INEP).</p>
   </section>
 </section>
+
+{# Conteúdo da landing (card `t_2c2e564b`, spec §5): o que dá para consultar,
+   de onde vêm os dados e para quem é. Copy institucional, sem superlativo e
+   sem CTA de piloto — a landing pública da Fase 2 do `plano.md` é outra. Os
+   anos da seção de fonte saem de `settings.anos_disponiveis` já formatados em
+   `recorte_anos`; nada de literal de ano aqui. #}
+<section aria-labelledby="encontra-titulo">
+  <h2 id="encontra-titulo">O que você encontra</h2>
+  <div class="encontra">
+    <div>
+      <h3>Ficha da escola</h3>
+      <p>Série de matrículas, oferta por etapa e rendimento. Nas escolas privadas ativas, também a posição da escola no município.</p>
+      <a href="#q">Buscar uma escola</a>
+    </div>
+    <div>
+      <h3>Mercado municipal</h3>
+      <p>Tamanho do mercado, composição por etapa e participação das escolas privadas, ano a ano.</p>
+      <a href="{{ app_prefix }}/mercados/3106200">Ver o mercado de Belo Horizonte</a>
+    </div>
+    <div>
+      <h3>Metodologia</h3>
+      <p>De onde vem cada número, o que cada indicador mede e quais são os limites de leitura.</p>
+      <a href="{{ href_metodologia }}">Ler a metodologia</a>
+    </div>
+  </div>
+</section>
+
+<section aria-labelledby="fonte-titulo">
+  <h2 id="fonte-titulo">De onde vêm os dados</h2>
+  <p>
+    Os números vêm do Censo Escolar da Educação Básica, levantamento anual do
+    INEP que cobre todas as escolas do país. O Panorama Escola recorta Minas
+    Gerais e publica os anos {{ recorte_anos }}. Quando um dado não existe na
+    base, a tela mostra “sem dado”, e nunca zero.
+  </p>
+  <p><a href="{{ href_metodologia }}">Como os números são calculados</a></p>
+</section>
+
+<section aria-labelledby="publico-titulo">
+  <h2 id="publico-titulo">Para quem é</h2>
+  <p>
+    Para quem acompanha a educação básica privada em Minas Gerais: gestão e
+    expansão de redes, direção de escolas e análise de mercado. O Panorama não
+    exibe dado individual de aluno.
+  </p>
+</section>
 {% endblock %}
