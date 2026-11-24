@@ -7,7 +7,9 @@ numéricos e vivem no arquivo:
 * borda de **controle** (input/select) com ≥3:1 sobre `#ffffff` — WCAG 1.4.11
   para o limite visual do controle, separada da borda decorativa de cartão;
 * `:hover` em `a`, `button` e `.paginacao__link` (affordance de ponteiro);
-* alvo de toque ≥44px em `.topo__nav a` e `.paginacao__link`.
+* alvo de toque ≥44px em `.topo__nav a` e `.paginacao__link`;
+* texto do painel do recorte da landing com ≥4,5:1 sobre o fundo `#eaf1f6`
+  (card `t_437796c3`) — o painel não fica mais sobre o branco do cartão.
 
 Um teste aqui impede que uma edição futura devolva a borda decorativa para o
 input ou encolha de novo o link de navegação.
@@ -100,3 +102,59 @@ def test_alvos_de_toque_do_topo_e_da_paginacao_tem_44px():
         assert "inline-flex" in regra, f"{seletor} precisa de display inline-flex"
         assert altura is not None, f"{seletor} sem min-height explícito"
         assert int(altura.group(1)) >= ALVO_MINIMO_PX
+
+
+# -- hero da landing e painel do recorte (card t_437796c3) --------------------
+
+#: Fundo do painel do recorte (spec §4): tom de `--cor-destaque`. O texto do
+#: painel não fica mais sobre `#ffffff` — o contraste tem de ser medido aqui.
+FUNDO_PAINEL = "#eaf1f6"
+
+#: WCAG 1.4.3 para texto normal (o card pede 4,5:1, não os 3:1 de elemento).
+CONTRASTE_TEXTO_MINIMO = 4.5
+
+
+def test_texto_do_painel_do_recorte_tem_contraste_de_4_5_para_1():
+    css = CSS.read_text(encoding="utf-8")
+    texto = re.search(r"--cor-texto:\s*(#[0-9a-fA-F]{6})", css)
+    suave = re.search(r"--cor-texto-suave:\s*(#[0-9a-fA-F]{6})", css)
+    assert texto is not None and suave is not None
+
+    assert _contraste(texto.group(1), FUNDO_PAINEL) >= CONTRASTE_TEXTO_MINIMO
+    assert _contraste(suave.group(1), FUNDO_PAINEL) >= CONTRASTE_TEXTO_MINIMO
+
+
+def test_painel_do_recorte_usa_o_fundo_e_o_raio_da_spec():
+    css = CSS.read_text(encoding="utf-8")
+    painel = _regra(".hero .recorte")
+
+    assert f"background: {FUNDO_PAINEL}" in painel
+    assert "border-radius: var(--raio-grande)" in painel
+    # A variável nova é o 16 px da especificação, não um valor solto na regra.
+    assert re.search(r"--raio-grande:\s*16px", css)
+
+
+def test_rotulos_e_fonte_do_painel_usam_o_texto_suave_medido_acima():
+    for seletor in (".recorte__rotulo", ".recorte__fonte"):
+        assert "var(--cor-texto-suave)" in _regra(seletor), seletor
+
+
+def test_hero_empilha_antes_de_48rem_e_vira_duas_colunas_depois():
+    base = _regra(".hero")
+    assert "display: grid" in base
+    # Abaixo do breakpoint é uma coluna: nada de `1.1fr 0.9fr` na regra base.
+    assert "display: flex" not in base
+    assert "1.1fr" not in base
+
+    css = CSS.read_text(encoding="utf-8")
+    bloco = re.search(r"@media \(min-width: 48rem\)\s*\{(.*?)\n\}", css, re.S)
+    assert bloco is not None, "breakpoint do hero ausente"
+    assert ".hero" in bloco.group(1)
+    assert "1.1fr 0.9fr" in bloco.group(1)
+
+
+def test_nenhum_outline_none_no_css():
+    """O foco visível de 3 px vale para o hero também: nada de removê-lo."""
+    css = CSS.read_text(encoding="utf-8")
+
+    assert re.search(r"outline:\s*(?:none|0)\b", css) is None
