@@ -24,10 +24,24 @@ from panorama_api.contract import (
 )
 from panorama_api.web.dados import DESCRICAO_COMPETIDORES
 
-#: Rótulo canônico do proxy de retenção (contrato 2b R4). A métrica se chama
+#: Rótulos canônicos do proxy de retenção (contrato 2b R4). A métrica se chama
 #: "proxy de retenção líquida"; o complemento existe para impedir que o número
 #: seja lido como taxa de evasão.
 ROTULO_RETENCAO = "Proxy de retenção líquida (não é taxa de evasão)"
+
+#: Posições de **crescimento** da série (`rank_crec_municipio`/`rank_crec_mg`).
+#: `crec` é abreviação de *crescimento* (`crescimento_yoy_pct`), não de creche —
+#: lida como "creche", a linha exibia posição de creche para escola sem creche
+#: nenhuma (escola 31005371, `qt_mat_creche = 0`). O parêntese fixa a direção:
+#: 1.º é a escola que **mais cresceu**, não a de maior matrícula.
+ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO = (
+    "Posição por crescimento anual da matrícula no município "
+    "(1.º = maior crescimento ano a ano)"
+)
+ROTULO_POSICAO_CRESCIMENTO_MG = (
+    "Posição por crescimento anual da matrícula em Minas Gerais "
+    "(1.º = maior crescimento ano a ano)"
+)
 
 #: Definição visível da comparação de concorrência: mesma unidade geográfica
 #: (município) e mesmo ano censitário.
@@ -211,6 +225,8 @@ __all__ = [
     "MOTIVO_SECAO_INDICADORES",
     "MOTIVO_SEM_PRIVADAS",
     "NAO_SE_APLICA",
+    "ROTULO_POSICAO_CRESCIMENTO_MG",
+    "ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO",
     "ROTULO_RETENCAO",
     "TEXTO_ABAIXO_PORTE",
     "TEXTO_OFERTA_DESCONHECIDA",

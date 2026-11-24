@@ -60,6 +60,87 @@ def _serie(
     ]
 
 
+#: Escola real do card F11 (COL COTEMIG BARROCA, BH): `qt_mat_creche = 0` e
+#: posição nos rankings de **crescimento** (`rank_crec_municipio = 487`,
+#: `rank_crec_mg = 2.134`). É a evidência que separa "creche" de "crescimento".
+COTEMIG = "31005371"
+COTEMIG_URL = f"/app/escolas/{COTEMIG}"
+#: Rótulos exigidos pelo card: crescimento anual + direção da posição.
+POSICAO_MUNICIPIO = (
+    "Posição por crescimento anual da matrícula no município "
+    "(1.º = maior crescimento ano a ano)"
+)
+POSICAO_MG = (
+    "Posição por crescimento anual da matrícula em Minas Gerais "
+    "(1.º = maior crescimento ano a ano)"
+)
+
+
+def _serie_cotemig() -> list[dict]:
+    """Matrícula da 31005371 em 2025: 680 na básica, todo o médio em técnico."""
+    return [
+        history_row(
+            co_entidade=COTEMIG,
+            nu_ano_censo=2025,
+            tp_dependencia="4",
+            tp_situacao_funcionamento="1",
+            qt_mat_bas=680,
+            qt_mat_creche=0,
+            qt_mat_pre=0,
+            qt_mat_fund_ai=0,
+            qt_mat_fund_af=0,
+            qt_mat_med=680,
+            qt_mat_prof=680,
+            qt_mat_eja=0,
+            qt_mat_esp=21,
+            of_creche=0,
+            of_pre=0,
+            of_fund_ai=0,
+            of_fund_af=0,
+            of_med=1,
+            of_prof=1,
+            of_eja=0,
+        )
+    ]
+
+
+def _indicador_cotemig(**overrides) -> dict:
+    """Linha de `mart_escola_indicadores` da 31005371 (números do diagnóstico)."""
+    valores = {
+        "co_entidade": COTEMIG,
+        "qt_mat_bas": 680,
+        "qt_mat_creche": 0,
+        "qt_mat_med": 680,
+        "qt_mat_prof": 680,
+        "qt_mat_esp": 21,
+        "crescimento_yoy_pct": 12.4,
+        "rank_crec_municipio": 487,
+        "rank_crec_mg": 2134,
+    }
+    valores.update(overrides)
+    return indicator_row(**valores)
+
+
+def _cotemig(client, repository) -> str:
+    """HTML da ficha da 31005371 (privada ativa, com indicadores e competição)."""
+    repository.schools = [
+        school_row(co_entidade=COTEMIG, no_entidade="COL COTEMIG BARROCA")
+    ]
+    repository.history = _serie_cotemig()
+    repository.indicators = [_indicador_cotemig()]
+    repository.competidores = [competidor_row(co_entidade=COTEMIG)]
+    return _html(client.get(COTEMIG_URL))
+
+
+def _valor_da_definicao(html: str, termo: str) -> str:
+    """Texto do `<dd>` imediatamente após o `<dt>` cujo texto é `termo`."""
+    achado = re.search(
+        rf"<dt>{re.escape(termo)}</dt>\s*<dd>(.*?)</dd>", html, flags=re.S
+    )
+    assert achado is not None, f"linha ausente na ficha: {termo!r}"
+    return re.sub(r"<[^>]+>", "", achado.group(1)).strip()
+
+
 # -- classificador de universo: 0 chamadas para pública/inativa -----------------
 
 
@@ -237,6 +318,44 @@ def test_comparacao_municipal_mostra_a_definicao(client, repository):
     assert "Escolas privadas ativas no mesmo município e ano censitário (MG)" in html
     # A posição no município é exibida junto do líder.
     assert "ESCOLA LIDER" in html
+
+
+# -- posição por crescimento da matrícula (F11) -------------------------------
+
+
+def test_posicao_por_crescimento_nao_e_rotulada_de_creche(client, repository):
+    """`rank_crec_*` é posição por crescimento: a 31005371 nem tem creche.
+
+    O bug exibia "Posição por matrícula de creche" (487/2.134) para uma escola
+    com `qt_mat_creche = 0`, porque `crec` foi lido como "creche". O teste falha
+    se o rótulo voltar (ou se qualquer "posição" voltar a mencionar creche).
+    """
+    html = _cotemig(client, repository)
+
+    rotulos = re.findall(r"<dt>(.*?)</dt>", html, flags=re.S)
+    posicoes = [rotulo for rotulo in rotulos if rotulo.startswith("Posição por")]
+    assert posicoes, "nenhuma posição exibida na ficha"
+    assert all("creche" not in rotulo.lower() for rotulo in posicoes), posicoes
+
+    # Crescimento anual explícito, com a direção da posição.
+    assert POSICAO_MUNICIPIO in html
+    assert POSICAO_MG in html
+    assert _valor_da_definicao(html, POSICAO_MUNICIPIO) == "487.º"
+    assert _valor_da_definicao(html, POSICAO_MG) == "2.134.º"
+
+
+def test_posicao_por_crescimento_sem_dado_nao_vira_zero(client, repository):
+    """`null` na posição é "sem dado" (AGENTS.md §6) — nunca `0.º`."""
+    repository.history = _serie_cotemig()
+    repository.indicators = [
+        _indicador_cotemig(rank_crec_municipio=None, rank_crec_mg=None)
+    ]
+
+    html = _html(client.get(COTEMIG_URL))
+
+    assert _valor_da_definicao(html, POSICAO_MUNICIPIO) == "sem dado"
+    assert _valor_da_definicao(html, POSICAO_MG) == "sem dado"
+    assert "0.º" not in html
 
 
 # -- 503: página inteira, nunca parcial ---------------------------------------

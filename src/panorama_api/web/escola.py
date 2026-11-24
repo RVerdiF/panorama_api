@@ -39,6 +39,8 @@ from panorama_api.web.conteudo import (
     MOTIVO_SECAO_COMPETIDORES,
     MOTIVO_SECAO_INDICADORES,
     NAO_SE_APLICA,
+    ROTULO_POSICAO_CRESCIMENTO_MG,
+    ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO,
     ROTULO_RETENCAO,
     UNIVERSOS,
     rotulo_etapa,
@@ -395,11 +397,16 @@ def contexto_indicadores(item: IndicatorItem | None) -> list[dict[str, Any]]:
             item.share_total_pct,
             unidade="%",
         ),
-        # A posição municipal por matrícula BAS vem de `/competitors`
-        # (seção própria); aqui só as posições específicas de creche, que não
-        # existem naquela mart.
-        linha("Posição por matrícula de creche no município", item.rank_crec_municipio),
-        linha("Posição por matrícula de creche em Minas Gerais", item.rank_crec_mg),
+        # `rank_crec_*` são posições por **crescimento** da matrícula
+        # (`crescimento_yoy_pct`), não por matrícula: a posição municipal por
+        # matrícula BAS vem de `/competitors`, em seção própria. O sufixo ".º"
+        # é o ordinal da posição; `null` continua "sem dado", nunca 0.º.
+        linha(
+            ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO,
+            item.rank_crec_municipio,
+            unidade=".º",
+        ),
+        linha(ROTULO_POSICAO_CRESCIMENTO_MG, item.rank_crec_mg, unidade=".º"),
     ]
     return linhas
 
