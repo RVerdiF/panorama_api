@@ -244,6 +244,24 @@ def test_t5_guarda_o_valor_bruto_nao_o_texto_formatado(mercado_html: str) -> Non
     assert all("sem dado" in celula[2] for celula in celulas[1:])
 
 
+def test_t5_marca_so_o_total_oficial_como_data_fixa(mercado_html: str) -> None:
+    """O total oficial (`bas`) não é etapa do mercado: não se move na ordenação.
+
+    A marcação vem da chave da etapa no dado (`ETAPA_PADRAO_MERCADO`), não do
+    rótulo renderizado — trocar o texto de "Educação básica (total)" não pode
+    tirar a linha da posição original.
+    """
+    _atributos, corpo = _tabela(mercado_html, LEGENDA_T5)
+    linhas = _linhas(corpo)
+
+    atributos_fixa, _celulas = _linha_de(linhas, "Educação básica (total)")
+    assert "data-fixa" in atributos_fixa
+
+    # Nenhuma outra linha da composição é fixa: só o total oficial.
+    fixas = [celulas[0][2] for atributos, celulas in linhas if "data-fixa" in atributos]
+    assert fixas == ["Educação básica (total)"]
+
+
 # -- T3: ficha, rendimento por ano -------------------------------------------
 
 

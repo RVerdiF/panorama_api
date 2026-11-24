@@ -87,7 +87,7 @@
         </thead>
         <tbody>
           {% for linha in etapas %}
-          <tr>
+          <tr{% if linha.fixa %} data-fixa{% endif %}>
             <th scope="row">{{ linha.rotulo }}</th>
             <td data-valor="{{ linha.qt_mat_total | fmt_bruto }}">{{ linha.qt_mat_total | fmt_contagem }}</td>
             <td data-valor="{{ linha.qt_mat_privada | fmt_bruto }}">{{ linha.qt_mat_privada | fmt_contagem }}</td>
