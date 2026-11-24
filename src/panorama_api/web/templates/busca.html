@@ -103,11 +103,23 @@
         <tbody>
           {% for escola in escolas %}
           <tr>
-            <td>{{ escola.no_entidade | fmt_nulo }}</td>
+            <td>
+              {# O nome é o link da ficha; o código INEP continua em `<code>`. #}
+              {% if escola.co_entidade %}
+              <a href="{{ app_prefix }}/escolas/{{ escola.co_entidade }}">{{ escola.no_entidade | fmt_nulo }}</a>
+              {% else %}
+              {{ escola.no_entidade | fmt_nulo }}
+              {% endif %}
+            </td>
             <td><code>{{ escola.co_entidade }}</code></td>
             <td>
+              {# Município leva ao mercado municipal; o código IBGE fica ao lado. #}
+              {% if escola.co_municipio %}
+              <a href="{{ app_prefix }}/mercados/{{ escola.co_municipio }}">{{ escola.no_municipio | fmt_nulo }}</a>
+              <code>{{ escola.co_municipio }}</code>
+              {% else %}
               {{ escola.no_municipio | fmt_nulo }}
-              {% if escola.co_municipio %}<code>{{ escola.co_municipio }}</code>{% endif %}
+              {% endif %}
             </td>
             <td>{{ escola.tp_dependencia | fmt_nulo }}</td>
             <td>{{ escola.tp_situacao_funcionamento | fmt_nulo }}</td>
