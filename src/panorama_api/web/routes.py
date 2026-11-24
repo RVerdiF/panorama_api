@@ -180,6 +180,9 @@ def contexto_base(
         "app_prefix": PREFIXO_WEB,
         "app_version": __version__,
         "css_url": assets().url("app.css"),
+        # Base única de JS do front (card `t_71b25279`): mesmo registro de
+        # assets, mesma URL com hash, carregada com `defer` no `<head>`.
+        "js_url": assets().url("app.js"),
         "contract": CONTRACT,
         "contract_version": settings.contract_version,
         "data_version": settings.data_version,
