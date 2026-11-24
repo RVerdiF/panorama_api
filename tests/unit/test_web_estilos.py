@@ -234,8 +234,8 @@ def test_barra_do_hero_empilha_com_raio_16px_e_vira_pilula_em_48rem():
     # Pílula a partir de 48rem: o raio de 999 px vive dentro do breakpoint.
     pilula = css.index("border-radius: 999px")
     assert css.rindex("@media (min-width: 48rem)", 0, pilula) >= 0
-    # E o agrupador de botões entra na grade como itens (`contents`).
-    assert "display: contents" in css
+    # O bloco dos botões ocupa a linha inteira da grade da barra.
+    assert "grid-column: 1 / -1" in css
 
 
 def test_foco_visivel_continua_valendo_para_os_botoes():

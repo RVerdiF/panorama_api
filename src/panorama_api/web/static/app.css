@@ -656,19 +656,22 @@ tbody th {
     align-items: center;
   }
 
-  /* Pílula de uma linha: `contents` põe os botões na grade dos campos. A dica
-     do nome sai do modo visual aqui; segue no documento para o
-     `aria-describedby` e visível em tela estreita. */
+  /* Pílula (raio 999 px) em dois blocos, como no wireframe da spec §5: campos
+     numa linha, botões na seguinte — em uma linha só não cabem na coluna do
+     hero. O padding lateral maior mantém o conteúdo dentro da curva. A dica do
+     nome sai do modo visual aqui; segue no documento para o `aria-describedby`
+     (e visível em tela estreita). */
   .hero__busca {
-    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto auto;
-    align-items: end;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 0.5rem 0.9rem;
-    padding: 0.85rem 1rem;
+    padding: 0.9rem 2.5rem;
     border-radius: 999px;
   }
 
   .hero__acoes {
-    display: contents;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
   }
 
   .hero__busca .dica {
