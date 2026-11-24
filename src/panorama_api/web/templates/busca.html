@@ -12,8 +12,9 @@
 <article class="cartao">
   <h1>Busca de escolas</h1>
   {# Entrada orientadora (achados A2/A3): o que é, recorte, anos publicados e
-     fonte, mais os três caminhos de uso. O bloco de orientação fica no topo da
-     própria busca — não há landing separada. #}
+     fonte. Os três atalhos saíram no card `t_2c2e564b`: o caminho de uso agora
+     mora na landing, e `/app/` — que continua sendo porta de entrada por
+     deep-link — mantém só uma linha de orientação e o link para `/`. #}
   <section class="orientacao" aria-labelledby="orientacao">
     <h2 id="orientacao" class="visualmente-oculto">O que é o Panorama Escola</h2>
     <p class="subtitulo">
@@ -22,11 +23,7 @@
       (<abbr title="Instituto Nacional de Estudos e Pesquisas Educacionais Anísio Teixeira">INEP</abbr>).
       Anos publicados: {% for ano in anos_disponiveis %}{{ ano }}{% if not loop.last %}, {% endif %}{% endfor %}.
     </p>
-    <ul class="orientacao__atalhos">
-      <li><a href="#formulario-busca">Buscar escola pelo nome</a></li>
-      <li><a href="#co_municipio">Escolher um município</a></li>
-      <li><a href="{{ href_metodologia }}">Metodologia</a></li>
-    </ul>
+    <p><a href="{{ href_inicio }}">Sobre o Panorama Escola</a></p>
   </section>
 
   <form id="formulario-busca" class="formulario" method="get" action="{{ app_prefix }}/" role="search">
