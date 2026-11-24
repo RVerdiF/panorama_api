@@ -35,7 +35,7 @@ from starlette.routing import Match
 from starlette.types import ASGIApp
 
 from panorama_api.core.http_cache import CACHE_SCOPE_KEY
-from panorama_api.web import PREFIXO_WEB
+from panorama_api.web import PREFIXO_WEB, e_caminho_web
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +110,7 @@ def _pertence(caminho: str, prefixo: str) -> bool:
 
 
 class PageViewMiddleware(BaseHTTPMiddleware):
-    """Emite uma linha `page_view` por requisição de página sob `/app`."""
+    """Emite uma linha `page_view` por requisição de página do front."""
 
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
@@ -121,7 +121,7 @@ class PageViewMiddleware(BaseHTTPMiddleware):
         caminho = request.url.path
         # `/app/static/*` são assets imutáveis, não páginas; `/v1` e `/health`
         # têm a própria linha (`http_cache`/`bq_query`) e não são front.
-        if not _pertence(caminho, PREFIXO_WEB) or _pertence(caminho, ASSET_PREFIX):
+        if not e_caminho_web(caminho) or _pertence(caminho, ASSET_PREFIX):
             return await call_next(request)
 
         inicio = time.monotonic()

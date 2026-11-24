@@ -8,7 +8,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, RedirectResponse, Response
+from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from panorama_api import __version__
@@ -31,11 +31,12 @@ from panorama_api.core.logging_config import configure_logging
 from panorama_api.core.startup import validate_schema
 from panorama_api.repositories.bigquery_repo import BigQueryServingRepository
 from panorama_api.repositories.serving import ServingRepository
-from panorama_api.web import PREFIXO_WEB
+from panorama_api.web import PREFIXO_WEB, e_caminho_web
 from panorama_api.web.middleware import WebGZipMiddleware
 from panorama_api.web.observability import PageViewMiddleware
 from panorama_api.web.routes import RETRY_AFTER_SEGUNDOS, pagina_erro, pagina_inexistente
 from panorama_api.web.routes import router as web_router
+from panorama_api.web.routes import router_inicio
 
 logger = logging.getLogger(__name__)
 
@@ -80,9 +81,11 @@ def create_app(
     # na chave desde F9/D7 — mudança de código que altera a representação também
     # precisa invalidar o corpo servido).
     app.add_middleware(HttpCacheMiddleware)
-    # Cache das páginas SSR /app (card t_68bd7615): mesma mecânica e mesma chave,
-    # com `private, no-cache`, para que a revalidação do navegador seja respondida
-    # por 304 sem executar o handler (logo sem tocar no repositório/BigQuery).
+    # Cache das páginas SSR `/` e `/app` (cards t_68bd7615 e t_386b791c): mesma
+    # mecânica e mesma chave, com `private, no-cache`, para que a revalidação do
+    # navegador seja respondida por 304 sem executar o handler (logo sem tocar no
+    # repositório/BigQuery). `e_caminho_web` é o mesmo predicado do erro HTML, do
+    # gzip e do `page_view`: inclui a raiz `/` da landing e `/app` com segmentos.
     # Assets ficam de fora: são imutáveis por nome com hash e mantêm o próprio
     # `Cache-Control`.
     app.add_middleware(
@@ -92,16 +95,17 @@ def create_app(
         pagina=True,
         exclude_prefix=f"{PREFIXO_WEB}/static/",
         match_root=True,
+        predicado=e_caminho_web,
     )
     # gzip do HTML/CSS do front e das páginas de erro (egress, plano §3).
-    # Restrito a `/app`: `/v1` é contrato público e não pode ganhar headers novos.
-    # Fica fora da camada do cache: o LRU guarda o corpo cru e cada requisição
-    # negocia a compressão pelo `Accept-Encoding`.
+    # Restrito às páginas do front (`/` e `/app`): `/v1` é contrato público e não
+    # pode ganhar headers novos. Fica fora da camada do cache: o LRU guarda o
+    # corpo cru e cada requisição negocia a compressão pelo `Accept-Encoding`.
     app.add_middleware(WebGZipMiddleware, minimum_size=500)
-    # Linha `page_view` por requisição de `/app` (card F6, plano §7). Fica por
-    # fora do cache de páginas para ler a decisão `hit`/`miss` que ele publica em
-    # `request.scope` — e por fora do gzip, para medir a requisição como um todo.
-    # Assets `/app/static/*` são ignorados: não são páginas.
+    # Linha `page_view` por requisição de página do front (card F6, plano §7).
+    # Fica por fora do cache de páginas para ler a decisão `hit`/`miss` que ele
+    # publica em `request.scope` — e por fora do gzip, para medir a requisição
+    # como um todo. Assets `/app/static/*` são ignorados: não são páginas.
     app.add_middleware(PageViewMiddleware)
 
     app.add_exception_handler(ProblemError, _handle_problem)
@@ -114,16 +118,11 @@ def create_app(
     app.include_router(v1_router, prefix="/v1")
     # Front SSR sob `/app` (decisão D1 = A). Mesmo processo/serviço da API.
     app.include_router(web_router)
-    # Entrada do sistema (card t_0c84b91f): a raiz deixa de ser 404 em
-    # `application/problem+json` e passa a levar ao front. `307` (e não `302`)
-    # preserva método e corpo de quem chega por POST. `HEAD` entra junto porque
-    # o `FastAPI` não o deriva do `GET`: sem isso, `curl -I /` (e qualquer
-    # monitor de disponibilidade) receberia 405 no lugar do redirect.
-    # `include_in_schema=False` mantém o contrato do `/v1`/OpenAPI como estava.
-    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
-    def raiz() -> Response:
-        """Raiz do serviço → front (`/app/`)."""
-        return RedirectResponse(f"{PREFIXO_WEB}/", status_code=307)
+    # Entrada do sistema (cards t_0c84b91f e t_386b791c): `/` é a página de
+    # entrada (landing) em HTML, sem prefixo de router — `/app/` continua sendo a
+    # busca. GET e HEAD respondem 200; `include_in_schema=False` mantém o
+    # contrato do `/v1`/OpenAPI como estava. Zero consultas ao repositório.
+    app.include_router(router_inicio)
 
     return app
 
@@ -211,9 +210,8 @@ def _handle_unexpected(request: Request, exc: Exception) -> Response:
 
 
 def _is_web(request: Request) -> bool:
-    """Prefixo `/app` responde HTML; `/v1` e `/health` continuam em problem+json."""
-    caminho = request.url.path
-    return caminho == PREFIXO_WEB or caminho.startswith(PREFIXO_WEB + "/")
+    """Páginas do front (`/` e `/app`) respondem HTML; `/v1` e `/health`, JSON."""
+    return e_caminho_web(request.url.path)
 
 
 app = create_app()

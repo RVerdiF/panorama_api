@@ -30,7 +30,7 @@ from panorama_api.contract import (
 )
 from panorama_api.core import validation
 from panorama_api.core.errors import ErrorCode, ProblemError, ano_fora_do_contrato, invalid
-from panorama_api.web import PREFIXO_WEB, dados
+from panorama_api.web import CAMINHO_INICIO, PREFIXO_WEB, dados
 from panorama_api.web.assets import CACHE_CONTROL_ASSET, AssetRegistry
 from panorama_api.web.conteudo import (
     AVISOS_METODOLOGIA,
@@ -158,7 +158,10 @@ def contexto_base(request: Request, *, pagina: str | None = None) -> dict[str, A
         # Links do front em caminho relativo: `url_for` devolve URL absoluta
         # (com host), o que não é desejável dentro do HTML servido.
         "href_metodologia": f"{PREFIXO_WEB}/metodologia",
-        # Busca é a página inicial do front (caminho relativo, sem `url_for`).
+        # Entrada do sistema: o logo do topo volta para a landing, não para a
+        # busca (card `t_386b791c`). `/app/` continua sendo a busca.
+        "href_inicio": CAMINHO_INICIO,
+        # Busca é a página principal do front (caminho relativo, sem `url_for`).
         "href_busca": f"{PREFIXO_WEB}/",
         "pagina_atual": pagina,
     }
@@ -228,6 +231,33 @@ def _settings(request: Request) -> Settings:
 #: Router do front. O prefixo `/app` está no próprio router para que `url_for`
 #: resolva os nomes `web_*` sem depender do registro em `main.create_app`.
 router = APIRouter(prefix=PREFIXO_WEB, include_in_schema=False)
+
+#: Router da página de entrada. Sem prefixo: a landing mora na raiz `/`, fora do
+#: `/app` da busca (card `t_386b791c`). `GET` **e** `HEAD` porque o `FastAPI` não
+#: deriva `HEAD` do `GET`: sem a rota explícita, `curl -I /` receberia `405`.
+router_inicio = APIRouter(include_in_schema=False)
+
+
+@router_inicio.api_route(
+    CAMINHO_INICIO,
+    methods=["GET", "HEAD"],
+    response_class=HTMLResponse,
+    name="web_inicio",
+    summary="Página de entrada (landing)",
+)
+def inicio(request: Request) -> Response:
+    """Landing em `/`: shell do front com a entrada para a busca.
+
+    Substitui o redirect `307` → `/app/` (card `t_0c84b91f`): quem chega na
+    raiz vê a apresentação do produto e o link para a busca, e quem tem `/app/`
+    em favorito ou link compartilhado continua caindo direto nas escolas.
+
+    Zero consultas ao repositório — a página não exibe número nenhum. Como
+    :func:`panorama_api.web.e_caminho_web` inclui a raiz, a resposta ganha gzip,
+    `ETag`/`Cache-Control: private, no-cache` com 304 e a linha `page_view`, e um
+    erro inesperado aqui vira página HTML (nunca `application/problem+json`).
+    """
+    return templates().TemplateResponse(request, "inicio.html", contexto_base(request))
 
 
 def _sugestoes_busca_vazia(
@@ -631,5 +661,6 @@ __all__ = [
     "pagina_erro",
     "pagina_inexistente",
     "router",
+    "router_inicio",
     "templates",
 ]
