@@ -523,6 +523,14 @@ tbody th {
   fill: var(--cor-destaque);
 }
 
+/* Segunda escola da comparação: contorno tracejado (distingue sem cor). */
+.serie__barra--b {
+  fill: none;
+  stroke: var(--cor-destaque);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 2;
+}
+
 .serie__eixo {
   stroke: var(--cor-borda);
   stroke-width: 1;

@@ -97,6 +97,27 @@ MOTIVO_SECAO_ESCOLA_INATIVA = (
 #: dado" com este motivo, nunca 0 (AGENTS.md §6).
 MOTIVO_SEM_COMPARACAO = "sem linha de comparação municipal para {ano}"
 
+#: Título da página de comparação entre duas escolas (card C4) e do link de
+#: entrada na ficha. O texto é o mesmo nas duas pontas: o leitor reconhece o
+#: destino pelo rótulo.
+TITULO_COMPARACAO = "Comparação entre escolas"
+ROTULO_COMPARAR_ENTRADA = "Comparar com outra escola"
+ROTULO_COMPARAR_COM_ESTA = "Comparar com esta"
+
+#: Escolas de municípios diferentes são permitidas na comparação lado a lado,
+#: mas a leitura municipal (participação e posição) não vale para o par.
+MOTIVO_MUNICIPIOS_DIFERENTES = (
+    "As escolas estão em municípios diferentes: a comparação municipal "
+    "(participação no mercado e posição) não se aplica a este par."
+)
+
+#: Sem ano censitário em comum, a oferta por etapa não tem ano de referência
+#: comum — dizer "não se aplica" é mais honesto que escolher o ano de uma delas.
+MOTIVO_SEM_ANO_COMUM = (
+    "As duas escolas não têm ano censitário em comum na série: a oferta e a "
+    "matrícula por etapa não podem ser comparadas no mesmo ano."
+)
+
 #: Estado legítimo da tela de mercado: a mart não tem linha de share para a
 #: etapa, ou seja, nenhuma escola privada do recorte tem matrícula observada.
 #: **Não** é ausência de mercado nem share de 0% para as escolas ausentes.
@@ -279,16 +300,20 @@ __all__ = [
     "MOTIVO_ENTRADA_SAIDA",
     "MOTIVO_ALEM_DO_FIM",
     "MOTIVO_FORA_DO_UNIVERSO_PRIVADO",
+    "MOTIVO_MUNICIPIOS_DIFERENTES",
     "MOTIVO_SECAO_COMPETIDORES",
     "MOTIVO_SECAO_ESCOLA_INATIVA",
     "MOTIVO_SECAO_ESCOLA_PUBLICA",
     "MOTIVO_SECAO_INDICADORES",
+    "MOTIVO_SEM_ANO_COMUM",
     "MOTIVO_SEM_COMPARACAO",
     "MOTIVO_SEM_PRIVADAS",
     "NAO_SE_APLICA",
     "NOTA_GRUPO_ETAPAS",
     "NOTA_GRUPO_MODALIDADES",
     "NOTA_GRUPO_TOTAL",
+    "ROTULO_COMPARAR_COM_ESTA",
+    "ROTULO_COMPARAR_ENTRADA",
     "ROTULO_POSICAO_CRESCIMENTO_MG",
     "ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO",
     "ROTULO_RETENCAO",
@@ -297,6 +322,7 @@ __all__ = [
     "TEXTO_NESTA_PAGINA",
     "TEXTO_OFERTA_DESCONHECIDA",
     "TEXTO_VOLTAR_VISAO_GERAL",
+    "TITULO_COMPARACAO",
     "TITULO_GRUPO_ETAPAS",
     "TITULO_GRUPO_MODALIDADES",
     "TITULO_GRUPO_TOTAL",
