@@ -1,16 +1,23 @@
-"""Tela de mercado `/app/mercados/{co_municipio}` (card `t_c06ff921`).
+"""Visão geral do mercado `/app/mercados/{co_municipio}` (cards F5 e NAV-3).
 
-Cobre os critérios de aceite do card sobre o HTML renderizado de verdade
+Cobre os critérios de aceite da tela sobre o HTML renderizado de verdade
 (``TestClient`` + repositório fake, nenhuma rede/BigQuery):
 
+* a abertura consulta **só** `dados.mercado` (3 chamadas) e **nunca** o share —
+  o ranking de share vive em `/app/mercados/{co_municipio}/escolas` (NAV-3);
 * ``ANO_FORA_DO_CONTRATO`` → ``404`` **com** seletor de outro ano;
-* ``data.items: []`` do share → "mercado sem escolas privadas com matrícula";
-* escola ausente do share **nunca** aparece como ``0%``;
+* ``offset`` não é recorte desta rota → ``422`` sem consultar o repositório;
+* a composição é consultada sem recorte de etapa; a etapa do seletor vale para
+  cobertura, entrada/saída e denominadores;
 * ``null`` de entrada/saída no primeiro ano da série → "sem dado";
 * sem HHI/C4 (decisão D4) e sem vocabulário geográfico proibido;
-* share sempre com ``entidade_tipo=escola``, ``limit=50`` e paginação por
-  ``has_more`` (nunca "de N resultados");
-* recorte obrigatório: ano, etapa, ``meta.universo``, ``meta.fonte``, avisos.
+* recorte obrigatório: ano, etapa, ``meta.universo``, ``meta.fonte``, avisos;
+* subnav do mercado com o recorte atual, sem ``offset``, e a seção ativa em
+  ``aria-current="page"``; revalidação ``If-None-Match`` → 304 sem consulta.
+
+Os testes do ranking de share que viviam aqui foram **movidos** para
+`tests/unit/test_web_mercado_escolas.py` (não apagados): é a rota que agora os
+renderiza.
 """
 
 from __future__ import annotations
@@ -23,11 +30,7 @@ from fastapi.testclient import TestClient
 
 from panorama_api.config import Settings
 from panorama_api.main import create_app
-from panorama_api.web.conteudo import (
-    MOTIVO_ALEM_DO_FIM,
-    MOTIVO_ENTRADA_SAIDA,
-    MOTIVO_SEM_PRIVADAS,
-)
+from panorama_api.web.conteudo import MOTIVO_ENTRADA_SAIDA
 from tests.unit.conftest import (
     FakeRepository,
     concentracao_row,
@@ -38,12 +41,15 @@ from tests.unit.conftest import (
 
 MUNICIPIO = "3106200"
 MERCADO = f"/app/mercados/{MUNICIPIO}"
+ESCOLAS = f"{MERCADO}/escolas"
 #: Anos do seletor usados nos testes.
 ANOS = (2021, 2022, 2023, 2024, 2025)
 #: Termos proibidos como vocabulário de comparação geográfica (escopo-adiado-v1).
 TERMOS_PROIBIDOS = ("raio", "próximos", "proximos", "na região", "na regiao")
 #: Nenhuma forma de total no HTML ("de 1.025 resultados", "de 20 resultados").
 TEXTO_DE_TOTAL = re.compile(r"\bde\s+[\d.]+\s+resultados?\b", re.IGNORECASE)
+#: Teto de peso pedido pelo card para a abertura (sem o ranking).
+TETO_HTML_BYTES = 25 * 1024
 
 
 def _settings(*, anos: str = ",".join(str(ano) for ano in ANOS)) -> Settings:
@@ -62,9 +68,8 @@ def _settings(*, anos: str = ",".join(str(ano) for ano in ANOS)) -> Settings:
 def mercado_repo() -> FakeRepository:
     """Repositório com mercado (todas as etapas) e 60 escolas no share.
 
-    ``LIMITE_SHARE_PADRAO`` é 50, então a primeira página tem 50 linhas e
-    ``has_more`` — a segunda página serve para a paginação ser exercitada. Há
-    share em duas etapas (``bas`` e ``med``) para os testes de seletor.
+    O share existe aqui para provar que a Visão geral **não** o consulta; o
+    ranking usa o mesmo cenário em `test_web_mercado_escolas.py`.
     """
     return FakeRepository(
         municipios=[municipio_row()],
@@ -89,7 +94,10 @@ def mercado_repo() -> FakeRepository:
 
 
 def _client(
-    repository: FakeRepository, *, anos: str | None = None, raise_server_exceptions: bool = True
+    repository: FakeRepository,
+    *,
+    anos: str | None = None,
+    raise_server_exceptions: bool = True,
 ) -> TestClient:
     app = create_app(
         settings=_settings() if anos is None else _settings(anos=anos),
@@ -106,6 +114,88 @@ def _html(response, status: int = 200) -> str:
 
 def _consultas(repository: FakeRepository, metodo: str) -> list[dict]:
     return [kwargs for nome, kwargs in repository.calls if nome == metodo]
+
+
+# -- orçamento de consultas e de HTML (NAV-3) -------------------------------
+
+
+def test_visao_geral_consulta_so_a_composicao_e_nunca_o_share(mercado_repo):
+    """Abertura: 3 chamadas de `dados.mercado`, nenhuma de `share_mercado`."""
+    _html(_client(mercado_repo).get(MERCADO))
+
+    chamadas = [nome for nome, _ in mercado_repo.calls]
+    assert set(chamadas) == {"get_municipio", "get_market", "get_concentracao"}
+    assert "get_market_share" not in chamadas
+
+
+def test_visao_geral_cabe_no_teto_de_html(mercado_repo):
+    resposta = _client(mercado_repo).get(MERCADO)
+
+    assert len(resposta.content) <= TETO_HTML_BYTES
+
+
+def test_visao_geral_nao_renderiza_o_ranking_de_share(mercado_repo):
+    html = desescapar(_html(_client(mercado_repo).get(MERCADO)))
+
+    # O ranking é a outra seção: só o link do subnav aparece aqui.
+    assert "Share de matrícula —" not in html
+    assert "Recorte do share" not in html
+    assert f'href="{ESCOLAS}' in html
+    # Links mercado → escola são do ranking, não da abertura.
+    assert "/app/escolas/310000" not in html
+
+
+def test_offset_na_visao_geral_responde_422_sem_consultar(mercado_repo):
+    resposta = _client(mercado_repo).get(f"{MERCADO}?offset=50")
+
+    html = _html(resposta, 422)
+    assert resposta.headers["cache-control"] == "no-store"
+    assert "offset" in html
+    assert mercado_repo.calls == []
+
+
+# -- subnav, navbar e revalidação -------------------------------------------
+
+
+def test_subnav_leva_ano_e_etapa_sem_offset_e_marca_a_secao_ativa(mercado_repo):
+    html = desescapar(_html(_client(mercado_repo).get(f"{MERCADO}?ano=2024&etapa=med")))
+    secao = html.split('aria-label="Seções do mercado"')[-1].split("</nav>")[0]
+
+    assert (
+        f'<a href="{MERCADO}?ano=2024&etapa=med" aria-current="page">Visão geral</a>'
+        in secao
+    )
+    assert f'<a href="{ESCOLAS}?ano=2024&etapa=med">Escolas do mercado</a>' in secao
+    assert "offset" not in secao
+    # São links que trocam de URL, não abas na mesma página.
+    assert 'role="tablist"' not in html
+
+
+def test_navbar_marca_municipios_como_area_nas_duas_rotas(mercado_repo):
+    cliente = _client(mercado_repo)
+
+    for url in (MERCADO, ESCOLAS):
+        html = cliente.get(url).text
+        assert '<a href="/app/mercados/" aria-current="true">Municípios</a>' in html
+
+
+def test_revalidacao_com_if_none_match_nao_consulta(mercado_repo):
+    cliente = _client(mercado_repo)
+    primeira = cliente.get(MERCADO)
+    assert primeira.status_code == 200
+    etag = primeira.headers["etag"]
+
+    mercado_repo.calls.clear()
+    segunda = cliente.get(MERCADO, headers={"If-None-Match": etag})
+
+    assert segunda.status_code == 304
+    assert mercado_repo.calls == []
+
+
+def test_formulario_do_seletor_aponta_para_a_propria_visao_geral(mercado_repo):
+    html = _html(_client(mercado_repo).get(MERCADO))
+
+    assert f'<form class="formulario" method="get" action="{MERCADO}" role="search">' in html
 
 
 # -- ano fora do contrato: 404 com seletor -----------------------------------
@@ -134,7 +224,9 @@ def test_ano_na_lista_sem_linha_no_mart_responde_404_com_seletor(
     mercado_repo: FakeRepository,
 ):
     """Ano do seletor sem publicação: o `/v1` responde ANO_FORA_DO_CONTRATO."""
-    mercado_repo.markets = [row for row in mercado_repo.markets if row["nu_ano_censo"] == 2025]
+    mercado_repo.markets = [
+        row for row in mercado_repo.markets if row["nu_ano_censo"] == 2025
+    ]
 
     html = _html(_client(mercado_repo).get(f"{MERCADO}?ano=2024"), 404)
 
@@ -162,158 +254,34 @@ def test_maior_ano_do_seletor_e_o_padrao_mesmo_com_lista_nao_ordenada():
     assert 'value="2023" selected' in html
 
 
-# -- share: vazio e ausência de escola --------------------------------------
+# -- composição: contrato de chamada ---------------------------------------
 
 
-def test_share_vazio_diz_mercado_sem_escolas_privadas_com_matricula(mercado_repo):
-    mercado_repo.share = []
-
-    html = _html(_client(mercado_repo).get(MERCADO))
-
-    assert MOTIVO_SEM_PRIVADAS in html
-    assert MOTIVO_ALEM_DO_FIM not in html
-    assert "<table" not in html.split('aria-labelledby="share"')[-1][:1200]
-
-
-@pytest.mark.parametrize("params", ["?offset=0", "?etapa=bas&offset=0"])
-def test_share_vazio_com_offset_zero_mantem_a_mensagem_de_ausencia(
-    mercado_repo, params
+def test_composicao_e_a_unica_consulta_de_mercado_e_sem_recorte_de_etapa(
+    mercado_repo,
 ):
-    """Com `offset=0` a ausência é real: a mensagem atual não muda (C2)."""
-    mercado_repo.share = []
-
-    html = _html(_client(mercado_repo).get(f"{MERCADO}{params}"))
-
-    assert MOTIVO_SEM_PRIVADAS in html
-    assert MOTIVO_ALEM_DO_FIM not in html
-    assert "Voltar à primeira página" not in html
-
-
-# -- offset além do fim: NÃO é mercado sem privadas (C2) ---------------------
-
-
-def test_offset_alem_do_fim_nao_diz_que_o_mercado_nao_tem_privadas(mercado_repo):
-    """Página vazia com `offset > 0` não é ausência de mercado (BH tem 819)."""
-    resposta = _client(mercado_repo).get(f"{MERCADO}?etapa=bas&offset=1000")
-
-    html = _html(resposta)
-    assert MOTIVO_SEM_PRIVADAS not in html
-    assert MOTIVO_ALEM_DO_FIM in html
-    # A volta leva ao mesmo recorte (ano/etapa) na 1ª página, sem `offset`.
-    # `&amp;` é o `&` do href depois do escape do Jinja: o navegador vê a URL
-    # literal do critério de aceite.
-    assert (
-        f'href="{MERCADO}?ano=2025&etapa=bas"'
-        in desescapar(html)
-    )
-    # Página 200 de página vazia: a política de cache das páginas não muda.
-    assert resposta.headers["cache-control"] == "private, no-cache"
-
-
-def test_offset_alem_do_fim_preserva_ano_e_etapa_no_link_de_volta(mercado_repo):
-    html = desescapar(
-        _html(_client(mercado_repo).get(f"{MERCADO}?ano=2024&etapa=med&offset=1000"))
-    )
-
-    assert f'href="{MERCADO}?ano=2024&etapa=med"' in html
-    assert "offset=1000" not in html.split('aria-labelledby="share"')[-1]
-
-
-def test_offset_alem_do_fim_nao_pede_refinamento_nem_mostra_anterior(mercado_repo):
-    """A lista acabou: nem "Próxima" nem o aviso de teto de paginação."""
-    html = _html(_client(mercado_repo).get(f"{MERCADO}?offset=1000"))
-
-    secao = html.split('aria-labelledby="share"')[-1]
-    assert "Próxima" not in secao
-    assert "Limite de paginação atingido" not in secao
-
-
-def test_escola_ausente_do_share_nunca_aparece_como_zero_por_cento(mercado_repo):
-    """Só a linha do share é exibida; ausência não é 0%."""
-    mercado_repo.share = [
-        share_row(nu_ano_censo=2025, etapa="bas", id_entidade="31000007")
-    ]
-
-    html = _html(_client(mercado_repo).get(MERCADO))
-
-    assert "31000007" in html
-    assert "31000008" not in html
-    # Nenhuma célula de percentual sai como zero.
-    assert "<td>0%</td>" not in html
-    assert "<td>0,0%</td>" not in html
-
-
-def test_share_nulo_sai_como_sem_dado_e_nao_como_zero(mercado_repo):
-    mercado_repo.share = [
-        share_row(
-            nu_ano_censo=2025,
-            etapa="bas",
-            id_entidade="31000009",
-            mat_entidade=None,
-            share_privado_pct=None,
-            share_total_pct=None,
-        )
-    ]
-
-    html = _html(_client(mercado_repo).get(MERCADO))
-
-    assert "31000009" in html
-    assert "sem dado" in html
-    assert "<td>0%</td>" not in html
-    assert "<td>sem dado%</td>" not in html
-
-
-# -- share: contrato de chamada e paginação ---------------------------------
-
-
-def test_share_e_consultado_com_entidade_tipo_escola_e_limit_50(mercado_repo):
-    _client(mercado_repo).get(MERCADO)
-
-    (consulta,) = _consultas(mercado_repo, "get_market_share")
-    assert consulta["entidade_tipo"] == "escola"
-    assert consulta["limit"] == 50
-    assert consulta["offset"] == 0
-    assert consulta["etapa"] == "bas"
-    assert consulta["ano"] == max(ANOS)
-
-
-def test_composicao_e_consultada_sem_recorte_de_etapa(mercado_repo):
     _client(mercado_repo).get(MERCADO)
 
     consultas = _consultas(mercado_repo, "get_market")
-    assert consultas
-    # A primeira é a da composição (a tela); a segunda é do serviço de share,
-    # que confirma a existência do mercado da etapa antes de paginar.
+    assert len(consultas) == 1
     assert consultas[0]["etapa"] is None
 
 
-def test_proxima_so_aparece_com_has_more(mercado_repo):
-    html = _html(_client(mercado_repo).get(MERCADO))
-    assert "Próxima" in html
+def test_etapa_informada_vale_para_cobertura_e_movimento(mercado_repo):
+    html = _html(_client(mercado_repo).get(f"{MERCADO}?etapa=med"))
 
-    mercado_repo.share = mercado_repo.share[:5]
-    html = _html(_client(mercado_repo).get(MERCADO))
-    assert "Próxima" not in html
-
-
-def test_paginacao_preserva_ano_e_etapa(mercado_repo):
-    html = _html(_client(mercado_repo).get(f"{MERCADO}?ano=2025&etapa=med"))
-
-    assert f"ano=2025" in html
-    assert "etapa=med" in html
-    assert "offset=50" in html
+    assert "Cobertura da matrícula — Ensino médio" in html
+    assert "Entrada e saída de escolas — Ensino médio" in html
+    # A composição continua cobrindo todas as etapas publicadas.
+    assert "Tamanho do mercado por etapa" in html
 
 
-def test_html_nunca_mostra_o_total_de_resultados(mercado_repo):
-    for params in ("", "?ano=2024", "?etapa=med", "?offset=50"):
-        html = _html(_client(mercado_repo).get(f"{MERCADO}{params}"))
-        assert not TEXTO_DE_TOTAL.search(html), TEXTO_DE_TOTAL.search(html)
+def test_denominadores_vem_da_linha_da_etapa_sem_consultar_share(mercado_repo):
+    html = _html(_client(mercado_repo).get(f"{MERCADO}?etapa=med"))
 
-
-def test_offset_invalido_responde_404_ou_422_sem_consultar_share(mercado_repo):
-    resposta = _client(mercado_repo).get(f"{MERCADO}?offset=5000")
-
-    assert resposta.status_code in (422, 404)
+    assert "Escolas privadas ativas no município e ano" in html
+    assert ">30<" in html
+    assert ">100<" in html
     assert not _consultas(mercado_repo, "get_market_share")
 
 
@@ -350,7 +318,7 @@ def test_nao_exibe_hhi_nem_c4_e_nao_consulta_concentracao_a_parte(mercado_repo):
     assert "C4" not in html
     assert "HHI" not in html
     # `get_concentracao` só é chamado pelo serviço de `market` (não pela tela).
-    assert len(_consultas(mercado_repo, "get_concentracao")) <= 1
+    assert len(_consultas(mercado_repo, "get_concentracao")) == 1
 
 
 def test_mercado_nao_usa_termos_geograficos_proibidos(mercado_repo):
@@ -377,8 +345,9 @@ def test_recorte_obrigatorio_ano_etapa_universo_fonte_e_avisos(mercado_repo):
     assert "Universo (meta.universo)" in html
     assert "escolas_ativas_mg" in html
     assert "Fonte (meta.fonte)" in html
-    assert "mart_market_share" in html
     assert "mart_mercado" in html
+    # O recorte do share só existe na rota do ranking.
+    assert "mart_market_share" not in html
     assert "Avisos (meta.avisos)" in html
 
 
@@ -397,13 +366,7 @@ def test_etapa_invalida_responde_422(mercado_repo):
 
     assert resposta.status_code == 422
     assert resposta.headers["content-type"].startswith("text/html")
-
-
-def test_etapa_informada_seleciona_o_share_daquela_etapa(mercado_repo):
-    _client(mercado_repo).get(f"{MERCADO}?etapa=creche")
-
-    (consulta,) = _consultas(mercado_repo, "get_market_share")
-    assert consulta["etapa"] == "creche"
+    assert mercado_repo.calls == []
 
 
 def test_etapa_sem_mercado_responde_404_com_seletor(mercado_repo):
@@ -421,13 +384,19 @@ def test_metadados_da_pagina_trazem_ano_e_etapa_do_recorte(mercado_repo):
     assert "Ensino médio" in html
 
 
+def test_html_nunca_mostra_o_total_de_resultados(mercado_repo):
+    for params in ("", "?ano=2024", "?etapa=med"):
+        html = _html(_client(mercado_repo).get(f"{MERCADO}{params}"))
+        assert not TEXTO_DE_TOTAL.search(html), TEXTO_DE_TOTAL.search(html)
+
+
 # -- 503: página inteira ------------------------------------------------
 
 
 def test_503_em_qualquer_consulta_vira_pagina_503(mercado_repo):
     from panorama_api.core.errors import UpstreamUnavailable
 
-    mercado_repo.errors["get_market_share"] = UpstreamUnavailable()
+    mercado_repo.errors["get_market"] = UpstreamUnavailable()
 
     resposta = _client(mercado_repo).get(MERCADO)
 
@@ -441,7 +410,7 @@ def test_503_em_qualquer_consulta_vira_pagina_503(mercado_repo):
 
 
 def test_erro_nao_tratado_nao_vaza_stack(mercado_repo):
-    mercado_repo.errors["get_market_share"] = RuntimeError("nada")
+    mercado_repo.errors["get_market"] = RuntimeError("nada")
 
     resposta = _client(mercado_repo, raise_server_exceptions=False).get(MERCADO)
 
@@ -533,5 +502,6 @@ def test_atalho_nao_entra_no_contrato_openapi(mercado_repo):
 
     assert ATALHO not in paths
     assert "/" not in paths
-    # A tela de mercado continua no contrato como estava.
+    # As rotas do mercado continuam fora do contrato de `/v1`.
     assert "/app/mercados/{co_municipio}" not in paths
+    assert "/app/mercados/{co_municipio}/escolas" not in paths
