@@ -65,6 +65,12 @@
 
     <div class="campo campo--acao">
       <button type="submit">Buscar</button>
+      {% if filtros.q or filtros.co_municipio or filtros.apenas_ativas %}
+      {#- Saída do beco sem saída quando um filtro esconde o resultado (achado
+          C3): só aparece com filtro ativo, então não é um link morto na 1ª
+          visita. Limpa tudo, inclusive o offset (o `action` do form). -#}
+      <a class="limpar-filtros" href="{{ app_prefix }}/">Limpar filtros</a>
+      {% endif %}
     </div>
   </form>
 

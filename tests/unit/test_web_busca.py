@@ -478,3 +478,38 @@ def test_html_nunca_mostra_o_total_de_resultados(client, repository, params):
 
     assert not TEXTO_DE_TOTAL.search(html)
     assert "total de resultados" not in html.lower()
+
+
+# -- "Limpar filtros" (achado C3) --------------------------------------------
+
+#: O link precisa sair do formulário para a busca limpa, sem sobra de filtro.
+LINK_LIMPAR = re.compile(
+    r'<a class="limpar-filtros" href="/app/">Limpar filtros</a>'
+)
+
+
+def test_primeira_visita_nao_oferece_limpar_filtros(client):
+    """Sem filtro ativo o link seria uma ação sem efeito: não aparece."""
+    html = _get(client).text
+
+    assert "Limpar filtros" not in html
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {"q": "modelo"},
+        {"co_municipio": "3106200"},
+        {"apenas_ativas": "true"},
+    ],
+)
+def test_limpar_filtros_aparece_com_filtro_ativo_e_aponta_para_a_busca(
+    client, repository, params
+):
+    """Qualquer filtro ativo (nome, município ou situação) mostra a saída."""
+    repository.schools = _escolas(3)
+
+    html = _get(client, params=params).text
+
+    assert LINK_LIMPAR.search(html)
+

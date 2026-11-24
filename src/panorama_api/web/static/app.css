@@ -2,7 +2,11 @@
   color-scheme: light;
   --cor-fundo: #f7f7f5;
   --cor-superficie: #ffffff;
+  /* Borda decorativa (cartão, topo, rodapé, tabela): não delimita controle. */
   --cor-borda: #d8d8d2;
+  /* Borda de controle (input/select): 3,47:1 sobre #ffffff — WCAG 1.4.11 pede
+     ≥3:1 para o limite do controle; a decorativa acima fica em 1,43:1. */
+  --cor-borda-controle: #8a8a82;
   --cor-texto: #1d1d1b;
   --cor-texto-suave: #5a5a54;
   --cor-destaque: #1f5f8b;
@@ -43,6 +47,13 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
+/* Affordance de ponteiro: o estado muda cor **e** espessura do sublinhado —
+   cor sozinha não é o único sinal (WCAG 1.4.1). #164a6c dá 9,4:1 sobre branco. */
+a:hover {
+  color: #164a6c;
+  text-decoration-thickness: 2px;
+}
+
 code {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.9em;
@@ -81,7 +92,9 @@ code {
   display: flex;
   flex-wrap: wrap;
   gap: var(--espaco);
-  align-items: baseline;
+  /* `center` e não `baseline`: os links da nav agora têm 44px de alvo e o
+     alinhamento por baseline desalinharia marca e nav na vertical. */
+  align-items: center;
   justify-content: space-between;
   padding-block: 0.85rem;
 }
@@ -96,6 +109,15 @@ code {
   display: flex;
   gap: 1.25rem;
   font-size: 0.95rem;
+}
+
+/* Alvo de toque ≥44px: sem altura explícita o link ficava com ~23px (achado C6).
+   `inline-flex` é o que faz `min-height` valer num elemento inline. */
+.topo__nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 0.25rem;
 }
 
 .conteudo {
@@ -265,7 +287,7 @@ li {
 .campo select {
   font: inherit;
   padding: 0.5rem 0.6rem;
-  border: 1px solid var(--cor-borda);
+  border: 1px solid var(--cor-borda-controle);
   border-radius: var(--raio);
   background: var(--cor-superficie);
   color: var(--cor-texto);
@@ -282,10 +304,6 @@ li {
   font-weight: 400;
 }
 
-.campo--acao {
-  justify-content: flex-end;
-}
-
 .formulario button {
   font: inherit;
   font-weight: 600;
@@ -295,6 +313,36 @@ li {
   background: var(--cor-destaque);
   color: #ffffff;
   cursor: pointer;
+}
+
+/* Hover do botão: escurece o preenchimento; #164a6c mantém 9,4:1 com o
+   texto branco. Vem depois de `.formulario button` para vencer no hover. */
+button:hover {
+  background: #164a6c;
+  border-color: #164a6c;
+}
+
+/* Ação do formulário: mantém a coluna de `.campo`, então o botão estica na
+   largura da célula — estado do mercado e da busca sem filtro. */
+.campo--acao {
+  justify-content: flex-end;
+}
+
+/* Só quando o link "Limpar filtros" existe (busca com filtro ativo) a ação
+   vira linha: botão e link lado a lado. `:has` evita classe extra no HTML e
+   deixa o mercado, que não tem o link, com o layout original intacto. */
+.campo--acao:has(.limpar-filtros) {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.limpar-filtros {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 0.25rem;
 }
 
 .dica {
@@ -339,10 +387,20 @@ li {
 }
 
 .paginacao__link {
+  /* Alvo de toque ≥44px (antes ~38px com o padding sozinho): achado C6. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   padding: 0.35rem 0.9rem;
   border: 1px solid var(--cor-destaque);
   border-radius: var(--raio);
   text-decoration: none;
+}
+
+.paginacao__link:hover {
+  background: rgba(31, 95, 139, 0.1);
+  border-color: #164a6c;
+  color: #164a6c;
 }
 
 .paginacao__contagem {
