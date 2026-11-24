@@ -79,6 +79,19 @@ def test_hover_em_link_botao_e_paginacao():
         assert seletor in css, f":hover ausente para {seletor}"
 
 
+def test_acao_do_formulario_so_vira_linha_com_o_link_limpar():
+    """Sem o link, a ação continua em coluna: o botão estica na largura da
+    célula. A linha vale só quando `.limpar-filtros` existe (busca com filtro),
+    senão o form do mercado — fora do escopo do card — muda de largura."""
+    base = _regra(".campo--acao")
+    assert "flex-direction" not in base, (
+        "`.campo--acao` não deve trocar flex-direction na regra base"
+    )
+
+    linha = _regra(".campo--acao:has(.limpar-filtros)")
+    assert "flex-direction: row" in linha
+
+
 def test_alvos_de_toque_do_topo_e_da_paginacao_tem_44px():
     for seletor in (".topo__nav a", ".paginacao__link"):
         regra = _regra(seletor)

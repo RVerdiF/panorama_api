@@ -322,13 +322,19 @@ button:hover {
   border-color: #164a6c;
 }
 
-/* Ação do formulário na mesma linha (o botão e, na busca, o link "Limpar
-   filtros"). Com um filho só — mercado — o layout é o mesmo de antes. */
+/* Ação do formulário: mantém a coluna de `.campo`, então o botão estica na
+   largura da célula — estado do mercado e da busca sem filtro. */
 .campo--acao {
+  justify-content: flex-end;
+}
+
+/* Só quando o link "Limpar filtros" existe (busca com filtro ativo) a ação
+   vira linha: botão e link lado a lado. `:has` evita classe extra no HTML e
+   deixa o mercado, que não tem o link, com o layout original intacto. */
+.campo--acao:has(.limpar-filtros) {
   flex-direction: row;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: 0.5rem 1rem;
 }
 
