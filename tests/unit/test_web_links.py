@@ -37,6 +37,7 @@ from tests.unit.conftest import (
 BUSCA = "/app/"
 MUNICIPIO = "3106200"
 MERCADO = f"/app/mercados/{MUNICIPIO}"
+ESCOLAS = f"{MERCADO}/escolas"
 ESCOLA = "/app/escolas/31000001"
 #: Qualquer `href` interno (o front nunca gera URL absoluta com host).
 HREF_INTERNO = re.compile(r'href="(/app[^"]*)"')
@@ -149,7 +150,7 @@ def test_busca_com_municipio_nulo_mostra_sem_dado_sem_link_de_mercado(
 
 
 def test_mercado_linka_o_nome_no_ranking_de_share(client_links):
-    html = _html(client_links.get(MERCADO))
+    html = _html(client_links.get(ESCOLAS))
 
     assert f'<a href="{ESCOLA}">ESCOLA MODELO</a>' in html
 
@@ -165,7 +166,7 @@ def test_mercado_com_nome_nulo_no_share_mostra_sem_dado_dentro_do_link(
 ):
     repo_links.share = [share_row(no_entidade=None)]
 
-    html = _html(client_links.get(MERCADO))
+    html = _html(client_links.get(ESCOLAS))
 
     assert f'<a href="{ESCOLA}">sem dado</a>' in html
 
@@ -173,7 +174,7 @@ def test_mercado_com_nome_nulo_no_share_mostra_sem_dado_dentro_do_link(
 def test_mercado_sem_share_nao_inventa_linha_nem_link(client_links, repo_links):
     repo_links.share = []
 
-    html = _html(client_links.get(MERCADO))
+    html = _html(client_links.get(ESCOLAS))
 
     assert f'href="{ESCOLA}"' not in html
     # O atalho de busca filtrada continua: é do município, não do share.
@@ -230,7 +231,7 @@ def _crawl(client, origem: str) -> list[tuple[str, int, str]]:
 def test_todos_os_links_internos_das_telas_respondem_200(client_links):
     falhas = [
         (origem, status, destino)
-        for origem in (BUSCA + "?q=modelo", MERCADO, ESCOLA)
+        for origem in (BUSCA + "?q=modelo", MERCADO, ESCOLAS, ESCOLA)
         for origem, status, destino in _crawl(client_links, origem)
         if status != 200
     ]

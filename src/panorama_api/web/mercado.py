@@ -1,14 +1,27 @@
-"""Regras da tela de mercado `/app/mercados/{co_municipio}` (card `t_c06ff921`).
+"""Regras das telas de mercado: Visão geral e Escolas do mercado (card NAV-3).
 
 Tudo aqui é **puro**: recebe as respostas do contrato (as mesmas do `/v1`) e
 devolve o contexto do template. Nenhum acesso a dado — quem consulta é
 `web/dados.py`, chamado pela rota em `web/routes.py`.
 
+Duas rotas, uma consulta cara cada (spec §5.3):
+
+* `/app/mercados/{co_municipio}` — **Visão geral**: tamanho, composição,
+  cobertura e entrada/saída. Consulta só `dados.mercado` (3 consultas,
+  ~63,7 MB).
+* `/app/mercados/{co_municipio}/escolas` — **Escolas do mercado**: o ranking de
+  share paginado. Consulta só `dados.share_mercado` (3 consultas, ~203,5 MB).
+
+O ranking saiu da abertura porque era a consulta mais cara do produto
+(`mart_market_share` ≈ 181 MB): antes, toda abertura, troca de etapa ou página
+do ranking custava 6 consultas / ~267 MB. Agora a abertura custa 3 / 63,7 MB e
+cada página do ranking 3 / 203,5 MB, sem recomputar a composição.
+
 Decisões que moram neste módulo:
 
-1. **Sem concentração (HHI/C4).** Decisão D4 do plano: fora do MVP. A tela
-   mostra tamanho e composição por etapa e o share de matrícula; os campos
-   `concentracao` do contrato não são exibidos nem consultados à parte.
+1. **Sem concentração (HHI/C4) na tela.** Decisão D4 do plano: fora do MVP. Os
+   campos `concentracao` do contrato são consultados pelo `/v1` e não exibidos;
+   a Visão geral não os usa.
 2. **Concorrência é municipal.** A contagem vem de `n_escolas_privadas`/
    `n_escolas_ativas` do mesmo município e ano — vocabulário de raio/proximidade
    não existe aqui (`docs/escopo-adiado-v1.md`). Essas duas contagens **não**
@@ -30,11 +43,19 @@ from panorama_api.web.conteudo import (
     MOTIVO_ALEM_DO_FIM,
     MOTIVO_ENTRADA_SAIDA,
     MOTIVO_SEM_PRIVADAS,
+    ROTULO_VISAO_GERAL,
     TEXTO_ABAIXO_PORTE,
     UNIVERSOS,
     rotulo_etapa,
     traduzir_aviso,
 )
+
+#: Identificador de cada seção do mercado no subnav (spec §2.2).
+VISAO_GERAL = "visao_geral"
+ESCOLAS = "escolas"
+
+#: Rótulo do item do subnav que leva ao ranking (spec §1).
+ROTULO_ESCOLAS_MERCADO = "Escolas do mercado"
 
 #: Colunas de cobertura de matrícula por etapa (`MarketItem.cobertura`).
 COBERTURA: tuple[tuple[str, str], ...] = (
@@ -52,13 +73,43 @@ MOVIMENTO: tuple[tuple[str, str], ...] = (
 )
 
 
+def itens_subnav(
+    *,
+    caminho: str,
+    filtros: dict[str, str],
+    ativo: str,
+    url_lista: Any,
+) -> list[dict[str, Any]]:
+    """Itens do subnav do mercado — macro única, sem JS (spec §2.2).
+
+    Os dois links levam o recorte atual (`ano` e `etapa`) e **nunca** `offset`:
+    a página do ranking é a sua própria URL canônica, e trocar de seção recomeça
+    na primeira página. A rota ativa leva `aria-current="page"` (macro
+    `partials/subnav.html`).
+    """
+    return [
+        {
+            "rotulo": ROTULO_VISAO_GERAL,
+            "href": url_lista(caminho, filtros),
+            "ativo": ativo == VISAO_GERAL,
+            "classe": "",
+        },
+        {
+            "rotulo": ROTULO_ESCOLAS_MERCADO,
+            "href": url_lista(f"{caminho}/escolas", filtros),
+            "ativo": ativo == ESCOLAS,
+            "classe": "",
+        },
+    ]
+
+
 def _linhas_por_etapa(items: Sequence[MarketItem]) -> list[dict[str, Any]]:
     """Uma linha por etapa servida por `mart_mercado` (ordem do contrato).
 
     `n_escolas_ativas`/`n_escolas_privadas` **não** entram aqui: a mart repete o
     total do município em todas as etapas e repeti-lo linha a linha sugere nove
     números diferentes. O total aparece uma única vez no resumo da página
-    (`denominadores`), que vem de `share.data.mercado`.
+    (`denominadores`), tirado da linha da etapa selecionada.
     """
     return [
         {
@@ -83,8 +134,13 @@ def _linhas_por_etapa(items: Sequence[MarketItem]) -> list[dict[str, Any]]:
 
 
 def _linha_da_etapa(linhas: Sequence[dict[str, Any]], etapa: str) -> dict[str, Any] | None:
-    """Linha da etapa selecionada (o share é sempre de uma etapa)."""
+    """Linha da etapa selecionada (cobertura e movimento são de uma etapa)."""
     return next((linha for linha in linhas if linha["etapa"] == etapa), None)
+
+
+def _item_da_etapa(items: Sequence[MarketItem], etapa: str) -> MarketItem | None:
+    """Item de `mart_mercado` da etapa selecionada (fonte dos denominadores)."""
+    return next((item for item in items if item.etapa == etapa), None)
 
 
 def _linhas_share(share: ShareResponse) -> list[dict[str, Any]]:
@@ -104,73 +160,40 @@ def _linhas_share(share: ShareResponse) -> list[dict[str, Any]]:
     ]
 
 
-def contexto_mercado(
-    *,
-    mercado: MarketsResponse,
-    share: ShareResponse,
-    anos_disponiveis: Sequence[int],
-    caminho: str,
-    filtros_pagina: dict[str, str],
-    montar_paginacao: Any,
-    url_lista: Any,
-) -> dict[str, Any]:
-    """Contexto completo do template a partir das respostas (já obtidas) do `/v1`.
+def contexto_visao_geral(*, mercado: MarketsResponse, etapa: str) -> dict[str, Any]:
+    """Contexto da **Visão geral** — tudo sai de `dados.mercado` (3 consultas).
 
     `mercado` é consultado **sem** recorte de etapa: a composição por etapa é o
-    conteúdo da tela. O share é sempre de uma etapa (o `/v1` exige `etapa`).
+    conteúdo da tela. A etapa selecionada vale para os blocos de cobertura e
+    entrada/saída e para os denominadores do resumo; a rota garante que ela
+    existe entre as etapas publicadas (etapa sem linha é `404` com seletor).
 
-    `share.data.items` vazio é estado legítimo e tem **dois** significados que a
-    tela não pode confundir (card `t_3ea9454f`, achado C2):
-
-    * `offset == 0` → o município não tem escola privada com matrícula nesta
-      etapa: "mercado sem escolas privadas com matrícula";
-    * `offset > 0` → o `offset` passou do fim da lista (o mercado tem escolas;
-      só não nesta página): "não há mais escolas nesta página" + volta à 1ª.
-
-    O contrato não tem `total`, então `items: []` com `offset > 0` **nunca**
-    prova ausência de mercado — só prova que a página está além do fim.
+    Os denominadores vêm da linha da etapa em `mart_mercado` — os mesmos campos
+    que o `/v1` usa no share quando a página de share volta vazia. Assim a
+    Visão geral não precisa da consulta de share para exibir o tamanho.
     """
     itens = list(mercado.data.items)
     etapas = _linhas_por_etapa(itens)
-    selecionada = share.data.etapa
-    denominadores = share.data.mercado
-    vazia = not share.data.items
-    alem_do_fim = vazia and share.page.offset > 0
+    item = _item_da_etapa(itens, etapa)
 
     return {
         "mercado": mercado.data,
-        "share": share.data,
-        "anos_disponiveis": list(anos_disponiveis),
         "ano_selecionado": mercado.meta.ano_referencia,
-        "etapa_selecionada": selecionada,
-        "etapa_rotulo": rotulo_etapa(selecionada),
+        "etapa_selecionada": etapa,
+        "etapa_rotulo": rotulo_etapa(etapa),
         "etapas": etapas,
         # O seletor oferece só as etapas publicadas para este município/ano
         # (linhas de `mart_mercado`), não as 9 do contrato: etapa sem linha
         # seria um 404 anunciado na própria tela.
         "etapas_disponiveis": {linha["etapa"]: linha["rotulo"] for linha in etapas},
-        "item_etapa": _linha_da_etapa(etapas, selecionada),
-        "linhas_share": _linhas_share(share),
-        # Página além do fim e mercado sem privadas são estados distintos: a
-        # mensagem de ausência só vale na 1ª página (offset == 0).
-        "sem_privadas": vazia and not alem_do_fim,
-        "alem_do_fim": alem_do_fim,
-        "motivo_sem_privadas": MOTIVO_SEM_PRIVADAS,
-        "motivo_alem_do_fim": MOTIVO_ALEM_DO_FIM,
-        # Mesmo ano e etapa, sem `offset`: a URL canônica da 1ª página. Só é
-        # calculada quando faz falta (página além do fim) — o link não existe em
-        # nenhuma outra situação da tela.
-        "url_primeira_pagina": (
-            url_lista(caminho, filtros_pagina, offset=0) if alem_do_fim else None
-        ),
-        "motivo_entrada_saida": MOTIVO_ENTRADA_SAIDA,
-        "texto_abaixo_porte": TEXTO_ABAIXO_PORTE,
+        "item_etapa": _linha_da_etapa(etapas, etapa),
         "denominadores": {
-            "n_escolas_privadas": denominadores.n_escolas_privadas,
-            "n_escolas_ativas": denominadores.n_escolas_ativas,
-            "qt_mat_privada": denominadores.qt_mat_privada,
-            "qt_mat_total": denominadores.qt_mat_total,
+            "n_escolas_privadas": item.n_escolas_privadas if item else None,
+            "n_escolas_ativas": item.n_escolas_ativas if item else None,
+            "qt_mat_privada": item.qt_mat_privada if item else None,
+            "qt_mat_total": item.qt_mat_total if item else None,
         },
+        "motivo_entrada_saida": MOTIVO_ENTRADA_SAIDA,
         "definicao_concorrencia": DEFINICAO_CONCORRENCIA,
         "meta": {
             "ano_referencia": mercado.meta.ano_referencia,
@@ -185,6 +208,53 @@ def contexto_mercado(
                 for codigo in mercado.meta.avisos
             ],
         },
+        "universo_texto": UNIVERSOS.get(mercado.meta.universo),
+    }
+
+
+def contexto_escolas_mercado(
+    *,
+    share: ShareResponse,
+    caminho: str,
+    filtros_pagina: dict[str, str],
+    montar_paginacao: Any,
+    url_lista: Any,
+) -> dict[str, Any]:
+    """Contexto de **Escolas do mercado** — tudo sai de `dados.share_mercado`.
+
+    `share.data.items` vazio é estado legítimo e tem **dois** significados que a
+    tela não pode confundir (card `t_3ea9454f`, achado C2):
+
+    * `offset == 0` → o município não tem escola privada com matrícula nesta
+      etapa: "mercado sem escolas privadas com matrícula";
+    * `offset > 0` → o `offset` passou do fim da lista (o mercado tem escolas;
+      só não nesta página): "não há mais escolas nesta página" + volta à 1ª.
+
+    O contrato não tem `total`, então `items: []` com `offset > 0` **nunca**
+    prova ausência de mercado — só prova que a página está além do fim.
+    """
+    vazia = not share.data.items
+    alem_do_fim = vazia and share.page.offset > 0
+
+    return {
+        "share": share.data,
+        "ano_selecionado": share.meta.ano_referencia,
+        "etapa_selecionada": share.data.etapa,
+        "etapa_rotulo": rotulo_etapa(share.data.etapa),
+        "linhas_share": _linhas_share(share),
+        # Página além do fim e mercado sem privadas são estados distintos: a
+        # mensagem de ausência só vale na 1ª página (offset == 0).
+        "sem_privadas": vazia and not alem_do_fim,
+        "alem_do_fim": alem_do_fim,
+        "motivo_sem_privadas": MOTIVO_SEM_PRIVADAS,
+        "motivo_alem_do_fim": MOTIVO_ALEM_DO_FIM,
+        # Mesmo ano e etapa, sem `offset`: a URL canônica da 1ª página. Só é
+        # calculada quando faz falta (página além do fim) — o link não existe em
+        # nenhuma outra situação da tela.
+        "url_primeira_pagina": (
+            url_lista(caminho, filtros_pagina, offset=0) if alem_do_fim else None
+        ),
+        "texto_abaixo_porte": TEXTO_ABAIXO_PORTE,
         "meta_share": {
             "ano_referencia": share.meta.ano_referencia,
             "etapa": rotulo_etapa(share.meta.etapa),
@@ -198,11 +268,20 @@ def contexto_mercado(
                 for codigo in share.meta.avisos
             ],
         },
-        "universo_texto": UNIVERSOS.get(mercado.meta.universo),
+        "universo_texto": UNIVERSOS.get(share.meta.universo),
         "paginacao": montar_paginacao(
             share.page, caminho=caminho, filtros=filtros_pagina
         ),
     }
 
 
-__all__ = ["COBERTURA", "MOVIMENTO", "contexto_mercado"]
+__all__ = [
+    "COBERTURA",
+    "ESCOLAS",
+    "MOVIMENTO",
+    "ROTULO_ESCOLAS_MERCADO",
+    "VISAO_GERAL",
+    "contexto_escolas_mercado",
+    "contexto_visao_geral",
+    "itens_subnav",
+]

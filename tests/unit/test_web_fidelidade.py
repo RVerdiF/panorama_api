@@ -166,14 +166,17 @@ def test_mercado_nao_mostra_contagem_com_decimal_nas_celulas_de_contagem():
             )
         ],
     )
+    cliente = _client(repo)
 
-    html = _html(_client(repo).get(MERCADO))
+    html = _html(cliente.get(MERCADO))
+    ranking = _html(cliente.get(f"{MERCADO}/escolas"))
 
     assert not CONTAGEM_COM_DECIMAL.search(html), CONTAGEM_COM_DECIMAL.search(html)
     # As contagens aparecem como inteiros; o percentual mantém a casa.
     assert ">172.322<" in html
     assert ">43<" in html
-    assert "8,7%" in html
+    # O percentual do share está no ranking desde o NAV-3.
+    assert "8,7%" in ranking
 
 
 def test_mercado_formatos_de_contagem_em_todas_as_secoes_sem_decimal():
@@ -369,6 +372,7 @@ def _telas(repo: FakeRepository) -> dict[str, str]:
         "escola": _html(client.get(ESCOLA)),
         "concorrencia": _html(client.get(f"{ESCOLA}/concorrencia")),
         "mercado": _html(client.get(MERCADO)),
+        "mercado_escolas": _html(client.get(f"{MERCADO}/escolas")),
         "metodologia": _html(client.get(METODOLOGIA)),
     }
 
@@ -399,7 +403,7 @@ def test_nenhuma_tela_exibe_jargao_interno_como_texto():
 
     telas = _telas(repo)
     # O mesmo texto em português explica os dois estados.
-    assert "abaixo do porte mínimo de comparabilidade" in telas["mercado"]
+    assert "abaixo do porte mínimo de comparabilidade" in telas["mercado_escolas"]
     # O aviso de porte é dos indicadores: mora na rota de concorrência (NAV-2).
     assert "abaixo do porte mínimo de comparabilidade" in telas["concorrencia"]
     assert "Oferta desconhecida" in telas["busca"]

@@ -1,0 +1,94 @@
+{#
+  Marcação comum às duas telas do mercado (spec §2.2, §5.3).
+
+  A **Visão geral** (`/app/mercados/{mun}`) e **Escolas do mercado**
+  (`/app/mercados/{mun}/escolas`) identificam o mesmo município, oferecem o
+  mesmo recorte de ano/etapa e mostram o recorte obrigatório da fonte. O que
+  muda é o subnav ativo e o `action` do formulário, que é sempre a rota atual —
+  por isso tudo aqui é parâmetro, nunca `url_for` de uma rota fixa.
+
+  Uso:
+    {% from "partials/mercado.html" import
+         cabecalho_mercado, seletor_mercado, recorte_mercado with context %}
+    {{ cabecalho_mercado(migalhas, municipio, municipio_nome) }}
+    {{ subnav(subnav_itens, "Seções do mercado") }}
+    {{ seletor_mercado(href_base, anos_disponiveis, ano_selecionado,
+                       etapas_disponiveis, etapa_selecionada, dica_etapa) }}
+    {{ recorte_mercado(meta, "Recorte de mart_mercado") }}
+#}
+{% from "partials/breadcrumb.html" import breadcrumb %}
+
+{% macro cabecalho_mercado(migalhas, municipio, municipio_nome) -%}
+{{ breadcrumb(migalhas) }}
+<h1>Mercado municipal</h1>
+<p class="subtitulo">
+  Município <code>{{ municipio }}</code>
+  {%- if municipio_nome %} · {{ municipio_nome }}{% endif %}
+</p>
+{# Atalho para a busca já filtrada por este município (mantém o recorte). #}
+<p class="nota">
+  <a href="{{ app_prefix }}/?co_municipio={{ municipio }}">Ver escolas deste município</a>
+</p>
+{%- endmacro %}
+
+{#
+  Seletores de recorte (ano e etapa). A página é sempre de UM município e o
+  recorte é substituível: a mesma marcação serve à página 200 e à 404 de
+  `ANO_FORA_DO_CONTRATO`, que precisa oferecer outro ano.
+#}
+{% macro seletor_mercado(href_base, anos_disponiveis, ano_selecionado, etapas_disponiveis, etapa_selecionada, dica_etapa) -%}
+<form class="formulario" method="get" action="{{ href_base }}" role="search">
+  <div class="campo">
+    <label for="ano">Ano de referência</label>
+    <select id="ano" name="ano">
+      {% for ano in anos_disponiveis %}
+      <option value="{{ ano }}"{% if ano == ano_selecionado %} selected{% endif %}>{{ ano | fmt_ano }}</option>
+      {% endfor %}
+    </select>
+    <p class="dica" id="ano-dica">Anos publicados para o front (<code>APP_ANOS_DISPONIVEIS</code>).</p>
+  </div>
+
+  <div class="campo">
+    <label for="etapa">Etapa</label>
+    <select id="etapa" name="etapa">
+      {% for codigo, rotulo in etapas_disponiveis.items() %}
+      <option value="{{ codigo }}"{% if codigo == etapa_selecionada %} selected{% endif %}>{{ rotulo }}</option>
+      {% endfor %}
+    </select>
+    <p class="dica">{{ dica_etapa }}</p>
+  </div>
+
+  <div class="campo campo--acao">
+    <button type="submit">Ver mercado</button>
+  </div>
+</form>
+{%- endmacro %}
+
+{# Recorte obrigatório (plano §1): ano, etapa, universo, fonte e avisos. #}
+{% macro recorte_mercado(m, titulo) -%}
+<dl class="lista-definicoes recorte" aria-label="{{ titulo }}">
+  <dt>Ano de referência</dt>
+  <dd>{{ m.ano_referencia | fmt_ano }}</dd>
+  <dt>Etapa</dt>
+  <dd>{{ m.etapa }}</dd>
+  <dt>Universo (meta.universo)</dt>
+  <dd>
+    <code>{{ m.universo }}</code>
+    {%- if m.universo_texto %} — {{ m.universo_texto }}{% endif %}
+  </dd>
+  <dt>Fonte (meta.fonte)</dt>
+  <dd>{{ m.orgao }} · {{ m.base }} · <code>{{ m.tabela }}</code></dd>
+  <dt>Avisos (meta.avisos)</dt>
+  <dd>
+    {% if m.avisos %}
+    <ul class="lista-regras">
+      {% for aviso in m.avisos %}
+      <li>{{ aviso.texto }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    nenhum aviso para este recorte
+    {% endif %}
+  </dd>
+</dl>
+{%- endmacro %}

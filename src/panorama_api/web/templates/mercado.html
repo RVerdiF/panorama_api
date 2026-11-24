@@ -1,92 +1,24 @@
 {% extends "base.html" %}
-{% from "partials/breadcrumb.html" import breadcrumb with context %}
+{% from "partials/mercado.html" import cabecalho_mercado, recorte_mercado, seletor_mercado with context %}
+{% from "partials/subnav.html" import subnav with context %}
+
+{# **Visão geral** do mercado (cards F5 e NAV-3): tamanho, composição por etapa,
+   cobertura e entrada/saída. O ranking de share saiu daqui — vive em
+   `/app/mercados/{mun}/escolas`, que é quem consulta `mart_market_share`. #}
 
 {# O município no `<title>` é o que distingue abas de mercados diferentes
    (achado D3). Sem nome na resposta, o código IBGE ocupa o lugar — nunca um
    título sem identificação nenhuma. #}
-{% set municipio_nome = (mercado.no_municipio if mercado and mercado.no_municipio else municipio) %}
 {% block titulo %}Mercado municipal de {{ municipio_nome }} — Panorama Escola{% endblock %}
-
-{#
-  Seletores de recorte (ano e etapa). A página é sempre de UM município e o
-  recorte é substituível: a mesma marcação serve à página 200 e à 404 de
-  `ANO_FORA_DO_CONTRATO`, que precisa oferecer outro ano.
-#}
-{% macro seletor() -%}
-<form class="formulario" method="get" action="{{ href_base }}" role="search">
-  <div class="campo">
-    <label for="ano">Ano de referência</label>
-    <select id="ano" name="ano">
-      {% for ano in anos_disponiveis %}
-      <option value="{{ ano }}"{% if ano == ano_selecionado %} selected{% endif %}>{{ ano | fmt_ano }}</option>
-      {% endfor %}
-    </select>
-    <p class="dica" id="ano-dica">Anos publicados para o front (<code>APP_ANOS_DISPONIVEIS</code>).</p>
-  </div>
-
-  <div class="campo">
-    <label for="etapa">Etapa</label>
-    <select id="etapa" name="etapa">
-      {% for codigo, rotulo in etapas_disponiveis.items() %}
-      <option value="{{ codigo }}"{% if codigo == etapa_selecionada %} selected{% endif %}>{{ rotulo }}</option>
-      {% endfor %}
-    </select>
-    <p class="dica">O share é sempre de uma etapa; a composição abaixo cobre todas.</p>
-  </div>
-
-  <div class="campo campo--acao">
-    <button type="submit">Ver mercado</button>
-  </div>
-</form>
-{%- endmacro %}
-
-{# Recorte obrigatório (plano §1): ano, etapa, universo, fonte e avisos. #}
-{% macro recorte(m, titulo) -%}
-<dl class="lista-definicoes recorte" aria-label="{{ titulo }}">
-  <dt>Ano de referência</dt>
-  <dd>{{ m.ano_referencia | fmt_ano }}</dd>
-  <dt>Etapa</dt>
-  <dd>{{ m.etapa }}</dd>
-  <dt>Universo (meta.universo)</dt>
-  <dd>
-    <code>{{ m.universo }}</code>
-    {%- if universo_texto %} — {{ universo_texto }}{% endif %}
-  </dd>
-  <dt>Fonte (meta.fonte)</dt>
-  <dd>{{ m.orgao }} · {{ m.base }} · <code>{{ m.tabela }}</code></dd>
-  <dt>Avisos (meta.avisos)</dt>
-  <dd>
-    {% if m.avisos %}
-    <ul class="lista-regras">
-      {% for aviso in m.avisos %}
-      <li>{{ aviso.texto }}</li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    nenhum aviso para este recorte
-    {% endif %}
-  </dd>
-</dl>
-{%- endmacro %}
 
 {% block conteudo %}
 <article class="cartao">
-  {# "Voltar" explícito: a busca é a entrada do front e o mercado não estava
-     linkado a ela em lugar nenhum (achado B7). O caminho é `Busca › município`,
-     com o último item em texto (é a tela atual). #}
-  {{ breadcrumb([{"rotulo": "Busca", "href": href_busca},
-                 {"rotulo": municipio_nome}]) }}
-  <h1>Mercado municipal</h1>
-  <p class="subtitulo">
-    Município <code>{{ municipio }}</code>
-    {%- if mercado and mercado.no_municipio %} · {{ mercado.no_municipio }}{% endif %}
-  </p>
-  {# Atalho para a busca já filtrada por este município (mantém o recorte). #}
-  <p class="nota">
-    <a href="{{ app_prefix }}/?co_municipio={{ municipio }}">Ver escolas deste município</a>
-  </p>
-
-  {{ seletor() }}
+  {{ cabecalho_mercado(migalhas, municipio, municipio_nome) }}
+  {{ subnav(subnav_itens, "Seções do mercado") }}
+  {# O `action` é a rota atual: o recorte vale para as duas seções, mas o
+     formulário da Visão geral não leva `offset` (não é rota paginada). #}
+  {{ seletor_mercado(href_base, anos_disponiveis, ano_selecionado, etapas_disponiveis, etapa_selecionada,
+                     "A composição abaixo cobre todas as etapas; a etapa escolhida vale para cobertura e entrada/saída.") }}
 
   {% if sem_dados_ano %}
   <section aria-labelledby="sem-dados-ano" class="cartao--erro">
@@ -116,7 +48,8 @@
       <dd>{{ denominadores.qt_mat_total | fmt_contagem }}</dd>
     </dl>
     <p class="nota">
-      Esta tela mostra tamanho, composição por etapa e share de matrícula. Ela
+      Esta tela mostra tamanho, composição por etapa, cobertura e entrada/saída.
+      O ranking de share de matrícula fica em <em>Escolas do mercado</em>. Ela
       não estima concentração de mercado a partir do share: a semântica do
       recorte de concentração está fora do MVP (decisão D4 do plano).
     </p>
@@ -213,88 +146,9 @@
   {% endif %}
   {% endif %}
 
-  <section aria-labelledby="share">
-    <h2 id="share">Share de matrícula — {{ etapa_rotulo }}</h2>
-    <p class="subtitulo">
-      Participação de cada <strong>escola</strong> na matrícula da etapa
-      (<code>entidade_tipo=escola</code>), em {{ ano_selecionado | fmt_ano }}.
-    </p>
-
-    <p class="aviso">
-      Escola ausente desta tabela <strong>não</strong> tem 0% de share: a
-      ausência significa matrícula não observada para a etapa. Share nulo
-      aparece como <em>sem dado</em>.
-    </p>
-
-    {% if alem_do_fim %}
-    <p class="sem-dado">{{ motivo_alem_do_fim }}</p>
-    <p>
-      <a class="paginacao__link" href="{{ url_primeira_pagina }}">Voltar à primeira página</a>
-    </p>
-    {% elif sem_privadas %}
-    <p class="sem-dado">{{ motivo_sem_privadas }}.</p>
-    {% else %}
-    <p class="paginacao__contagem">Mostrando {{ paginacao.mostrando }}.</p>
-    <div class="tabela-rolavel" role="region" aria-label="Share de matrícula por escola (tabela com rolagem)" tabindex="0">
-      <table class="tabela">
-        <caption>Share de matrícula por escola na etapa {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Posição</th>
-            <th scope="col">Escola</th>
-            <th scope="col">Código INEP</th>
-            <th scope="col">Matrícula</th>
-            <th scope="col">Share na matrícula privada</th>
-            <th scope="col">Share na matrícula total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for linha in linhas_share %}
-          <tr>
-            <th scope="row">{{ linha.posicao }}.º</th>
-            <td>
-              {# O nome é o link da ficha; o código INEP continua em `<code>`. #}
-              {% if linha.id_entidade %}
-              <a href="{{ app_prefix }}/escolas/{{ linha.id_entidade }}">{{ linha.no_entidade | fmt_nulo }}</a>
-              {% else %}
-              {{ linha.no_entidade | fmt_nulo }}
-              {% endif %}
-              {% if linha.is_abaixo_porte %}<span class="nota">{{ texto_abaixo_porte }}</span>{% endif %}
-            </td>
-            <td><code>{{ linha.id_entidade }}</code></td>
-            <td>{{ linha.mat_entidade | fmt_contagem }}</td>
-            <td>{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}</td>
-            <td>{{ linha.share_total_pct | fmt_nulo }}{% if linha.share_total_pct is not none %}%{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    <nav class="paginacao" aria-label="Paginação do share">
-      {% if paginacao.url_anterior %}
-      <a class="paginacao__link" href="{{ paginacao.url_anterior }}" rel="prev">Anterior</a>
-      {% endif %}
-      {% if paginacao.url_proxima %}
-      <a class="paginacao__link" href="{{ paginacao.url_proxima }}" rel="next">Próxima</a>
-      {% endif %}
-    </nav>
-    {% if paginacao.refinar %}
-    <p class="aviso">
-      Limite de paginação atingido. Escolha outra etapa para continuar a leitura.
-    </p>
-    {% endif %}
-    {% endif %}
-  </section>
-
   <section aria-labelledby="recorte-mercado">
     <h2 id="recorte-mercado">Recorte da composição</h2>
-    {{ recorte(meta, "Recorte de mart_mercado") }}
-  </section>
-
-  <section aria-labelledby="recorte-share">
-    <h2 id="recorte-share">Recorte do share</h2>
-    {{ recorte(meta_share, "Recorte de mart_market_share") }}
+    {{ recorte_mercado(meta, "Recorte de mart_mercado") }}
   </section>
   {% endif %}
 </article>
