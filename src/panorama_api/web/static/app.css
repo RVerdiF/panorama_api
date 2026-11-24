@@ -94,8 +94,7 @@ code {
   display: flex;
   flex-wrap: wrap;
   gap: var(--espaco);
-  /* `center` e não `baseline`: os links da nav agora têm 44px de alvo e o
-     alinhamento por baseline desalinharia marca e nav na vertical. */
+  /* `center` e não `baseline`: os links da nav têm 44px de alvo. */
   align-items: center;
   justify-content: space-between;
   padding-block: 0.85rem;
@@ -109,18 +108,31 @@ code {
 
 .topo__nav {
   display: flex;
+  /* Sem hambúrguer (spec §2.3): 3 itens quebram em segunda linha a 390 px. */
+  flex-wrap: wrap;
   gap: 1.25rem;
   font-size: 0.95rem;
 }
 
-/* Alvo de toque ≥44px: sem altura explícita o link ficava com ~23px (achado C6).
-   `inline-flex` é o que faz `min-height` valer num elemento inline. */
+/* Alvo de toque ≥44px (antes ~23px, achado C6): `inline-flex` é o que faz o
+   `min-height` valer num elemento inline. */
 .topo__nav a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
   padding-inline: 0.25rem;
 }
+
+/* Submenu nativo (spec §2.1): `<summary>` com 44 px de alvo (achado C6) e a
+   seta no `::after`. */
+.topo__submenu > summary { display: inline-flex; align-items: center; min-height: 44px; padding-inline: 0.25rem; cursor: pointer; list-style: none; }
+.topo__submenu > summary::-webkit-details-marker { display: none; }
+/* `content: "▾" / ""`: glifo decorativo, fora da árvore de acessibilidade. */
+.topo__submenu > summary::after { content: "▾" / ""; margin-left: 0.35rem; }
+.topo__submenu[open] > summary::after { content: "▴" / ""; }
+
+/* Painel em fluxo: empurra o conteúdo, sem `position: absolute` (spec §2.3). */
+.topo__painel { margin: 0.25rem 0 0; padding: 0.25rem 0 0.25rem 0.75rem; list-style: none; display: grid; gap: 0.15rem; border-left: 1px solid var(--cor-borda); }
 
 .conteudo {
   padding-block: 1.75rem 2.5rem;
@@ -206,9 +218,8 @@ li {
   font-style: italic;
 }
 
-/* Entrada orientadora da busca (card t_0c84b91f): o bloco que diz o que é o
-   produto antes do formulário. Sem cor de destaque própria — a hierarquia já
-   vem do `h1` e do texto de apoio. */
+/* Entrada orientadora da busca: o bloco que diz o que é o produto antes do
+   formulário, sem cor de destaque própria (a hierarquia vem do `h1`). */
 .orientacao__atalhos {
   display: flex;
   flex-wrap: wrap;
@@ -330,9 +341,8 @@ button:hover {
   justify-content: flex-end;
 }
 
-/* Só quando o link "Limpar filtros" existe (busca com filtro ativo) a ação
-   vira linha: botão e link lado a lado. `:has` evita classe extra no HTML e
-   deixa o mercado, que não tem o link, com o layout original intacto. */
+/* Só com o link "Limpar filtros" (busca com filtro) a ação vira linha; `:has`
+   evita classe extra e deixa o mercado com o layout de coluna intacto. */
 .campo--acao:has(.limpar-filtros) {
   flex-direction: row;
   flex-wrap: wrap;
@@ -513,11 +523,8 @@ tbody th {
   margin-top: 1rem;
 }
 
-/* Hero da landing (card `t_437796c3`, spec §3/§4): texto à esquerda e painel do
-   recorte à direita a partir de 48rem. Abaixo disso empilha — o texto primeiro,
-   o painel depois, porque o `h1` é o que apresenta o produto. `minmax(0, 1fr)`
-   na coluna única e no par evita rolagem horizontal: o conteúdo encolhe em vez
-   de estourar a linha em tela estreita. */
+/* Hero da landing (spec §3/§4): empilha abaixo de 48rem — texto, depois painel —
+   e vira duas colunas depois. `minmax(0, 1fr)` evita rolagem horizontal. */
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -529,9 +536,9 @@ tbody th {
   font-size: clamp(1.75rem, 4vw, 2.75rem);
 }
 
-/* Painel do recorte: fundo tint da cor de ação e raio grande. Os rótulos e a
-   linha da fonte usam `--cor-texto-suave`, medido sobre #eaf1f6 em
-   `test_web_estilos.py` (WCAG 1.4.3 pede ≥4,5:1 também aqui, não só no branco). */
+/* Painel do recorte: tint da cor de ação e raio grande. O contraste de
+   `--cor-texto-suave` sobre #eaf1f6 é medido em `test_web_estilos.py`
+   (WCAG 1.4.3 pede ≥4,5:1 também aqui, não só sobre o branco). */
 .hero .recorte {
   margin-top: 0;
   padding: 1.5rem;
@@ -549,8 +556,7 @@ tbody th {
   margin: 0;
 }
 
-/* Número em cima do rótulo sem inverter a ordem do `dl`: o número segue sendo
-   o `dd` (valor) e o rótulo o `dt` (termo) para o leitor de tela. */
+/* Número em cima do rótulo sem inverter a ordem do `dl`: o número segue `dd`. */
 .recorte__item {
   display: flex;
   flex-direction: column-reverse;
@@ -576,8 +582,8 @@ tbody th {
   max-width: none;
 }
 
-/* Busca no hero (card `t_e075a6f6`, spec §6/§7): mesmo GET da busca, sem JS.
-   Abaixo de 48rem empilha, com 100% de largura e alvo de 44 px (WCAG 2.5.5). */
+/* Busca no hero: mesmo GET da busca, sem JS. Abaixo de 48rem empilha, com 100%
+   de largura e alvo de 44 px (WCAG 2.5.5). */
 .hero__busca {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -657,10 +663,8 @@ tbody th {
   }
 
   /* Pílula (raio 999 px) em dois blocos, como no wireframe da spec §5: campos
-     numa linha, botões na seguinte — em uma linha só não cabem na coluna do
-     hero. O padding lateral maior mantém o conteúdo dentro da curva. A dica do
-     nome sai do modo visual aqui; segue no documento para o `aria-describedby`
-     (e visível em tela estreita). */
+     numa linha, botões na seguinte. O padding lateral mantém o conteúdo dentro
+     da curva; a dica do nome só sai do modo visual (segue para o `aria-describedby`). */
   .hero__busca {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 0.5rem 0.9rem;
