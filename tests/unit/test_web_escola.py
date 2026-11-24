@@ -381,8 +381,9 @@ def test_oferta_tri_estado_na_pagina(client, repository):
     assert _celulas_da_linha(tabela, "Pré-escola")[0] == "Não"
     assert _celulas_da_linha(tabela, "Ensino médio")[0] == "Sim"
     assert _celulas_da_linha(tabela, "EJA")[0] == "Desconhecido"
-    # `is_oferta_desconhecida` é explicado e não é lido como "não oferta".
-    assert "is_oferta_desconhecida" in html
+    # E6: a flag interna não aparece como texto; a explicação é em português.
+    assert "is_oferta_desconhecida" not in html
+    assert "Oferta desconhecida" in html
 
 
 def _tabela(html: str, prefixo_caption: str) -> str:

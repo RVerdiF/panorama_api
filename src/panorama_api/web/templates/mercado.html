@@ -107,13 +107,13 @@
     </p>
     <dl class="lista-definicoes">
       <dt>Escolas privadas ativas no município e ano</dt>
-      <dd>{{ denominadores.n_escolas_privadas | fmt_nulo }}</dd>
+      <dd>{{ denominadores.n_escolas_privadas | fmt_contagem }}</dd>
       <dt>Escolas ativas no município e ano (todas as dependências)</dt>
-      <dd>{{ denominadores.n_escolas_ativas | fmt_nulo }}</dd>
+      <dd>{{ denominadores.n_escolas_ativas | fmt_contagem }}</dd>
       <dt>Matrícula privada observada — {{ etapa_rotulo }}</dt>
-      <dd>{{ denominadores.qt_mat_privada | fmt_nulo }}</dd>
+      <dd>{{ denominadores.qt_mat_privada | fmt_contagem }}</dd>
       <dt>Matrícula total observada — {{ etapa_rotulo }}</dt>
-      <dd>{{ denominadores.qt_mat_total | fmt_nulo }}</dd>
+      <dd>{{ denominadores.qt_mat_total | fmt_contagem }}</dd>
     </dl>
     <p class="nota">
       Esta tela mostra tamanho, composição por etapa e share de matrícula. Ela
@@ -130,14 +130,20 @@
       básica (total)</em> é o total oficial do Censo, não a soma das subetapas.
       Valor ausente aparece como <em>sem dado</em>, nunca como zero.
     </p>
+    <p class="aviso">
+      A contagem de <strong>escolas ativas</strong> e de <strong>privadas
+      ativas</strong> do município não varia por etapa: na mart, a escola
+      ativa aparece em todas as etapas (o recorte por etapa vale para a
+      matrícula, não para a contagem de escolas). Por isso esses dois totais
+      aparecem uma única vez em <em>Tamanho do mercado</em>, acima — repeti-los
+      em cada linha daria a impressão de nove números diferentes.
+    </p>
     <div class="tabela-rolavel" role="region" aria-label="Composição do mercado por etapa (tabela com rolagem)" tabindex="0">
       <table class="tabela">
         <caption>Tamanho do mercado por etapa — {{ ano_selecionado | fmt_ano }}</caption>
         <thead>
           <tr>
             <th scope="col">Etapa</th>
-            <th scope="col">Escolas ativas</th>
-            <th scope="col">Privadas ativas</th>
             <th scope="col">Matrícula total</th>
             <th scope="col">Matrícula privada</th>
             <th scope="col">Privada no total</th>
@@ -147,10 +153,8 @@
           {% for linha in etapas %}
           <tr>
             <th scope="row">{{ linha.rotulo }}</th>
-            <td>{{ linha.n_escolas_ativas | fmt_nulo }}</td>
-            <td>{{ linha.n_escolas_privadas | fmt_nulo }}</td>
-            <td>{{ linha.qt_mat_total | fmt_nulo }}</td>
-            <td>{{ linha.qt_mat_privada | fmt_nulo }}</td>
+            <td>{{ linha.qt_mat_total | fmt_contagem }}</td>
+            <td>{{ linha.qt_mat_privada | fmt_contagem }}</td>
             <td>{{ linha.pct_privada_no_total_pct | fmt_nulo }}{% if linha.pct_privada_no_total_pct is not none %}%{% endif %}</td>
           </tr>
           {% endfor %}
@@ -175,7 +179,7 @@
           {% for celula in item_etapa.cobertura %}
           <tr>
             <th scope="row">{{ celula.rotulo }}</th>
-            <td>{{ celula.valor | fmt_nulo }}</td>
+            <td>{{ celula.valor | fmt_contagem }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -199,7 +203,7 @@
           {% for celula in item_etapa.movimento %}
           <tr>
             <th scope="row">{{ celula.rotulo }}</th>
-            <td>{{ celula.valor | fmt_nulo }}</td>
+            <td>{{ celula.valor | fmt_contagem }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -255,10 +259,10 @@
               {% else %}
               {{ linha.no_entidade | fmt_nulo }}
               {% endif %}
-              {% if linha.is_abaixo_porte %}<span class="nota">IS_ABAIXO_PORTE</span>{% endif %}
+              {% if linha.is_abaixo_porte %}<span class="nota">{{ texto_abaixo_porte }}</span>{% endif %}
             </td>
             <td><code>{{ linha.id_entidade }}</code></td>
-            <td>{{ linha.mat_entidade | fmt_nulo }}</td>
+            <td>{{ linha.mat_entidade | fmt_contagem }}</td>
             <td>{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}</td>
             <td>{{ linha.share_total_pct | fmt_nulo }}{% if linha.share_total_pct is not none %}%{% endif %}</td>
           </tr>

@@ -34,8 +34,7 @@
       <li>
         <strong>Oferta por etapa é tri-estado.</strong> <em>Sim</em> significa matrícula
         maior que zero; <em>Não</em> significa zero declarado; <em>Desconhecido</em>
-        significa que a base não informou a oferta daquela etapa.
-        <code>is_oferta_desconhecida</code> não significa "não oferta".
+        significa que a base não informou a oferta daquela etapa. {{ explicacao_oferta_desconhecida }}
       </li>
       <li>
         <strong>{{ rotulo_retencao }}.</strong>
@@ -69,12 +68,18 @@
 
   <section aria-labelledby="avisos">
     <h2 id="avisos">Avisos que podem aparecer nas telas</h2>
+    <p class="subtitulo">
+      Cada aviso é um código do contrato que muda a leitura de um número. O
+      código fica visível para conferência com o JSON da API; a explicação ao
+      lado é o que a ficha mostra ao leitor.
+    </p>
     {% if avisos_conhecidos %}
-    <ul class="lista-regras">
-      {% for codigo, texto in avisos_conhecidos.items() %}
-      <li><code>{{ codigo }}</code> — {{ texto }}</li>
+    <dl class="lista-definicoes">
+      {% for titulo, texto in avisos_conhecidos %}
+      <dt>{{ titulo }}</dt>
+      <dd>{{ texto }}</dd>
       {% endfor %}
-    </ul>
+    </dl>
     {% else %}
     <p class="sem-dado">sem dado</p>
     {% endif %}

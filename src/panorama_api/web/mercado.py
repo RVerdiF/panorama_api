@@ -11,7 +11,10 @@ Decisões que moram neste módulo:
    `concentracao` do contrato não são exibidos nem consultados à parte.
 2. **Concorrência é municipal.** A contagem vem de `n_escolas_privadas`/
    `n_escolas_ativas` do mesmo município e ano — vocabulário de raio/proximidade
-   não existe aqui (`docs/escopo-adiado-v1.md`).
+   não existe aqui (`docs/escopo-adiado-v1.md`). Essas duas contagens **não**
+   variam por etapa na mart (a escola ativa entra em todas), então a tela as
+   mostra uma única vez, como total do município; repeti-las em cada linha da
+   composição por etapa daria a impressão de nove totais distintos.
 3. **Ausência nunca vira zero.** `share_privado_pct`/`share_total_pct` nulos e
    os campos de entrada/saída do primeiro ano da série saem como "sem dado"
    com o motivo; escola ausente do share **não é** 0%.
@@ -27,6 +30,7 @@ from panorama_api.web.conteudo import (
     MOTIVO_ALEM_DO_FIM,
     MOTIVO_ENTRADA_SAIDA,
     MOTIVO_SEM_PRIVADAS,
+    TEXTO_ABAIXO_PORTE,
     UNIVERSOS,
     rotulo_etapa,
     traduzir_aviso,
@@ -49,14 +53,18 @@ MOVIMENTO: tuple[tuple[str, str], ...] = (
 
 
 def _linhas_por_etapa(items: Sequence[MarketItem]) -> list[dict[str, Any]]:
-    """Uma linha por etapa servida por `mart_mercado` (ordem do contrato)."""
+    """Uma linha por etapa servida por `mart_mercado` (ordem do contrato).
+
+    `n_escolas_ativas`/`n_escolas_privadas` **não** entram aqui: a mart repete o
+    total do município em todas as etapas e repeti-lo linha a linha sugere nove
+    números diferentes. O total aparece uma única vez no resumo da página
+    (`denominadores`), que vem de `share.data.mercado`.
+    """
     return [
         {
             "etapa": item.etapa,
             "rotulo": rotulo_etapa(item.etapa),
-            "n_escolas_ativas": item.n_escolas_ativas,
             "n_escolas_publicas": item.n_escolas_publicas,
-            "n_escolas_privadas": item.n_escolas_privadas,
             "qt_mat_total": item.qt_mat_total,
             "qt_mat_publica": item.qt_mat_publica,
             "qt_mat_privada": item.qt_mat_privada,
@@ -156,6 +164,7 @@ def contexto_mercado(
             url_lista(caminho, filtros_pagina, offset=0) if alem_do_fim else None
         ),
         "motivo_entrada_saida": MOTIVO_ENTRADA_SAIDA,
+        "texto_abaixo_porte": TEXTO_ABAIXO_PORTE,
         "denominadores": {
             "n_escolas_privadas": denominadores.n_escolas_privadas,
             "n_escolas_ativas": denominadores.n_escolas_ativas,
