@@ -11,8 +11,9 @@
   <a class="pular-para-conteudo" href="#conteudo">Pular para o conteúdo</a>
   <header class="topo">
     <div class="topo__interno">
-      {# O logo é o caminho de volta para a entrada do front (achado A5). #}
-      <a class="topo__marca" href="{{ href_busca }}">Panorama Escola</a>
+      {# O logo é o caminho de volta para a entrada do front (achado A5). Desde a
+         landing (card t_386b791c) ele aponta para `/`, não para a busca. #}
+      <a class="topo__marca" href="{{ href_inicio }}">Panorama Escola</a>
       <nav class="topo__nav" aria-label="Navegação principal">
         <a href="{{ href_busca }}"{% if pagina_atual == "busca" %} aria-current="page"{% endif %}>Busca</a>
         <a href="{{ href_metodologia }}"{% if pagina_atual == "metodologia" %} aria-current="page"{% endif %}>Metodologia</a>

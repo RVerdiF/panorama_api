@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block titulo %}Panorama Escola — escolas e mercados da educação básica em Minas Gerais{% endblock %}
+
+{# A landing apresenta o produto e não exibe valor nenhum: a nota de ausência do
+   rodapé ("campo sem valor aparece como sem dado") fala de dado exibido e sairia
+   como ruído aqui, como já acontece na 1ª visita da busca (achado A3). #}
+{% block rodape_nota %}{% endblock %}
+
+{% block conteudo %}
+<section class="cartao">
+  <h1>Escolas e mercados da educação básica em Minas Gerais</h1>
+  <p class="subtitulo">
+    Matrículas, oferta por etapa, rendimento e participação de mercado das escolas
+    mineiras, a partir do Censo Escolar da Educação Básica (INEP).
+  </p>
+  <p><a href="{{ href_busca }}">Ir para a busca</a></p>
+</section>
+{% endblock %}

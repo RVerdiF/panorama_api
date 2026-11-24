@@ -1,15 +1,18 @@
-"""Entrada do sistema `/app` — card `t_0c84b91f`.
+"""Entrada do sistema `/` e front `/app` — cards `t_0c84b91f` e `t_386b791c`.
 
 Cobre, sobre o HTML renderizado de verdade (``TestClient`` + repositório fake,
-nenhuma rede/BigQuery), os achados do relatório `avaliacao-ui.md` que este card
-fecha:
+nenhuma rede/BigQuery):
 
-* A1 — `GET /` responde `307` para `/app/` (antes era 404 em
-  ``application/problem+json``), e `/v1/*`/`/health` continuam intactos;
+* A1 — `GET /` responde ``200`` com a **página de entrada** em HTML (o redirect
+  ``307`` → `/app/` saiu no card `t_386b791c`), `HEAD /` também responde ``200``,
+  a página sai com gzip, ``ETag``/`private, no-cache` com ``304``, gera a linha
+  `page_view` (prova em `test_web_observabilidade.py`), não consulta o
+  repositório e um erro inesperado nela vira página HTML — e `/v1/*`/`/health`
+  continuam intactos;
 * A2/A3 — `/app/` sem consulta orienta (o que é, recorte MG, anos de
   `APP_ANOS_DISPONIVEIS`, fonte INEP) e **não** mostra "sem dado" do bloco
   "Recorte da busca", que só aparece depois de uma consulta;
-* A5 — o logo do topo é link para `/app/`;
+* A5 — o logo do topo é link para a entrada `/`;
 * B7 — `aria-current="page"` na tela ativa e breadcrumb com links em escola e
   mercado;
 * D3 — `<title>` do mercado traz o nome do município.
@@ -20,12 +23,14 @@ from __future__ import annotations
 import re
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 
 from panorama_api.config import Settings
 from panorama_api.core.http_cache import HttpCacheMiddleware
 from panorama_api.main import create_app
 from panorama_api.web import PREFIXO_WEB
+from panorama_api.web import routes as web_routes
 from tests.unit.conftest import (
     FakeRepository,
     competidor_row,
@@ -38,11 +43,15 @@ from tests.unit.conftest import (
 )
 
 ANOS = (2021, 2022, 2023, 2024, 2025)
+INICIO = "/"
 BUSCA = f"{PREFIXO_WEB}/"
 METODOLOGIA = f"{PREFIXO_WEB}/metodologia"
 MUNICIPIO = "3106200"
 MERCADO = f"{PREFIXO_WEB}/mercados/{MUNICIPIO}"
 ESCOLA = f"{PREFIXO_WEB}/escolas/31000001"
+TITULO_INICIO = (
+    "Panorama Escola — escolas e mercados da educação básica em Minas Gerais"
+)
 
 
 def _settings(*, anos: str = ",".join(str(ano) for ano in ANOS)) -> Settings:
@@ -95,38 +104,122 @@ def _get(cliente: TestClient, caminho: str, **kwargs):
     return cliente.request("GET", caminho, **kwargs)
 
 
-# -- A1: raiz do serviço ------------------------------------------------------
+# -- A1: a raiz é a página de entrada (landing) ------------------------------
 
 
-def test_raiz_redireciona_para_o_front_com_307(cliente: TestClient):
-    # `follow_redirects=False`: o `TestClient` segue redirect por padrão e o
-    # teste precisa ver a resposta 307, não a página final.
-    resposta = _get(cliente, "/", follow_redirects=False)
+def test_raiz_responde_a_landing_em_html(cliente: TestClient):
+    resposta = _get(cliente, INICIO)
 
-    assert resposta.status_code == 307
-    assert resposta.headers["location"] == BUSCA
-    # Redirect não carrega corpo: quem chega em `/` não vê JSON de erro nenhum.
-    assert resposta.content == b""
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"].startswith("text/html")
+    # Não é mais redirect: o corpo é a página, não um `Location`.
+    assert "location" not in resposta.headers
+    html = resposta.text
+    assert "<h1>Escolas e mercados da educação básica em Minas Gerais</h1>" in html
+    # A busca continua em `/app/`, e é para lá que a landing leva.
+    assert re.search(r'<a href="/app/">Ir para a busca</a>', html)
 
 
-def test_raiz_responde_head_com_o_mesmo_redirect(cliente: TestClient):
-    """`curl -I /` (HEAD) recebe o redirect, não 405.
+def test_raiz_responde_head_com_a_pagina(cliente: TestClient):
+    """`curl -I /` (HEAD) recebe 200, não 405.
 
-    O `FastAPI` não deriva `HEAD` do `GET`: sem a rota explícita, o critério de
-    aceite (`curl -sI /`) via 405 com `application/problem+json`.
+    O `FastAPI` só deriva `HEAD` de um `GET` que declare `methods` explicitamente;
+    a rota da landing declara `GET` e `HEAD` justamente para isso.
     """
-    resposta = cliente.request("HEAD", "/", follow_redirects=False)
+    resposta = cliente.request("HEAD", INICIO)
 
-    assert resposta.status_code == 307
-    assert resposta.headers["location"] == BUSCA
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"].startswith("text/html")
 
 
 def test_raiz_nao_entra_no_openapi(cliente: TestClient):
-    """A raiz é conveniência de entrada, não parte do contrato `/v1`."""
+    """A raiz é entrada do sistema, não parte do contrato `/v1`."""
     schema = cliente.get("/openapi.json").json()
 
-    assert "/" not in schema["paths"]
+    assert INICIO not in schema["paths"]
     assert not [caminho for caminho in schema["paths"] if caminho.startswith(PREFIXO_WEB)]
+
+
+def test_raiz_tem_o_titulo_da_landing(cliente: TestClient):
+    html = _get(cliente, INICIO).text
+
+    titulo = re.search(r"<title>(.*?)</title>", html, re.DOTALL)
+    assert titulo is not None
+    assert titulo.group(1) == TITULO_INICIO
+
+
+def test_raiz_usa_o_shell_com_um_unico_h1_e_landmarks(cliente: TestClient):
+    html = _get(cliente, INICIO).text
+
+    assert html.count("<h1") == 1
+    assert '<header class="topo">' in html
+    assert '<main id="conteudo"' in html
+    assert '<footer class="rodape">' in html
+    # A landing não exibe valor nenhum: a nota de ausência do rodapé sairia como
+    # ruído (mesma regra da 1ª visita da busca, achado A3).
+    assert "sem dado" not in html.lower()
+
+
+def test_raiz_sai_comprimida_com_gzip(cliente: TestClient):
+    """`/` entra no gzip do front; o `/v1` continua sem compressão."""
+    resposta = _get(cliente, INICIO, headers={"Accept-Encoding": "gzip"})
+
+    assert resposta.status_code == 200
+    # `TestClient` descomprime o corpo; o header prova que houve compressão.
+    assert resposta.headers.get("content-encoding") == "gzip"
+
+
+def test_raiz_tem_etag_e_cache_privado_com_304(cliente: TestClient):
+    primeira = _get(cliente, INICIO)
+
+    assert primeira.status_code == 200
+    assert primeira.headers["cache-control"] == "private, no-cache"
+    etag = primeira.headers["etag"]
+
+    # Revalidação responde 304 antes do handler (sem re-renderizar a página).
+    segunda = cliente.get(INICIO, headers={"If-None-Match": etag})
+
+    assert segunda.status_code == 304
+    assert segunda.headers["etag"] == etag
+
+
+def test_erro_inesperado_na_raiz_vira_pagina_html(
+    entrada_repo: FakeRepository, monkeypatch: pytest.MonkeyPatch
+):
+    """Erro em `/` é página HTML do front, nunca `application/problem+json`."""
+    app = create_app(settings=_settings(), repository=entrada_repo)
+    ambiente = web_routes.templates()
+    render_original = ambiente.TemplateResponse
+
+    def _render_quebrado(request: Request, nome: str, *args, **kwargs):  # type: ignore[no-untyped-def]
+        # A landing estoura ao renderizar; `erro.html` continua funcionando — é
+        # isso que prova a conversão do erro inesperado em página HTML.
+        if nome == "inicio.html":
+            raise RuntimeError("boom na landing")
+        return render_original(request, nome, *args, **kwargs)
+
+    monkeypatch.setattr(ambiente, "TemplateResponse", _render_quebrado)
+
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        resposta = test_client.request(
+            "GET", INICIO, headers={"Accept-Encoding": "identity"}
+        )
+
+    assert resposta.status_code == 500
+    assert resposta.headers["content-type"].startswith("text/html")
+    assert "application/problem+json" not in resposta.headers["content-type"]
+    assert "erro interno" in resposta.text.lower()
+    assert "boom na landing" not in resposta.text
+
+
+def test_raiz_nao_consulta_o_repositorio(entrada_repo: FakeRepository):
+    app = create_app(settings=_settings(), repository=entrada_repo)
+    with TestClient(app) as test_client:
+        entrada_repo.calls.clear()
+        test_client.request("GET", INICIO)
+        test_client.request("HEAD", INICIO)
+
+    assert entrada_repo.calls == []
 
 
 def test_health_continua_json_intacto(cliente: TestClient):
@@ -184,10 +277,12 @@ def test_busca_usa_os_anos_do_setting_nao_um_literal(entrada_repo: FakeRepositor
 # -- A5: logo e B7: aria-current --------------------------------------------
 
 
-def test_logo_do_topo_e_link_para_o_front(cliente: TestClient):
-    html = _get(cliente, BUSCA).text
+def test_logo_do_topo_e_link_para_a_entrada(cliente: TestClient):
+    """O logo volta para a landing `/`, não direto para a busca (A5)."""
+    for caminho in (INICIO, BUSCA, METODOLOGIA):
+        html = _get(cliente, caminho).text
 
-    assert re.search(r'<a class="topo__marca" href="/app/">Panorama Escola</a>', html)
+        assert re.search(r'<a class="topo__marca" href="/">Panorama Escola</a>', html)
 
 
 def test_aria_current_marca_a_tela_ativa(cliente: TestClient):

@@ -219,6 +219,23 @@ def test_page_view_de_erro_carrega_o_status_real_e_nao_cacheia(capsys):
     assert linha["status"] == 404
 
 
+def test_page_view_cobre_a_pagina_de_entrada(capsys):
+    """A landing `/` é página do front desde o card `t_386b791c`."""
+    app, _repo = _app()
+    with TestClient(app) as client:
+        capsys.readouterr()
+        primeira = client.get("/")
+        client.get("/", headers={"If-None-Match": primeira.headers["etag"]})
+
+    linhas = _linhas(capsys.readouterr().out)
+
+    assert primeira.status_code == 200
+    assert [linha["route"] for linha in linhas] == ["/", "/"]
+    assert [linha["status"] for linha in linhas] == [200, 304]
+    # `miss` na primeira renderização, `304` na revalidação por `ETag`.
+    assert [linha["cache"] for linha in linhas] == ["miss", "304"]
+
+
 # -- identidade: hash, nunca o e-mail ---------------------------------------
 
 

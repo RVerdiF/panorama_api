@@ -30,7 +30,7 @@ import logging
 from collections import OrderedDict
 from dataclasses import dataclass
 from threading import Lock
-from typing import Iterable, cast
+from typing import Callable, Iterable, cast
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -186,7 +186,10 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
       as páginas SSR, com ``Cache-Control: private, no-cache`` (revalidação
       sempre, respondida por 304 sem executar o handler). Os assets ficam de
       fora porque já são imutáveis pelo nome com hash e trazem o próprio
-      ``Cache-Control``.
+      ``Cache-Control``. Essa instância recebe ``predicado=e_caminho_web``
+      (``web/__init__.py``), que inclui a raiz ``/`` da landing (card
+      `t_386b791c`); o predicado é a autoridade quando informado, e ``prefix``
+      segue como a identidade da superfície de páginas.
     """
 
     def __init__(
@@ -199,6 +202,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         pagina: bool = False,
         exclude_prefix: str | None = None,
         match_root: bool = False,
+        predicado: Callable[[str], bool] | None = None,
     ) -> None:
         super().__init__(app)
         self.cache = cache if cache is not None else LruCache()
@@ -207,6 +211,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         self.pagina = pagina
         self.exclude_prefix = exclude_prefix
         self.match_root = match_root
+        self.predicado = predicado
 
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
@@ -309,6 +314,11 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         caminho = request.url.path
         if self.exclude_prefix is not None and _pertence(caminho, self.exclude_prefix):
             return False
+        if self.predicado is not None:
+            # A superfície de páginas decide o que é página com o predicado
+            # compartilhado (`web.e_caminho_web`): raiz `/` **exata** e `/app`
+            # com seus segmentos, nunca um prefixo solto.
+            return self.predicado(caminho)
         return _pertence(caminho, self.prefix, aceita_raiz=self.match_root)
 
     @property
