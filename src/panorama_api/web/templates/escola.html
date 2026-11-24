@@ -140,7 +140,9 @@
     <p class="subtitulo">
       Oferta é tri-estado: <em>Sim</em> (matrícula maior que zero),
       <em>Não</em> (zero declarado) e <em>Desconhecido</em> (a base não
-      informou). <em>Desconhecido</em> não é "não oferta".
+      informou). <em>Desconhecido</em> não é "não oferta". As linhas estão
+      agrupadas pela natureza do número: total oficial, etapas que somam e
+      modalidades/subconjuntos que <strong>não</strong> somam ao total.
     </p>
     {% if recente.is_oferta_desconhecida %}
     <p class="aviso">{{ texto_oferta_desconhecida }}</p>
@@ -155,15 +157,22 @@
             <th scope="col">Matrícula</th>
           </tr>
         </thead>
+        {# Um `<tbody>` por grupo semântico: somar as linhas de grupos
+           diferentes não dá o total (card F11). #}
+        {% for grupo in etapas %}
         <tbody>
-          {% for etapa in etapas %}
+          <tr class="grupo-etapas">
+            <th colspan="3" scope="rowgroup">{{ grupo.titulo }} — {{ grupo.nota }}</th>
+          </tr>
+          {% for linha in grupo.linhas %}
           <tr>
-            <th scope="row">{{ etapa.rotulo }}</th>
-            <td>{{ etapa.oferta | fmt_oferta }}</td>
-            <td>{{ etapa.matricula | fmt_celula }}</td>
+            <th scope="row">{{ linha.rotulo }}</th>
+            <td>{{ linha.oferta | fmt_oferta }}</td>
+            <td>{{ linha.matricula | fmt_celula }}</td>
           </tr>
           {% endfor %}
         </tbody>
+        {% endfor %}
       </table>
     </div>
   </section>

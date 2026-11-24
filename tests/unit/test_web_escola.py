@@ -525,6 +525,89 @@ def _celulas_da_linha(tabela: str, rotulo: str) -> list[str]:
     ]
 
 
+# -- tabela de oferta: total, etapas e modalidades (F11) ---------------------
+
+#: Grupos exigidos pelo card, na ordem, com as linhas de cada um.
+GRUPOS_ESPERADOS = (
+    ("Total oficial", ["Educação básica (total)"]),
+    (
+        "Etapas que somam ao total",
+        [
+            "Creche",
+            "Pré-escola",
+            "Ensino fundamental — anos iniciais",
+            "Ensino fundamental — anos finais",
+            "Ensino médio",
+            "EJA",
+        ],
+    ),
+    (
+        "Modalidades e subconjuntos que não somam ao total",
+        ["Educação profissional", "Educação especial"],
+    ),
+)
+
+
+def _grupos_da_oferta(html: str) -> list[tuple[str, str]]:
+    """(cabeçalho do grupo, corpo do `<tbody>`) da tabela de oferta, em ordem."""
+    tabela = _tabela(html, "Oferta por etapa")
+    grupos: list[tuple[str, str]] = []
+    for corpo in re.findall(r"<tbody>(.*?)</tbody>", tabela, flags=re.S):
+        cabecalho = re.search(r'scope="rowgroup">(.*?)</th>', corpo, flags=re.S)
+        assert cabecalho is not None, "grupo sem cabeçalho na tabela de oferta"
+        grupos.append((re.sub(r"<[^>]+>", "", cabecalho.group(1)).strip(), corpo))
+    return grupos
+
+
+def _rotulos_do_grupo(corpo: str) -> list[str]:
+    """Rótulos das linhas de etapa de um `<tbody>` (exclui o cabeçalho)."""
+    return [
+        re.sub(r"<[^>]+>", "", rotulo).strip()
+        for rotulo in re.findall(r'<th scope="row">(.*?)</th>', corpo, flags=re.S)
+    ]
+
+
+def test_tabela_de_oferta_separa_total_etapas_e_modalidades(client, repository):
+    """31005371: as linhas somavam 2.061 alunos numa escola de 680."""
+    html = _cotemig(client, repository)
+
+    grupos = _grupos_da_oferta(html)
+    assert [cabecalho.split(" — ")[0] for cabecalho, _ in grupos] == [
+        titulo for titulo, _ in GRUPOS_ESPERADOS
+    ]
+    for (titulo, linhas), (_cabecalho, corpo) in zip(GRUPOS_ESPERADOS, grupos):
+        assert _rotulos_do_grupo(corpo) == linhas, titulo
+
+    # O total oficial (680) está sozinho: a soma ingênua das nove linhas é
+    # exatamente os 2.061 do diagnóstico, e só o grupo de etapas é aditivo.
+    soma_ingenua = sum(
+        int(_celulas_da_linha(corpo, rotulo)[1])
+        for _, corpo in grupos
+        for rotulo in _rotulos_do_grupo(corpo)
+    )
+    assert soma_ingenua == 2061
+    assert _celulas_da_linha(grupos[0][1], "Educação básica (total)") == ["Sim", "680"]
+    assert "não é a soma" in grupos[0][0]
+    assert "não somam ao total" in grupos[2][0]
+
+
+def test_prof_e_esp_nao_sao_apresentados_como_etapa_aditiva(client, repository):
+    """`prof`/`esp` ficam só nas modalidades: fora do grupo que soma ao total."""
+    html = _cotemig(client, repository)
+
+    grupos = {
+        cabecalho.split(" — ")[0]: corpo for cabecalho, corpo in _grupos_da_oferta(html)
+    }
+    etapas = _rotulos_do_grupo(grupos["Etapas que somam ao total"])
+    modalidades = _rotulos_do_grupo(
+        grupos["Modalidades e subconjuntos que não somam ao total"]
+    )
+
+    for rotulo in ("Educação profissional", "Educação especial"):
+        assert rotulo not in etapas, f"{rotulo} voltou a ser etapa aditiva"
+        assert rotulo in modalidades
+
+
 # -- meta obrigatória e vocabulário -------------------------------------------
 
 
