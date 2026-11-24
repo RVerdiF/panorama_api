@@ -39,6 +39,7 @@ from panorama_api.web.conteudo import (
     ETAPAS_ROTULOS,
     ETAPA_PADRAO_MERCADO,
     EXPLICACAO_OFERTA_DESCONHECIDA,
+    ROTULO_COMPARAR_COM_ESTA,
     ROTULO_RETENCAO,
     TEXTO_OFERTA_DESCONHECIDA,
     UNIVERSOS,
@@ -47,6 +48,7 @@ from panorama_api.web.conteudo import (
     traduzir_avisos,
 )
 from panorama_api.web.escola import (
+    contexto_comparacao,
     contexto_concorrencia,
     contexto_concorrencia_nao_se_aplica,
     contexto_visao_geral,
@@ -132,6 +134,11 @@ SUGESTAO_ATALHO_SEM_MUNICIPIO = (
     "Para ver o mercado, selecione um município no formulário."
 )
 ACAO_ATALHO_SEM_MUNICIPIO = {"href": CAMINHO_INICIO, "rotulo": "Voltar ao início"}
+
+#: Comparação lado a lado (card C4): rota própria e o teto de escolas do card.
+#: Dois ids no máximo; a URL canônica é a ordem crescente (`A,B` ≡ `B,A`).
+CAMINHO_COMPARAR = f"{PREFIXO_WEB}/comparar"
+MAXIMO_ESCOLAS_COMPARADAS = 2
 
 
 @lru_cache
@@ -624,6 +631,128 @@ def _escola_do_recorte(request: Request, co_entidade: str) -> Any | None:
             raise
         return None
     return resposta.data[0] if resposta.data else None
+
+
+@router.get(
+    "/comparar",
+    response_class=HTMLResponse,
+    name="web_comparar",
+    summary="Comparação entre duas escolas (série e oferta, sem JS)",
+)
+def comparar(
+    request: Request,
+    escolas: str | None = None,
+    q: str | None = None,
+) -> Response:
+    """Comparação SSR de **uma ou duas** escolas (card C4, `t_58f9adbb`).
+
+    Contrato da rota:
+
+    * ``escolas=<id>[,<id>]`` com ids de 8 dígitos, no **mesmo** formato
+      validado da ficha. Zero ids, mais de dois, id inválido ou id repetido →
+      ``422`` HTML, antes de qualquer consulta;
+    * **URL canônica**: dois ids fora da ordem crescente respondem ``308`` para
+      ``?escolas=A,B`` — assim ``A,B`` e ``B,A`` compartilham uma única chave de
+      `ETag`/LRU, e o custo dobrado por *miss* não é pago duas vezes;
+    * com **um** id, a página mostra a escola A e o formulário de busca
+      (``q``, a mesma validação da busca por nome); os resultados trazem o link
+      "Comparar com esta" já na forma canônica. ``q`` com dois ids → ``422``:
+      a rota não aplicaria a busca, e ignorar o parâmetro em silêncio mentiria
+      sobre o recorte.
+
+    Dados: **as mesmas** funções da ficha (`dados.historico_escola`), uma
+    consulta por escola — série e oferta saem do mesmo item e a página não
+    consulta indicadores nem comparação municipal. Um ``404`` de escola
+    inexistente sobe e vira a página 404 do front.
+    """
+    ids = _ids_da_comparacao(escolas)
+    duas = len(ids) == MAXIMO_ESCOLAS_COMPARADAS
+    if duas:
+        if q is not None:
+            raise invalid(
+                "a busca por nome só existe na página com uma escola; remova q "
+                "para comparar as duas",
+                loc=("query", "q"),
+            )
+        if ids != tuple(sorted(ids)):
+            return RedirectResponse(
+                url=f"{CAMINHO_COMPARAR}?escolas={','.join(sorted(ids))}",
+                status_code=308,
+            )
+        termo = None
+    else:
+        termo = validation.search_term((q or "").strip() or None)
+
+    # Uma consulta por escola (série + oferta); nenhuma outra leitura.
+    historicos = [
+        dados.historico_escola(request, co_entidade=co_entidade) for co_entidade in ids
+    ]
+
+    contexto: dict[str, Any] = {
+        **contexto_base(request, area="escolas"),
+        **contexto_comparacao(historicos=historicos),
+        "caminho_comparar": CAMINHO_COMPARAR,
+        "escolas_param": ids[0],
+        "filtros": {"q": termo or ""},
+        "resultados": [],
+        "resultados_tem_mais": False,
+        "texto_comparar_com_esta": ROTULO_COMPARAR_COM_ESTA,
+    }
+    if duas:
+        return templates().TemplateResponse(request, "comparar.html", contexto)
+
+    if termo:
+        resposta = dados.buscar_escolas(
+            request, q=termo, limit=dados.LIMITE_BUSCA_PADRAO
+        )
+        contexto.update(
+            resultados=[
+                _resultado_comparavel(escola, ids[0]) for escola in resposta.data
+            ],
+            resultados_tem_mais=resposta.page.has_more,
+        )
+    return templates().TemplateResponse(request, "comparar.html", contexto)
+
+
+def _ids_da_comparacao(valor: str | None) -> tuple[str, ...]:
+    """Ids de ``?escolas=``: um ou dois, formato da ficha, sem repetição.
+
+    A validação de formato é a **mesma** de `core.validation.co_entidade`
+    (reusada, não reescrita); só o `loc` do erro aponta o parâmetro desta
+    rota, para a página 422 mandar corrigir `escolas` e não `co_entidade`.
+    """
+    brutos = [parte.strip() for parte in (valor or "").split(",")]
+    if len(brutos) > MAXIMO_ESCOLAS_COMPARADAS:
+        raise invalid(
+            "a comparação aceita no máximo duas escolas (escolas=<id>[,<id>])",
+            loc=("query", "escolas"),
+        )
+    ids: list[str] = []
+    for parte in brutos:
+        try:
+            ids.append(validation.co_entidade(parte, loc="query"))
+        except ProblemError as erro:
+            raise invalid(erro.detail, loc=("query", "escolas")) from erro
+    if len(set(ids)) != len(ids):
+        raise invalid(
+            "a comparação precisa de duas escolas diferentes",
+            loc=("query", "escolas"),
+        )
+    return tuple(ids)
+
+
+def _resultado_comparavel(escola: Any, co_entidade_a: str) -> dict[str, Any]:
+    """Resultado da busca já com o link canônico para comparar.
+
+    ``co_entidade`` ausente na resposta não gera link (sem chave não há URL).
+    A própria escola A também não: ``?escolas=A,A`` seria ``422`` por id
+    repetido — o link existiria para levar a uma página de erro.
+    """
+    co_entidade = getattr(escola, "co_entidade", None)
+    href = None
+    if co_entidade and co_entidade != co_entidade_a:
+        href = f"{CAMINHO_COMPARAR}?escolas={','.join(sorted((co_entidade_a, co_entidade)))}"
+    return {"escola": escola, "href_comparar": href}
 
 
 @router.get(

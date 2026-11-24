@@ -19,6 +19,10 @@
   {{ cabecalho_escola(cabecalho, migalhas, sem_nome) }}
   {{ subnav(subnav_itens) }}
 
+  {#- Entrada da comparação lado a lado (card C4): a ficha já tem o id e abre a
+      página com um id, onde se busca a segunda escola sem JS. -#}
+  <p><a href="{{ href_comparar }}">{{ rotulo_comparar }}</a></p>
+
   {% if motivo_concorrencia %}
   {# Escola fora do universo de privadas ativas: a ausência da seção é
      explicada sem consulta (decisão pelo item mais recente da série). #}

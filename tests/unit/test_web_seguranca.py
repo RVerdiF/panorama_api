@@ -48,6 +48,8 @@ CONCORRENCIA = f"{FICHA}/concorrencia"
 INDICE = "/app/mercados/"
 MERCADO = f"/app/mercados/{MUNICIPIO}"
 ATALHO = "/app/mercados"
+COMPARAR = f"/app/comparar?escolas={ESCOLA}"
+COMPARAR_DUAS = f"/app/comparar?escolas={ESCOLA},31000002"
 
 #: Todos os templates do front, por página que os renderiza (o guarda exige que
 #: cada página carregue exatamente a tag única de `app.js`).
@@ -59,6 +61,10 @@ PAGINAS = (
     (CONCORRENCIA, 200),
     (INDICE, 200),
     (MERCADO, 200),
+    # Comparação lado a lado (card C4): as duas formas da página — com um id e
+    # com dois — carregam a mesma base única de JS.
+    (COMPARAR, 200),
+    (COMPARAR_DUAS, 200),
     # Erros HTML também herdam o layout base (`erro.html`).
     (ATALHO, 422),
     ("/app/rota-que-nao-existe", 404),
@@ -92,8 +98,14 @@ def _settings() -> Settings:
 def _repo() -> FakeRepository:
     return FakeRepository(
         municipios=[municipio_row()],
-        schools=[school_row()],
-        history=[history_row(nu_ano_censo=ano) for ano in ANOS],
+        schools=[school_row(), school_row(co_entidade="31000002", no_entidade="ESCOLA B")],
+        history=[
+            history_row(nu_ano_censo=ano) for ano in ANOS
+        ]
+        + [
+            history_row(co_entidade="31000002", no_entidade="ESCOLA B", nu_ano_censo=ano)
+            for ano in ANOS
+        ],
         indicators=[indicator_row(nu_ano_censo=2025)],
         competidores=[competidor_row(nu_ano_censo=2025)],
         markets=[market_row(nu_ano_censo=ano, etapa="bas") for ano in ANOS],
