@@ -515,3 +515,88 @@ def test_limpar_filtros_aparece_com_filtro_ativo_e_aponta_para_a_busca(
 
     assert LINK_LIMPAR.search(html)
 
+
+# -- macro do select de município (card `t_e075a6f6`, spec §6) ----------------
+#
+# A macro `select_municipios` existe para a landing reaproveitar as 853 opções,
+# mas o card exige que o markup de `/app/` **não mude um byte**. O texto abaixo é
+# o select como estava inline em `busca.html` na `main` (0c32384), antes da
+# macro; ele é renderizado aqui pelo mesmo Jinja2 (autoescape ligado) e comparado
+# com o bloco extraído da página de verdade.
+MARKUP_ANTES = """<select id="co_municipio" name="co_municipio">
+        <option value="">Todos os municípios de MG</option>
+        {% for municipio in municipios %}
+        <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == filtros.co_municipio %} selected{% endif %}>{{ municipio.no_municipio }}</option>
+        {% endfor %}
+      </select>"""
+
+
+def _select_de_municipio(html: str) -> str:
+    """Bloco `<select>`…`</select>` do município: do `<select` até o fechamento."""
+    inicio = html.index("<select")
+    fim = html.index("</select>", inicio) + len("</select>")
+    return html[inicio:fim]
+
+
+def _markup_da_main(co_municipio: str) -> str:
+    """Renderiza o select como a `main` o gerava, com o filtro selecionado."""
+    from jinja2 import Environment
+
+    ambiente = Environment(autoescape=True)
+    modelo = ambiente.from_string(MARKUP_ANTES)
+    return modelo.render(
+        municipios=modulo_municipios.municipios_mg(),
+        filtros={"co_municipio": co_municipio},
+    )
+
+
+@pytest.mark.parametrize("co_municipio", ["", "3106200", "3100104"])
+def test_select_de_municipio_sai_byte_a_byte_como_antes_da_macro(
+    client, repository, co_municipio
+):
+    params = {"co_municipio": co_municipio} if co_municipio else {}
+
+    html = _get(client, params=params).text
+
+    assert _select_de_municipio(html) == _markup_da_main(co_municipio)
+
+
+def test_select_de_municipio_marca_uma_unica_opcao_como_selecionada(
+    client, repository
+):
+    """O `selected` vai na opção do filtro ativo, e em nenhuma outra."""
+    html = _get(client, params={"co_municipio": "3106200"}).text
+
+    assert html.count(" selected>") == 1
+    assert '<option value="3106200" selected>Belo Horizonte</option>' in html
+
+
+@pytest.mark.parametrize(
+    ("termo", "esperado"),
+    [
+        ("modelo", "ESCOLA MODELO"),
+        # Termo sem resultado: a URL do hero responde 200 com o estado vazio,
+        # exatamente como a busca já respondia.
+        ("magnum", "Nenhuma escola encontrada para esta busca."),
+    ],
+)
+def test_url_do_hero_responde_como_a_busca_de_sempre(
+    client, repository, termo, esperado
+):
+    """A URL que a barra do hero gera (`q` + `co_municipio`) é a busca de hoje.
+
+    O hero da landing não é rota nova: ele envia o mesmo GET de `/app/`, e o
+    resultado é a busca normal, com a consulta feita pelo repositório.
+    """
+    repository.schools = _escolas(1)
+
+    resposta = _get(client, params={"q": termo, "co_municipio": "3106200"})
+
+    assert resposta.status_code == 200
+    assert resposta.headers["content-type"].startswith("text/html")
+    ((nome, kwargs),) = _consultas_de_escola(repository)
+    assert nome == "search_schools"
+    assert kwargs["q"] == termo
+    assert kwargs["co_municipio"] == "3106200"
+    assert esperado in resposta.text
+

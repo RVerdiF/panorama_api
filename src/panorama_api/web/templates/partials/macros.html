@@ -5,3 +5,19 @@
 {% macro oferta(v) -%}
 {{ v | fmt_oferta }}
 {%- endmacro %}
+
+{#- Select de município (card `t_e075a6f6`, spec §6): a lista versionada de 853
+    municípios é o maior item das páginas do front (46 KB brutos), por isso vive
+    num único lugar e é usada pela busca `/app/` e pela barra do hero da landing.
+    O markup sai byte a byte igual ao que a busca tinha inline — o teste compara
+    com o texto gerado pelo template anterior. `selecionado` é o código já
+    escolhido (vazio na 1ª visita e no hero). Importar com `with context` é o que
+    deixa a macro enxergar `municipios`; `id` também é o `name` do campo. -#}
+{% macro select_municipios(id, selecionado) -%}
+<select id="{{ id }}" name="{{ id }}">
+        <option value="">Todos os municípios de MG</option>
+        {% for municipio in municipios %}
+        <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == selecionado %} selected{% endif %}>{{ municipio.no_municipio }}</option>
+        {% endfor %}
+      </select>
+{%- endmacro %}
