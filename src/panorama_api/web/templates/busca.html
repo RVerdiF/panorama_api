@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/macros.html" import select_municipios with context %}
 
 {% block titulo %}Busca de escolas — Panorama Escola{% endblock %}
 
@@ -45,12 +46,7 @@
 
     <div class="campo">
       <label for="co_municipio">Município</label>
-      <select id="co_municipio" name="co_municipio">
-        <option value="">Todos os municípios de MG</option>
-        {% for municipio in municipios %}
-        <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == filtros.co_municipio %} selected{% endif %}>{{ municipio.no_municipio }}</option>
-        {% endfor %}
-      </select>
+      {{ select_municipios("co_municipio", filtros.co_municipio) }}
     </div>
 
     <div class="campo campo--booleano">

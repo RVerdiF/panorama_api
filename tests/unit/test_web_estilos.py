@@ -158,3 +158,89 @@ def test_nenhum_outline_none_no_css():
     css = CSS.read_text(encoding="utf-8")
 
     assert re.search(r"outline:\s*(?:none|0)\b", css) is None
+
+
+# -- busca no hero da landing (card t_e075a6f6, spec §6/§8) -------------------
+
+#: Seletor composto dos controles da barra do hero, como está no arquivo.
+CAMPOS_DO_HERO = '.hero__campo input[type="search"],\n.hero__campo select'
+
+
+def _cor_da_variavel(nome: str) -> str:
+    css = CSS.read_text(encoding="utf-8")
+    achado = re.search(rf"--{re.escape(nome)}:\s*(#[0-9a-fA-F]{{6}})", css)
+    assert achado is not None, f"variável --{nome} ausente"
+    return achado.group(1)
+
+
+def test_botao_primario_do_hero_tem_branco_sobre_a_cor_de_destaque():
+    """"Buscar escolas": o par texto/fundo medido, não herdado."""
+    primario = _regra(".botao--primario")
+
+    assert "background: var(--cor-destaque)" in primario
+    assert "color: #ffffff" in primario
+    assert (
+        _contraste(_cor_da_variavel("cor-destaque"), "#ffffff")
+        >= CONTRASTE_TEXTO_MINIMO
+    )
+
+
+def test_botao_secundario_do_hero_e_contorno_com_a_cor_de_acao():
+    """`formaction` do mercado: fundo da superfície e contorno ≥3:1."""
+    secundario = _regra(".botao--secundario")
+    base = _regra(".botao")
+
+    assert "background: var(--cor-superficie)" in secundario
+    assert "color: var(--cor-destaque)" in secundario
+    assert "border: 1px solid var(--cor-destaque)" in base
+    assert (
+        _contraste(_cor_da_variavel("cor-destaque"), "#ffffff") >= CONTRASTE_MINIMO
+    )
+
+
+def test_hover_do_botao_secundario_nao_fica_texto_azul_sobre_azul_escuro():
+    """O `button:hover` global escureceria o preenchimento: aqui, não."""
+    hover = _regra(".botao--secundario:hover")
+    fundo = re.search(r"background:\s*(#[0-9a-fA-F]{6})", hover)
+    texto = re.search(r"color:\s*(#[0-9a-fA-F]{6})", hover)
+    assert fundo is not None and texto is not None
+
+    assert _contraste(texto.group(1), fundo.group(1)) >= CONTRASTE_TEXTO_MINIMO
+
+
+def test_campos_e_botoes_da_busca_do_hero_tem_alvo_de_44px():
+    """WCAG 2.5.5 nos dois modos (empilhado e em pílula)."""
+    campos = _regra(CAMPOS_DO_HERO)
+    botao = _regra(".botao")
+
+    for regra, alvo in ((campos, "campos"), (botao, "botões")):
+        altura = re.search(r"min-height:\s*(\d+)px", regra)
+        assert altura is not None, f"{alvo} da busca do hero sem min-height"
+        assert int(altura.group(1)) >= ALVO_MINIMO_PX
+
+    # Largura: os campos ocupam 100% da coluna e os botões, a do `.hero__acoes`.
+    assert "width: 100%" in campos
+    assert "grid-template-columns: minmax(0, 1fr)" in _regra(".hero__acoes")
+
+
+def test_barra_do_hero_empilha_com_raio_16px_e_vira_pilula_em_48rem():
+    css = CSS.read_text(encoding="utf-8")
+    base = _regra(".hero__busca")
+
+    # Empilhada abaixo de 48rem: uma coluna, raio grande (16 px) e sombra da spec.
+    assert "grid-template-columns: minmax(0, 1fr)" in base
+    assert "border-radius: var(--raio-grande)" in base
+    assert "box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08)" in base
+    # Pílula a partir de 48rem: o raio de 999 px vive dentro do breakpoint.
+    pilula = css.index("border-radius: 999px")
+    assert css.rindex("@media (min-width: 48rem)", 0, pilula) >= 0
+    # O bloco dos botões ocupa a linha inteira da grade da barra.
+    assert "grid-column: 1 / -1" in css
+
+
+def test_foco_visivel_continua_valendo_para_os_botoes():
+    """:focus-visible de 3 px cobre `<button>`, inclusive os do hero."""
+    css = CSS.read_text(encoding="utf-8")
+
+    assert "button:focus-visible" in css
+    assert "outline: 3px solid var(--cor-destaque)" in css

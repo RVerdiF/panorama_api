@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from fastapi import APIRouter, Request
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from starlette.responses import HTMLResponse
 
@@ -115,6 +115,15 @@ TITULO_PAGINA_INEXISTENTE = "Página não encontrada"
 SUGESTAO_PAGINA_INEXISTENTE = (
     "Confira o endereço digitado: ele não corresponde a nenhuma página deste site."
 )
+
+#: Atalho do hero da landing (`GET /app/mercados?co_municipio=`): sem município
+#: escolhido não há o que redirecionar (spec §6). A página diz o que fazer e
+#: volta para a landing, onde o formulário está.
+TITULO_ATALHO_SEM_MUNICIPIO = "Escolha um município"
+SUGESTAO_ATALHO_SEM_MUNICIPIO = (
+    "Para ver o mercado, selecione um município no formulário."
+)
+ACAO_ATALHO_SEM_MUNICIPIO = {"href": CAMINHO_INICIO, "rotulo": "Voltar ao início"}
 
 
 @lru_cache
@@ -271,8 +280,12 @@ def inicio(request: Request) -> Response:
     (nunca `application/problem+json`).
     """
     contexto = contexto_base(request)
+    municipios = municipios_mg()
     contexto.update(
-        recorte_municipios=len(municipios_mg()),
+        # As 853 opções da barra de busca do hero saem da mesma lista versionada
+        # da busca (`GET /app/`); lista de apoio de tela, zero consulta.
+        municipios=municipios,
+        recorte_municipios=len(municipios),
         recorte_anos=anos_publicados(_settings(request).anos_disponiveis),
         # `"bas"` é o total oficial do Censo, não uma etapa do mercado.
         recorte_etapas=sum(1 for etapa in ETAPAS_ROTULOS if etapa != "bas"),
@@ -539,6 +552,47 @@ def _secao_opcional(consulta: Any) -> tuple[Any | None, bool]:
         if erro.code is not ErrorCode.NAO_ENCONTRADO:
             raise
         return None, True
+
+
+@router.get(
+    "/mercados",
+    response_class=HTMLResponse,
+    name="web_mercado_atalho",
+    include_in_schema=False,
+    summary="Atalho do hero: mercado do município escolhido",
+)
+def mercado_atalho(request: Request, co_municipio: str | None = None) -> Response:
+    """Atalho `GET /app/mercados?co_municipio=` → tela do mercado (spec §6).
+
+    É o segundo botão da barra de busca do hero: o `<form>` é ``GET /app/``, e
+    o botão leva ``formaction="/app/mercados"``. A rota **só** redireciona:
+
+    * ``co_municipio`` válido (``^31\\d{5}$``, a mesma validação de
+      `core.validation`) → **303** `Location: /app/mercados/{co}`, ignorando
+      `q` e qualquer outro parâmetro que o form tenha enviado;
+    * ausente, vazio ou inválido → **422** em HTML (`pagina_erro`), com
+      "Escolha um município" e a volta para a landing.
+
+    Nenhum caminho consulta o repositório: o código do município é só sintaxe
+    de URL, e a tela de destino é quem valida a existência do recorte. O
+    `303` é o certo para um GET que só aponta para outra URL (o navegador
+    refaz a requisição como `GET` em `/app/mercados/{co}` e nunca reenvia o
+    formulário). Como o cache de páginas só trata ``200``, a resposta sai sem
+    `ETag` e sem `Cache-Control` de página.
+    """
+    try:
+        codigo = validation.co_municipio(co_municipio or "", loc="query")
+    except ProblemError as erro:
+        return pagina_erro(
+            request,
+            erro,
+            titulo=TITULO_ATALHO_SEM_MUNICIPIO,
+            sugestao=SUGESTAO_ATALHO_SEM_MUNICIPIO,
+            acao=ACAO_ATALHO_SEM_MUNICIPIO,
+        )
+    return RedirectResponse(
+        url=f"{PREFIXO_WEB}/mercados/{codigo}", status_code=303
+    )
 
 
 @router.get(

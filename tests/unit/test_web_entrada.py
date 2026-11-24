@@ -116,8 +116,9 @@ def test_raiz_responde_a_landing_em_html(cliente: TestClient):
     assert "location" not in resposta.headers
     html = resposta.text
     assert "<h1>Escolas e mercados da educação básica em Minas Gerais</h1>" in html
-    # A busca continua em `/app/`, e é para lá que a landing leva.
-    assert re.search(r'<a href="/app/">Ir para a busca</a>', html)
+    # A busca continua em `/app/`, e é para lá que a landing leva — desde o card
+    # `t_e075a6f6` pelo formulário GET do hero, não por um link textual.
+    assert re.search(r'<form class="hero__busca" method="get" action="/app/"', html)
 
 
 def test_raiz_responde_head_com_a_pagina(cliente: TestClient):

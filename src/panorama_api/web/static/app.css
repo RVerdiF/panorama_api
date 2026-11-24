@@ -576,11 +576,106 @@ tbody th {
   max-width: none;
 }
 
+/* Busca no hero (card `t_e075a6f6`, spec §6/§7): mesmo GET da busca, sem JS.
+   Abaixo de 48rem empilha, com 100% de largura e alvo de 44 px (WCAG 2.5.5). */
+.hero__busca {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  margin: 1.5rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--cor-borda);
+  border-radius: var(--raio-grande);
+  background: var(--cor-superficie);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.hero__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.hero__campo label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.hero__campo input[type="search"],
+.hero__campo select {
+  font: inherit;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--cor-borda-controle);
+  border-radius: var(--raio);
+  background: var(--cor-superficie);
+  color: var(--cor-texto);
+  min-width: 0;
+}
+
+.hero__acoes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+/* Primário: branco sobre `--cor-destaque` (6,8:1). Secundário: contorno. */
+.botao {
+  font: inherit;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 0.55rem 1.4rem;
+  border: 1px solid var(--cor-destaque);
+  border-radius: var(--raio);
+  cursor: pointer;
+}
+
+.botao--primario {
+  background: var(--cor-destaque);
+  color: #ffffff;
+}
+
+.botao--secundario {
+  background: var(--cor-superficie);
+  color: var(--cor-destaque);
+}
+
+/* O hover global de `button` daria azul sobre azul no secundário. */
+.botao--secundario:hover {
+  background: #eaf1f6;
+  color: #164a6c;
+  border-color: #164a6c;
+}
+
 @media (min-width: 48rem) {
   .hero {
     grid-template-columns: 1.1fr 0.9fr;
     gap: 1.5rem 2.5rem;
     align-items: center;
+  }
+
+  /* Pílula (raio 999 px) em dois blocos, como no wireframe da spec §5: campos
+     numa linha, botões na seguinte — em uma linha só não cabem na coluna do
+     hero. O padding lateral maior mantém o conteúdo dentro da curva. A dica do
+     nome sai do modo visual aqui; segue no documento para o `aria-describedby`
+     (e visível em tela estreita). */
+  .hero__busca {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem 0.9rem;
+    padding: 0.9rem 2.5rem;
+    border-radius: 999px;
+  }
+
+  .hero__acoes {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .hero__busca .dica {
+    display: none;
   }
 }
 
