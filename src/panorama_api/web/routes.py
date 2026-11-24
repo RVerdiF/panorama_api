@@ -116,8 +116,14 @@ def _templates() -> Jinja2Templates:
     return ambiente
 
 
-def contexto_base(request: Request) -> dict[str, Any]:
-    """Contexto comum a toda página: versões, CSS versionado e prefixo público."""
+def contexto_base(request: Request, *, pagina: str | None = None) -> dict[str, Any]:
+    """Contexto comum a toda página: versões, CSS versionado e prefixo público.
+
+    ``pagina`` é a tela ativa do nav principal (``"busca"``/``"metodologia"``).
+    Ela vira ``aria-current="page"`` no link correspondente; escola e mercado não
+    aparecem no nav, então não marcam nenhum item (marcar "Busca" numa ficha de
+    escola diria que o usuário está na busca, o que é falso).
+    """
     settings = _settings(request)
     return {
         "app_prefix": PREFIXO_WEB,
@@ -131,6 +137,7 @@ def contexto_base(request: Request) -> dict[str, Any]:
         "href_metodologia": f"{PREFIXO_WEB}/metodologia",
         # Busca é a página inicial do front (caminho relativo, sem `url_for`).
         "href_busca": f"{PREFIXO_WEB}/",
+        "pagina_atual": pagina,
     }
 
 
@@ -209,7 +216,7 @@ def busca(
     }
 
     contexto: dict[str, Any] = {
-        **contexto_base(request),
+        **contexto_base(request, pagina="busca"),
         "filtros": {
             "q": termo,
             "co_municipio": municipio,
@@ -223,6 +230,13 @@ def busca(
         "etapa_rotulo": rotulo_etapa(META_BUSCA["etapa"]),
         "universo_descricao": UNIVERSOS[UNIVERSO_ESCOLAS_MG],
         "avisos": None,
+        # Anos publicados do front (o mesmo `APP_ANOS_DISPONIVEIS` do seletor do
+        # mercado): o bloco de orientação anuncia o recorte real, nunca literal.
+        "anos_disponiveis": list(_settings(request).anos_disponiveis),
+        # Sem consulta o bloco "Recorte da busca" não tem o que declarar — em
+        # especial `ano_referencia`, que sairia como "sem dado" e passaria a
+        # impressão de base faltando (achado A3).
+        "houve_consulta": bool(termo or municipio),
     }
 
     if not termo and not municipio:
@@ -262,7 +276,7 @@ def busca(
 def metodologia(request: Request) -> Response:
     """Página estática de metodologia: de onde vem cada número e com que limites."""
     contexto = {
-        **contexto_base(request),
+        **contexto_base(request, pagina="metodologia"),
         "rotulo_retencao": ROTULO_RETENCAO,
         "definicao_retencao": DEFINICOES["retencao_liquida_proxy_pct"],
         "definicao_concorrencia": DEFINICAO_CONCORRENCIA,

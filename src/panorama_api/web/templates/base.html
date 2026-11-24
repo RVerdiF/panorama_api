@@ -11,10 +11,11 @@
   <a class="pular-para-conteudo" href="#conteudo">Pular para o conteúdo</a>
   <header class="topo">
     <div class="topo__interno">
-      <span class="topo__marca">Panorama Escola</span>
+      {# O logo é o caminho de volta para a entrada do front (achado A5). #}
+      <a class="topo__marca" href="{{ href_busca }}">Panorama Escola</a>
       <nav class="topo__nav" aria-label="Navegação principal">
-        <a href="{{ href_busca }}">Busca</a>
-        <a href="{{ href_metodologia }}">Metodologia</a>
+        <a href="{{ href_busca }}"{% if pagina_atual == "busca" %} aria-current="page"{% endif %}>Busca</a>
+        <a href="{{ href_metodologia }}"{% if pagina_atual == "metodologia" %} aria-current="page"{% endif %}>Metodologia</a>
       </nav>
     </div>
   </header>
@@ -29,10 +30,14 @@
         Fonte: Censo Escolar (INEP), recorte Minas Gerais.
         Dados publicados: <code>{{ data_version }}</code>; contrato <code>{{ contract_version }}</code>.
       </p>
+      {# Nota de ausência: só faz sentido numa página que exibe dado. Telas sem
+         consulta (1ª visita à busca) não a herdam (achado A3). #}
+      {% block rodape_nota %}
       <p>
         Esta página nunca troca dado ausente por zero: campo sem valor aparece como
         <strong>sem dado</strong>, com o motivo quando a base informa.
       </p>
+      {% endblock %}
     </div>
   </footer>
 </body>

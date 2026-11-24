@@ -1,6 +1,11 @@
 {% extends "base.html" %}
+{% from "partials/breadcrumb.html" import breadcrumb with context %}
 
-{% block titulo %}Mercado municipal — Panorama Escola{% endblock %}
+{# O município no `<title>` é o que distingue abas de mercados diferentes
+   (achado D3). Sem nome na resposta, o código IBGE ocupa o lugar — nunca um
+   título sem identificação nenhuma. #}
+{% set municipio_nome = (mercado.no_municipio if mercado and mercado.no_municipio else municipio) %}
+{% block titulo %}Mercado municipal de {{ municipio_nome }} — Panorama Escola{% endblock %}
 
 {#
   Seletores de recorte (ano e etapa). A página é sempre de UM município e o
@@ -66,6 +71,11 @@
 
 {% block conteudo %}
 <article class="cartao">
+  {# "Voltar" explícito: a busca é a entrada do front e o mercado não estava
+     linkado a ela em lugar nenhum (achado B7). O caminho é `Busca › município`,
+     com o último item em texto (é a tela atual). #}
+  {{ breadcrumb([{"rotulo": "Busca", "href": href_busca},
+                 {"rotulo": municipio_nome}]) }}
   <h1>Mercado municipal</h1>
   <p class="subtitulo">
     Município <code>{{ municipio }}</code>

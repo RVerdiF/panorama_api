@@ -8,7 +8,7 @@ from typing import AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from panorama_api import __version__
@@ -114,6 +114,17 @@ def create_app(
     app.include_router(v1_router, prefix="/v1")
     # Front SSR sob `/app` (decisão D1 = A). Mesmo processo/serviço da API.
     app.include_router(web_router)
+    # Entrada do sistema (card t_0c84b91f): a raiz deixa de ser 404 em
+    # `application/problem+json` e passa a levar ao front. `307` (e não `302`)
+    # preserva método e corpo de quem chega por POST. `HEAD` entra junto porque
+    # o `FastAPI` não o deriva do `GET`: sem isso, `curl -I /` (e qualquer
+    # monitor de disponibilidade) receberia 405 no lugar do redirect.
+    # `include_in_schema=False` mantém o contrato do `/v1`/OpenAPI como estava.
+    @app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+    def raiz() -> Response:
+        """Raiz do serviço → front (`/app/`)."""
+        return RedirectResponse(f"{PREFIXO_WEB}/", status_code=307)
+
     return app
 
 

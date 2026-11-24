@@ -2,15 +2,33 @@
 
 {% block titulo %}Busca de escolas — Panorama Escola{% endblock %}
 
+{# A nota de ausência do rodapé fala de dado exibido: só faz sentido depois de
+   uma consulta. A 1ª visita ao `/app/` não mostra valor nenhum, então a nota
+   sairia como ruído (e "sem dado" numa tela sem dado nenhum) — achado A3. #}
+{% block rodape_nota %}{% if houve_consulta %}{{ super() }}{% endif %}{% endblock %}
+
 {% block conteudo %}
 <article class="cartao">
   <h1>Busca de escolas</h1>
-  <p class="subtitulo">
-    Escolas de <strong>Minas Gerais</strong> no Censo Escolar (INEP). Busque pelo nome
-    da escola, escolha um município, ou combine os dois filtros.
-  </p>
+  {# Entrada orientadora (achados A2/A3): o que é, recorte, anos publicados e
+     fonte, mais os três caminhos de uso. O bloco de orientação fica no topo da
+     própria busca — não há landing separada. #}
+  <section class="orientacao" aria-labelledby="orientacao">
+    <h2 id="orientacao" class="visualmente-oculto">O que é o Panorama Escola</h2>
+    <p class="subtitulo">
+      O <strong>Panorama Escola</strong> reúne matrícula, oferta e mercado da educação
+      básica das escolas de <strong>Minas Gerais</strong>, a partir do Censo Escolar
+      (<abbr title="Instituto Nacional de Estudos e Pesquisas Educacionais Anísio Teixeira">INEP</abbr>).
+      Anos publicados: {% for ano in anos_disponiveis %}{{ ano }}{% if not loop.last %}, {% endif %}{% endfor %}.
+    </p>
+    <ul class="orientacao__atalhos">
+      <li><a href="#formulario-busca">Buscar escola pelo nome</a></li>
+      <li><a href="#co_municipio">Escolher um município</a></li>
+      <li><a href="{{ href_metodologia }}">Metodologia</a></li>
+    </ul>
+  </section>
 
-  <form class="formulario" method="get" action="{{ app_prefix }}/" role="search">
+  <form id="formulario-busca" class="formulario" method="get" action="{{ app_prefix }}/" role="search">
     <div class="campo">
       <label for="q">Nome da escola</label>
       <input
@@ -50,6 +68,10 @@
     </div>
   </form>
 
+  {# O recorte descreve a consulta feita (ano, etapa, universo, fonte, avisos).
+     Sem consulta não há recorte a declarar — e `ano_referencia` nulo sairia
+     como "sem dado", sugerindo base faltando (achado A3). #}
+  {% if houve_consulta %}
   <section aria-labelledby="recorte">
     <h2 id="recorte">Recorte da busca</h2>
     <dl class="lista-definicoes">
@@ -67,9 +89,7 @@
       {% endif %}
       <dt>Avisos (meta.avisos)</dt>
       <dd>
-        {% if avisos is none %}
-        sem dado (nenhuma busca realizada)
-        {% elif avisos %}
+        {% if avisos %}
         <ul class="lista-regras">
           {% for aviso in avisos %}
           <li>{{ aviso }}</li>
@@ -81,6 +101,7 @@
       </dd>
     </dl>
   </section>
+  {% endif %}
 
   <section aria-labelledby="escolas">
     <h2 id="escolas">Escolas</h2>
