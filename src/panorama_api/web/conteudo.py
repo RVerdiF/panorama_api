@@ -74,6 +74,29 @@ MOTIVO_SECAO_COMPETIDORES = (
     "matrícula da educação básica observada no município e ano."
 )
 
+#: Título da seção que virou rota própria na ficha (spec §2.2). O mesmo texto é o
+#: item do subnav e o `<h1>`/breadcrumb da rota `/app/escolas/{id}/concorrencia`.
+TITULO_SECAO_CONCORRENCIA = "Indicadores e concorrência"
+#: Rótulo do item de volta no subnav de seções.
+ROTULO_VISAO_GERAL = "Visão geral"
+#: Linha de orientação por âncoras dentro da própria página (sem JS).
+TEXTO_NESTA_PAGINA = "Nesta página:"
+#: Volta oferecida pela rota de concorrência quando a seção não se aplica.
+TEXTO_VOLTAR_VISAO_GERAL = "Voltar para a Visão geral"
+
+#: Nota da Visão geral quando a seção de indicadores não existe para a escola.
+#: A decisão é tomada sem consulta, pelo item mais recente da série de `history`.
+MOTIVO_SECAO_ESCOLA_PUBLICA = (
+    "Indicadores e concorrência: não se aplica a escola pública."
+)
+MOTIVO_SECAO_ESCOLA_INATIVA = (
+    "Indicadores e concorrência: não se aplica a escola inativa."
+)
+
+#: Comparação municipal ausente no **ano dos indicadores**: a seção mostra "sem
+#: dado" com este motivo, nunca 0 (AGENTS.md §6).
+MOTIVO_SEM_COMPARACAO = "sem linha de comparação municipal para {ano}"
+
 #: Estado legítimo da tela de mercado: a mart não tem linha de share para a
 #: etapa, ou seja, nenhuma escola privada do recorte tem matrícula observada.
 #: **Não** é ausência de mercado nem share de 0% para as escolas ausentes.
@@ -257,7 +280,10 @@ __all__ = [
     "MOTIVO_ALEM_DO_FIM",
     "MOTIVO_FORA_DO_UNIVERSO_PRIVADO",
     "MOTIVO_SECAO_COMPETIDORES",
+    "MOTIVO_SECAO_ESCOLA_INATIVA",
+    "MOTIVO_SECAO_ESCOLA_PUBLICA",
     "MOTIVO_SECAO_INDICADORES",
+    "MOTIVO_SEM_COMPARACAO",
     "MOTIVO_SEM_PRIVADAS",
     "NAO_SE_APLICA",
     "NOTA_GRUPO_ETAPAS",
@@ -266,11 +292,15 @@ __all__ = [
     "ROTULO_POSICAO_CRESCIMENTO_MG",
     "ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO",
     "ROTULO_RETENCAO",
+    "ROTULO_VISAO_GERAL",
     "TEXTO_ABAIXO_PORTE",
+    "TEXTO_NESTA_PAGINA",
     "TEXTO_OFERTA_DESCONHECIDA",
+    "TEXTO_VOLTAR_VISAO_GERAL",
     "TITULO_GRUPO_ETAPAS",
     "TITULO_GRUPO_MODALIDADES",
     "TITULO_GRUPO_TOTAL",
+    "TITULO_SECAO_CONCORRENCIA",
     "UNIVERSOS",
     "anos_publicados",
     "rotulo_etapa",

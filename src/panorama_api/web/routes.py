@@ -47,9 +47,9 @@ from panorama_api.web.conteudo import (
     traduzir_avisos,
 )
 from panorama_api.web.escola import (
-    contexto_escola,
-    item_mais_recente,
-    pertence_ao_universo_privado,
+    contexto_concorrencia,
+    contexto_concorrencia_nao_se_aplica,
+    contexto_visao_geral,
 )
 from panorama_api.web.filters import (
     fmt_ano,
@@ -499,18 +499,20 @@ def metodologia(request: Request) -> Response:
     "/escolas/{co_entidade}",
     response_class=HTMLResponse,
     name="web_escola",
-    summary="Visão da escola: série, oferta, rendimento e posição municipal",
+    summary="Visão geral da escola: série, oferta e rendimento",
 )
 def escola(co_entidade: str, request: Request, ano: int | None = None) -> Response:
-    """Tela da escola (card F4).
+    """Visão geral da escola (card F4; rota separada no NAV-2).
 
-    A série de `history` é obrigatória. Indicadores e comparação municipal só
-    são consultados quando o item mais recente da série diz **privada ativa**:
-    pública, inativa ou com dependência não informada não gasta cota nem
-    fabrica seção. Um 404 residual de universo nessas duas consultas vira
-    seção "não se aplica" na própria página (200); qualquer outro erro (503,
-    422, 500) sobe para o handler global, e a página inteira vira a página de
-    erro — nunca uma renderização parcial.
+    A série de `history` é a **única** consulta: cabeçalho, identificação,
+    oferta do ano recente, série e rendimento saem dela. Indicadores e
+    comparação municipal vivem em :func:`escola_concorrencia`
+    (`/app/escolas/{id}/concorrencia`), para que abrir a ficha custe 1 consulta
+    ao BigQuery em vez de 3 (spec §5).
+
+    Quando o item mais recente da série diz que a escola não é privada ativa, a
+    página explica que a seção de indicadores não se aplica — sem consultar as
+    marts privadas (falha fechada) e sem esconder a ausência.
 
     `?ano=` não é um recorte válido desta tela: a ficha mostra a série inteira
     e o ano de referência é o mais recente da própria série. Aceitar o
@@ -526,47 +528,90 @@ def escola(co_entidade: str, request: Request, ano: int | None = None) -> Respon
         )
     historico = dados.historico_escola(request, co_entidade=co_entidade)
 
-    indicadores = concorrentes = None
-    nao_se_aplica: list[str] = []
-    if pertence_ao_universo_privado(item_mais_recente(historico.data.items)):
-        indicadores, ausente = _secao_opcional(
-            lambda: dados.indicadores_escola(request, co_entidade=co_entidade)
-        )
-        if ausente:
-            nao_se_aplica.append("indicadores")
-        concorrentes, ausente = _secao_opcional(
-            lambda: dados.concorrentes_escola(request, co_entidade=co_entidade)
-        )
-        if ausente:
-            nao_se_aplica.append("competidores")
-
     contexto = {
         **contexto_base(request, area="escolas"),
-        **contexto_escola(
-            historico=historico,
-            indicadores=indicadores,
-            concorrentes=concorrentes,
-            nao_se_aplica=nao_se_aplica,
-        ),
+        **contexto_visao_geral(historico=historico),
     }
     return templates().TemplateResponse(request, "escola.html", contexto)
 
 
-def _secao_opcional(consulta: Any) -> tuple[Any | None, bool]:
-    """Executa uma consulta que pode não se aplicar à escola.
+@router.get(
+    "/escolas/{co_entidade}/concorrencia",
+    response_class=HTMLResponse,
+    name="web_escola_concorrencia",
+    summary="Indicadores e concorrência da escola (privada ativa)",
+)
+def escola_concorrencia(
+    co_entidade: str, request: Request, ano: int | None = None
+) -> Response:
+    """Indicadores e concorrência da escola (spec §2.2, §5.1, §5.2).
 
-    Só ``404 NAO_ENCONTRADO`` é absorvido (estado legítimo de universo: a seção
-    "não se aplica"). ``503`` e demais códigos sobem — página inteira de erro.
-    O ``detail`` do 404 não vai para a tela: é diagnóstico da API, e a
-    explicação exibida é texto fixo de `web/conteudo.py`. A tupla devolvida é
-    ``(resposta, nao_se_aplica)``.
+    Fonte única: ``dados.indicadores_escola`` — a resposta já traz a linha de
+    `mart_competidores` do ano dentro de cada item, então a comparação municipal
+    sai de `items[-1].competicao` e **não** existe chamada a `concorrentes_escola`
+    (2 consultas no total, sem leitura duplicada da mart).
+
+    O cabeçalho vem da própria resposta de indicadores (nome, município): o
+    `history` não é consultado nesta rota.
+
+    Um ``404 NAO_ENCONTRADO`` do `/v1` é ambíguo por contrato: pode ser escola
+    inexistente no recorte MG, ou escola existente fora do universo de
+    indicadores. A distinção é feita com **uma** consulta de identidade
+    (`buscar_escolas(co_entidade=...)`, a mesma da busca) só nesse caminho:
+    escola existente → página 200 "não se aplica" com a volta para a Visão
+    geral; escola inexistente → 404 inteiro. ``503``/``422``/``500`` continuam
+    sendo a página de erro inteira.
+
+    `?ano=` responde ``422`` `PARAMETRO_INVALIDO` antes de qualquer consulta —
+    a página mostra o ano mais recente da mart, e aceitar o parâmetro fingindo
+    aplicá-lo seria mentir sobre o recorte.
     """
+    if ano is not None:
+        raise invalid(
+            "a rota de indicadores mostra o ano mais recente publicado; o "
+            "parâmetro ano não é suportado aqui — remova-o da URL",
+            loc=("query", "ano"),
+        )
     try:
-        return consulta(), False
+        indicadores = dados.indicadores_escola(request, co_entidade=co_entidade)
     except ProblemError as erro:
         if erro.code is not ErrorCode.NAO_ENCONTRADO:
             raise
-        return None, True
+        escola_mg = _escola_do_recorte(request, co_entidade)
+        if escola_mg is None:
+            # Não existe no recorte MG: o 404 do `/v1` está certo.
+            raise erro
+        contexto = {
+            **contexto_base(request, area="escolas"),
+            **contexto_concorrencia_nao_se_aplica(
+                co_entidade=co_entidade, escola=escola_mg
+            ),
+        }
+        return templates().TemplateResponse(
+            request, "escola_concorrencia.html", contexto
+        )
+
+    contexto = {
+        **contexto_base(request, area="escolas"),
+        **contexto_concorrencia(indicadores=indicadores),
+    }
+    return templates().TemplateResponse(request, "escola_concorrencia.html", contexto)
+
+
+def _escola_do_recorte(request: Request, co_entidade: str) -> Any | None:
+    """Linha de `dim_escola` da escola, ou ``None`` quando ela não existe em MG.
+
+    Usa o seam de dados do front (`buscar_escolas`), nunca o repositório: é a
+    mesma consulta de identidade da busca. Só é chamada no caminho de 404 da
+    rota de concorrência, para separar "não existe" de "fora do universo".
+    """
+    try:
+        resposta = dados.buscar_escolas(request, co_entidade=co_entidade)
+    except ProblemError as erro:
+        if erro.code is not ErrorCode.NAO_ENCONTRADO:
+            raise
+        return None
+    return resposta.data[0] if resposta.data else None
 
 
 @router.get(

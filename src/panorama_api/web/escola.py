@@ -21,15 +21,16 @@ Duas decisões moram neste módulo:
 
 from __future__ import annotations
 
-from typing import Any, NamedTuple, Protocol, Sequence, TypeVar
+from typing import Any, Mapping, NamedTuple, Protocol, Sequence, TypeVar
 
 from markupsafe import Markup
 
 from panorama_api.contract import Etapa
 from panorama_api.schemas.common import Meta
-from panorama_api.schemas.competitors import CompetitorsResponse
+from panorama_api.schemas.competitors import Competicao
 from panorama_api.schemas.indicators import IndicatorItem, IndicatorsResponse
-from panorama_api.schemas.schools import HistoryItem, HistoryResponse
+from panorama_api.schemas.schools import HistoryItem, HistoryResponse, School
+from panorama_api.web import PREFIXO_WEB
 from panorama_api.web.conteudo import (
     DEFINICAO_CONCORRENCIA,
     EXPLICACAO_ABAIXO_PORTE,
@@ -37,7 +38,10 @@ from panorama_api.web.conteudo import (
     MOTIVO_ANO_AUSENTE,
     MOTIVO_FORA_DO_UNIVERSO_PRIVADO,
     MOTIVO_SECAO_COMPETIDORES,
+    MOTIVO_SECAO_ESCOLA_INATIVA,
+    MOTIVO_SECAO_ESCOLA_PUBLICA,
     MOTIVO_SECAO_INDICADORES,
+    MOTIVO_SEM_COMPARACAO,
     NAO_SE_APLICA,
     NOTA_GRUPO_ETAPAS,
     NOTA_GRUPO_MODALIDADES,
@@ -45,13 +49,18 @@ from panorama_api.web.conteudo import (
     ROTULO_POSICAO_CRESCIMENTO_MG,
     ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO,
     ROTULO_RETENCAO,
+    ROTULO_VISAO_GERAL,
+    TEXTO_NESTA_PAGINA,
+    TEXTO_VOLTAR_VISAO_GERAL,
     TITULO_GRUPO_ETAPAS,
     TITULO_GRUPO_MODALIDADES,
     TITULO_GRUPO_TOTAL,
+    TITULO_SECAO_CONCORRENCIA,
     UNIVERSOS,
     rotulo_etapa,
     traduzir_aviso,
 )
+from panorama_api.web.filters import SEM_DADO, fmt_nulo
 
 #: Códigos INEP usados na classificação (os mesmos de `services/schools.py`).
 DEPENDENCIA_PRIVADA = "4"
@@ -465,12 +474,18 @@ def contexto_indicadores(item: IndicatorItem | None) -> list[dict[str, Any]]:
     return linhas
 
 
-def contexto_competicao(item: Any | None) -> dict[str, Any] | None:
-    """Posição municipal do ano mais recente de `mart_competidores`."""
+def contexto_competicao(item: Competicao | None, *, ano: int | None) -> dict[str, Any] | None:
+    """Posição municipal do **mesmo ano** dos indicadores (spec §5.2).
+
+    A linha de `mart_competidores` vem dentro do item de indicadores: não existe
+    segunda leitura da mart nem chamada a `/competitors` para montar esta seção.
+    ``item is None`` é ausência de comparação naquele ano — a tela mostra
+    "sem dado" com o motivo (`MOTIVO_SEM_COMPARACAO`), nunca 0.
+    """
     if item is None:
         return None
     return {
-        "ano": item.nu_ano_censo,
+        "ano": ano,
         "rank": item.rank_mat_bas_municipio,
         "n_concorrentes": item.n_concorrentes_privados_municipio,
         "n_com_matricula": item.n_concorrentes_com_matricula_bas,
@@ -482,6 +497,7 @@ def contexto_competicao(item: Any | None) -> dict[str, Any] | None:
         "lider_matricula": item.lider_qt_mat_bas,
         "gap": item.gap_mat_bas_para_lider,
     }
+
 
 
 def resumo_meta(meta: Meta) -> dict[str, Any]:
@@ -501,47 +517,133 @@ def resumo_meta(meta: Meta) -> dict[str, Any]:
     }
 
 
-def _motivo_da_secao(
-    *, privada_ativa: bool, nao_se_aplica: bool, motivo_mart: str
-) -> str | None:
-    """Texto único da seção que não se aplica (``None`` = seção existe).
+#: Ativo/identificador de cada seção da ficha no subnav (spec §2.2).
+VISAO_GERAL = "visao_geral"
+CONCORRENCIA = "concorrencia"
 
-    Três estados, sem misturar diagnóstico da API com a explicação da tela:
-    fora do universo de privadas ativas, 404 residual da mart, ou seção normal.
+
+def motivo_concorrencia_nao_se_aplica(item: Any | None) -> str:
+    """Por que a rota de indicadores não existe para esta escola (sem consulta).
+
+    A decisão sai do item mais recente da série (`history`): dependência
+    diferente de privada é escola **pública**; privada que não está em atividade
+    é **inativa**. Campo ausente não vira rótulo de terceiro estado — cai na
+    explicação genérica do universo de privadas ativas.
     """
-    if not privada_ativa:
+    if item is None:
         return MOTIVO_FORA_DO_UNIVERSO_PRIVADO
-    if nao_se_aplica:
-        return motivo_mart
-    return None
+    dependencia = getattr(item, "tp_dependencia", None)
+    situacao = getattr(item, "tp_situacao_funcionamento", None)
+    if dependencia and dependencia != DEPENDENCIA_PRIVADA:
+        return MOTIVO_SECAO_ESCOLA_PUBLICA
+    if dependencia == DEPENDENCIA_PRIVADA and situacao and situacao != SITUACAO_ATIVA:
+        return MOTIVO_SECAO_ESCOLA_INATIVA
+    return MOTIVO_FORA_DO_UNIVERSO_PRIVADO
 
 
-def contexto_escola(
+def _campos_do_cabecalho(escola: Any) -> dict[str, Any]:
+    """Campos de cabeçalho comuns às duas rotas da ficha (nome e município)."""
+    return {
+        "co_entidade": escola.co_entidade,
+        "no_entidade": getattr(escola, "no_entidade", None),
+        "co_municipio": getattr(escola, "co_municipio", None),
+        "no_municipio": getattr(escola, "no_municipio", None),
+    }
+
+
+def _migalhas(
+    cabecalho: Mapping[str, Any], *, href_escola: str | None, ultimo: str | None
+) -> list[dict[str, Any]]:
+    """Itens do breadcrumb: Escolas › município › escola [› seção atual].
+
+    O município é link para o mercado, a escola é link para a Visão geral e o
+    último item (a tela atual) não é link. Nome ausente continua ``sem dado``.
+    """
+    itens: list[dict[str, Any]] = [{"rotulo": "Escolas", "href": f"{PREFIXO_WEB}/"}]
+    if cabecalho["co_municipio"]:
+        itens.append(
+            {
+                "rotulo": fmt_nulo(cabecalho["no_municipio"]),
+                "href": f"{PREFIXO_WEB}/mercados/{cabecalho['co_municipio']}",
+            }
+        )
+    rotulo_escola = cabecalho["no_entidade"] or f"Escola {cabecalho['co_entidade']}"
+    itens.append({"rotulo": rotulo_escola, "href": href_escola})
+    if ultimo is not None:
+        itens.append({"rotulo": ultimo, "href": None})
+    return itens
+
+
+def itens_subnav(
     *,
-    historico: HistoryResponse,
-    indicadores: IndicatorsResponse | None,
-    concorrentes: CompetitorsResponse | None,
-    nao_se_aplica: Sequence[str],
-) -> dict[str, Any]:
-    """Contexto completo do template a partir das respostas (já obtidas) do `/v1`.
+    cabecalho: Mapping[str, Any],
+    ativo: str,
+    mostra_concorrencia: bool,
+) -> list[dict[str, Any]]:
+    """Itens do subnav de seções da ficha — macro única, sem JS (spec §2.2).
 
-    `nao_se_aplica` lista as seções cujo `/v1` respondeu 404 de universo
-    (escola privada ativa sem a linha do ano nas marts).
+    "Indicadores e concorrência" só entra quando a seção existe para a escola
+    (`mostra_concorrencia`); o link de saída para o mercado acompanha o
+    município. A mesma lista serve a Visão geral, a rota de concorrência e, no
+    NAV-3, o mercado.
+    """
+    visao_geral = f"{PREFIXO_WEB}/escolas/{cabecalho['co_entidade']}"
+    itens: list[dict[str, Any]] = [
+        {
+            "rotulo": ROTULO_VISAO_GERAL,
+            "href": visao_geral,
+            "ativo": ativo == VISAO_GERAL,
+            "classe": "",
+        }
+    ]
+    if mostra_concorrencia:
+        itens.append(
+            {
+                "rotulo": TITULO_SECAO_CONCORRENCIA,
+                "href": f"{visao_geral}/concorrencia",
+                "ativo": ativo == CONCORRENCIA,
+                "classe": "",
+            }
+        )
+    if cabecalho["co_municipio"]:
+        itens.append(
+            {
+                "rotulo": (
+                    "Mercado de "
+                    f"{cabecalho['no_municipio'] or cabecalho['co_municipio']} →"
+                ),
+                "href": f"{PREFIXO_WEB}/mercados/{cabecalho['co_municipio']}",
+                "ativo": False,
+                "classe": "subnav__saida",
+            }
+        )
+    return itens
+
+
+def contexto_visao_geral(*, historico: HistoryResponse) -> dict[str, Any]:
+    """Contexto da **Visão geral** — tudo sai da série de `history` (1 consulta).
+
+    Indicadores e comparação municipal não vivem mais aqui: a rota própria
+    (`/app/escolas/{id}/concorrencia`) é quem consulta as marts privadas. Quando
+    a escola está fora do universo de privadas ativas, a página explica a
+    ausência da seção sem gastar consulta — a decisão sai do item mais recente
+    da série.
     """
     itens: list[HistoryItem] = list(historico.data.items)
     recente = item_mais_recente(itens)
     privada_ativa = pertence_ao_universo_privado(recente)
-    sem_secao = set(nao_se_aplica)
-
-    indicador_recente = (
-        item_mais_recente(indicadores.data.items) if indicadores is not None else None
-    )
-    competidor_recente = (
-        item_mais_recente(concorrentes.data.items) if concorrentes is not None else None
-    )
+    cabecalho = _campos_do_cabecalho(historico.data)
 
     return {
         "escola": historico.data,
+        "cabecalho": cabecalho,
+        "sem_nome": SEM_DADO,
+        "migalhas": _migalhas(cabecalho, href_escola=None, ultimo=None),
+        "subnav_itens": itens_subnav(
+            cabecalho=cabecalho,
+            ativo=VISAO_GERAL,
+            mostra_concorrencia=privada_ativa,
+        ),
         "itens": itens,
         "recente": recente,
         "ano_inicial": min((item.nu_ano_censo for item in itens), default=None),
@@ -555,29 +657,121 @@ def contexto_escola(
         "etapas": etapas_do_ano(recente) if recente is not None else [],
         "rendimento": rendimento_por_ano(itens),
         "colunas_rendimento": [campo.rotulo for campo in RENDIMENTO],
-        "indicadores": contexto_indicadores(indicador_recente),
-        "competicao": contexto_competicao(competidor_recente),
-        "motivo_indicadores": _motivo_da_secao(
-            privada_ativa=privada_ativa,
-            nao_se_aplica="indicadores" in sem_secao,
-            motivo_mart=MOTIVO_SECAO_INDICADORES,
+        # Nota fixa quando a seção de indicadores não existe para a escola.
+        "motivo_concorrencia": (
+            None if privada_ativa else motivo_concorrencia_nao_se_aplica(recente)
         ),
-        "motivo_competidores": _motivo_da_secao(
-            privada_ativa=privada_ativa,
-            nao_se_aplica="competidores" in sem_secao,
-            motivo_mart=MOTIVO_SECAO_COMPETIDORES,
-        ),
+        "texto_nesta_pagina": TEXTO_NESTA_PAGINA,
         "nao_se_aplica_titulo": NAO_SE_APLICA,
         "meta": resumo_meta(historico.meta),
-        "meta_indicadores": resumo_meta(indicadores.meta) if indicadores else None,
-        "meta_competidores": resumo_meta(concorrentes.meta) if concorrentes else None,
-        "definicao_concorrencia": DEFINICAO_CONCORRENCIA,
         "texto_oferta_desconhecida": EXPLICACAO_OFERTA_DESCONHECIDA,
-        "texto_abaixo_porte": EXPLICACAO_ABAIXO_PORTE,
-        "aviso_abaixo_porte": bool(
-            indicadores is not None and AVISO_ABAIXO_PORTE in indicadores.meta.avisos
-        ),
     }
 
 
-__all__ = ["contexto_escola", "item_mais_recente", "pertence_ao_universo_privado"]
+def contexto_concorrencia(*, indicadores: IndicatorsResponse) -> dict[str, Any]:
+    """Contexto de **Indicadores e concorrência** (fonte única: indicadores).
+
+    A comparação municipal vem da própria resposta de indicadores
+    (`items[-1].competicao`, alimentada por `mart_competidores` no mesmo
+    ano) — nenhuma segunda leitura da mart. Sem essa linha no ano mais recente,
+    a seção mostra "sem dado" e o motivo fixo, nunca 0 (AGENTS.md §6).
+    """
+    itens = list(indicadores.data.items)
+    recente = item_mais_recente(itens)
+    ano = recente.nu_ano_censo if recente is not None else None
+    competicao = contexto_competicao(
+        recente.competicao if recente is not None else None, ano=ano
+    )
+    cabecalho = _campos_do_cabecalho(indicadores.data)
+
+    return {
+        "escola": indicadores.data,
+        "cabecalho": cabecalho,
+        "sem_nome": f"Escola {cabecalho['co_entidade']}",
+        "migalhas": _migalhas(
+            cabecalho,
+            href_escola=f"{PREFIXO_WEB}/escolas/{cabecalho['co_entidade']}",
+            ultimo=TITULO_SECAO_CONCORRENCIA,
+        ),
+        "subnav_itens": itens_subnav(
+            cabecalho=cabecalho, ativo=CONCORRENCIA, mostra_concorrencia=True
+        ),
+        "nao_se_aplica": False,
+        "ano_indicadores": ano,
+        "indicadores": contexto_indicadores(recente),
+        "competicao": competicao,
+        "motivo_sem_comparacao": (
+            None
+            if competicao is not None
+            else (
+                MOTIVO_SEM_COMPARACAO.format(ano=ano)
+                if ano is not None
+                else MOTIVO_SECAO_COMPETIDORES
+            )
+        ),
+        "meta_indicadores": resumo_meta(indicadores.meta),
+        "definicao_concorrencia": DEFINICAO_CONCORRENCIA,
+        "texto_abaixo_porte": EXPLICACAO_ABAIXO_PORTE,
+        "aviso_abaixo_porte": AVISO_ABAIXO_PORTE in indicadores.meta.avisos,
+        "nao_se_aplica_titulo": NAO_SE_APLICA,
+        "titulo_secao": TITULO_SECAO_CONCORRENCIA,
+    }
+
+
+def contexto_concorrencia_nao_se_aplica(
+    *, co_entidade: str, escola: School | None
+) -> dict[str, Any]:
+    """Contexto da rota de concorrência quando a seção não se aplica (200).
+
+    O 404 de **universo** do `/v1` é estado legítimo: a página diz "não se
+    aplica", explica o motivo e oferece a volta para a Visão geral. `escola`
+    ausente (nada além do código INEP) mantém o cabeçalho como
+    ``Escola {co_entidade}``.
+    """
+    dados_escola: dict[str, Any] = {
+        "co_entidade": co_entidade,
+        "no_entidade": None,
+        "co_municipio": None,
+        "no_municipio": None,
+    }
+    motivo = MOTIVO_SECAO_INDICADORES
+    if escola is not None:
+        dados_escola.update(_campos_do_cabecalho(escola))
+        motivo = motivo_concorrencia_nao_se_aplica(escola)
+
+    return {
+        "escola": None,
+        "cabecalho": dados_escola,
+        "sem_nome": f"Escola {co_entidade}",
+        "migalhas": _migalhas(
+            dados_escola,
+            href_escola=f"{PREFIXO_WEB}/escolas/{co_entidade}",
+            ultimo=TITULO_SECAO_CONCORRENCIA,
+        ),
+        "subnav_itens": itens_subnav(
+            cabecalho=dados_escola, ativo=CONCORRENCIA, mostra_concorrencia=True
+        ),
+        "nao_se_aplica": True,
+        "motivo": motivo,
+        "href_visao_geral": f"{PREFIXO_WEB}/escolas/{co_entidade}",
+        "texto_voltar": TEXTO_VOLTAR_VISAO_GERAL,
+        "nao_se_aplica_titulo": NAO_SE_APLICA,
+        "titulo_secao": TITULO_SECAO_CONCORRENCIA,
+        "indicadores": [],
+        "competicao": None,
+        "motivo_sem_comparacao": None,
+        "meta_indicadores": None,
+    }
+
+
+__all__ = [
+    "CONCORRENCIA",
+    "VISAO_GERAL",
+    "contexto_concorrencia",
+    "contexto_concorrencia_nao_se_aplica",
+    "contexto_visao_geral",
+    "item_mais_recente",
+    "itens_subnav",
+    "motivo_concorrencia_nao_se_aplica",
+    "pertence_ao_universo_privado",
+]

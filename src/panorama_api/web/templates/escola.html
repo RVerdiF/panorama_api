@@ -1,70 +1,38 @@
 {% extends "base.html" %}
-{% from "partials/breadcrumb.html" import breadcrumb with context %}
+{% from "partials/cabecalho_escola.html" import cabecalho_escola with context %}
+{% from "partials/macros.html" import recorte, bloco_nao_se_aplica with context %}
+{% from "partials/subnav.html" import subnav with context %}
 
 {% block titulo %}{{ escola.no_entidade or "Escola " ~ escola.co_entidade }} — Panorama Escola{% endblock %}
 
 {#
-  Recorte obrigatório (plano §1): ano de referência, etapa, universo, fonte e
-  avisos. Um bloco por resposta consumida, para que a origem de cada número
-  esteja visível na própria seção.
+  Visão geral da escola (spec §2.2): uma única consulta (`history`) alimenta
+  cabeçalho, identificação, oferta do ano recente, série (SVG + tabela) e
+  rendimento. Indicadores e comparação municipal moram na rota própria
+  `/app/escolas/{id}/concorrencia` — aqui não se gasta cota com elas.
+
+  A ordem das seções é contrato: resumo → `#oferta` → `#serie` → `#rendimento`,
+  os mesmos `id`s que a linha "Nesta página:" aponta.
 #}
-{% macro recorte(m) -%}
-<dl class="lista-definicoes recorte">
-  <dt>Ano de referência</dt>
-  <dd>{{ m.ano_referencia | fmt_ano }}</dd>
-  <dt>Etapa</dt>
-  <dd>{{ m.etapa }}</dd>
-  <dt>Universo</dt>
-  <dd>
-    <code>{{ m.universo }}</code>
-    {%- if m.universo_texto %} — {{ m.universo_texto }}{% endif %}
-  </dd>
-  <dt>Fonte</dt>
-  <dd>{{ m.orgao }} — {{ m.base }}, tabela <code>{{ m.tabela }}</code></dd>
-  <dt>Avisos</dt>
-  <dd>
-    {% if m.avisos %}
-    <ul class="lista-regras">
-      {% for aviso in m.avisos %}
-      <li>{{ aviso.texto }}</li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    nenhum aviso para este recorte
-    {% endif %}
-  </dd>
-</dl>
-{%- endmacro %}
-
-{% macro bloco_nao_se_aplica(motivo) -%}
-<p class="nao-se-aplica">
-  <strong>{{ nao_se_aplica_titulo }}.</strong> {{ motivo }}
-</p>
-{%- endmacro %}
-
 {% block conteudo %}
 <article class="cartao">
-  {# Breadcrumb "Busca › município › escola" (achado B7). O município é link
-     para o mercado municipal — o mesmo destino do subtítulo, mas no caminho de
-     volta; o último item é esta ficha e não é link. #}
-  {% set itens_breadcrumb = [{"rotulo": "Busca", "href": href_busca}] %}
-  {% if escola.co_municipio %}
-    {% set _ = itens_breadcrumb.append({"rotulo": escola.no_municipio | fmt_nulo,
-                                       "href": app_prefix ~ "/mercados/" ~ escola.co_municipio}) %}
+  {{ cabecalho_escola(cabecalho, migalhas, sem_nome) }}
+  {{ subnav(subnav_itens) }}
+
+  {% if motivo_concorrencia %}
+  {# Escola fora do universo de privadas ativas: a ausência da seção é
+     explicada sem consulta (decisão pelo item mais recente da série). #}
+  <p class="nao-se-aplica">{{ motivo_concorrencia }}</p>
   {% endif %}
-  {% set _ = itens_breadcrumb.append({"rotulo": escola.no_entidade | fmt_nulo}) %}
-  {{ breadcrumb(itens_breadcrumb) }}
-  <h1>{{ escola.no_entidade | fmt_nulo }}</h1>
-  <p class="subtitulo">
-    Escola <code>{{ escola.co_entidade }}</code> ·
-    {# Município é link para o mercado municipal; o código IBGE fica ao lado. #}
-    {% if escola.co_municipio %}
-    <a href="{{ app_prefix }}/mercados/{{ escola.co_municipio }}">{{ escola.no_municipio | fmt_nulo }}</a>
-    {% else %}
-    {{ escola.no_municipio | fmt_nulo }}
-    {% endif %}
-    (código IBGE <code>{{ escola.co_municipio | fmt_nulo }}</code>)
-  </p>
+
+  <nav class="nesta-pagina" aria-label="Nesta página">
+    <p>
+      {{ texto_nesta_pagina }}
+      <a href="#oferta">Oferta e matrícula</a> ·
+      <a href="#serie">Série de matrículas</a> ·
+      <a href="#rendimento">Rendimento</a>
+    </p>
+  </nav>
 
   {% if recente %}
   <dl class="lista-definicoes">
@@ -91,47 +59,6 @@
   <section aria-labelledby="recorte-serie">
     <h2 id="recorte-serie">Recorte da série de matrículas</h2>
     {{ recorte(meta) }}
-  </section>
-
-  <section aria-labelledby="serie">
-    <h2 id="serie">Série de matrículas</h2>
-    <p class="subtitulo">
-      Matrícula da educação básica (total oficial do Censo, não a soma das
-      subetapas) por ano censitário. Ano sem valor aparece como
-      <em>sem dado</em> — nunca como zero.
-    </p>
-    <figure class="serie-figura">
-      {% if serie.svg %}
-      {{ serie.svg }}
-      <figcaption>
-        Cada barra é a matrícula de um ano; o traço tracejado marca um ano sem
-        dado. A tabela abaixo traz os mesmos valores com a origem de cada
-        ausência.
-      </figcaption>
-      {% else %}
-      <p class="sem-dado">sem dado</p>
-      <figcaption>Nenhum ano da série tem matrícula observada.</figcaption>
-      {% endif %}
-    </figure>
-    <div class="tabela-rolavel" role="region" aria-label="Série de matrículas por ano (tabela com rolagem)" tabindex="0">
-      <table>
-        <caption>Série de matrículas por ano censitário</caption>
-        <thead>
-          <tr>
-            <th scope="col">Ano</th>
-            <th scope="col">Matrícula — educação básica</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for ponto in serie.pontos %}
-          <tr>
-            <th scope="row">{{ ponto.ano | fmt_ano }}</th>
-            <td>{{ ponto.valor | fmt_contagem(ponto.motivo) }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
   </section>
 
   {% if etapas %}
@@ -178,6 +105,47 @@
   </section>
   {% endif %}
 
+  <section aria-labelledby="serie">
+    <h2 id="serie">Série de matrículas</h2>
+    <p class="subtitulo">
+      Matrícula da educação básica (total oficial do Censo, não a soma das
+      subetapas) por ano censitário. Ano sem valor aparece como
+      <em>sem dado</em> — nunca como zero.
+    </p>
+    <figure class="serie-figura">
+      {% if serie.svg %}
+      {{ serie.svg }}
+      <figcaption>
+        Cada barra é a matrícula de um ano; o traço tracejado marca um ano sem
+        dado. A tabela abaixo traz os mesmos valores com a origem de cada
+        ausência.
+      </figcaption>
+      {% else %}
+      <p class="sem-dado">sem dado</p>
+      <figcaption>Nenhum ano da série tem matrícula observada.</figcaption>
+      {% endif %}
+    </figure>
+    <div class="tabela-rolavel" role="region" aria-label="Série de matrículas por ano (tabela com rolagem)" tabindex="0">
+      <table>
+        <caption>Série de matrículas por ano censitário</caption>
+        <thead>
+          <tr>
+            <th scope="col">Ano</th>
+            <th scope="col">Matrícula — educação básica</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ponto in serie.pontos %}
+          <tr>
+            <th scope="row">{{ ponto.ano | fmt_ano }}</th>
+            <td>{{ ponto.valor | fmt_contagem(ponto.motivo) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   {% if rendimento %}
   <section aria-labelledby="rendimento">
     <h2 id="rendimento">Rendimento por ano</h2>
@@ -210,73 +178,5 @@
     </div>
   </section>
   {% endif %}
-
-  <section aria-labelledby="indicadores">
-    <h2 id="indicadores">Indicadores</h2>
-    {% if motivo_indicadores %}
-      {{ bloco_nao_se_aplica(motivo_indicadores) }}
-    {% elif indicadores %}
-      {% if aviso_abaixo_porte %}
-      <p class="aviso">{{ texto_abaixo_porte }}</p>
-      {% endif %}
-      <dl class="lista-definicoes">
-        {% for linha in indicadores %}
-        <dt>{{ linha.rotulo }}</dt>
-        <dd>{{ linha | fmt_celula }}</dd>
-        {% endfor %}
-      </dl>
-      {{ recorte(meta_indicadores) }}
-    {% endif %}
-  </section>
-
-  <section aria-labelledby="comparacao">
-    <h2 id="comparacao">Comparação municipal</h2>
-    <p class="subtitulo">
-      <strong>Definição da comparação:</strong> {{ definicao_concorrencia }}.
-      A comparação é sempre municipal, no mesmo ano censitário.
-    </p>
-    {% if motivo_competidores %}
-      {{ bloco_nao_se_aplica(motivo_competidores) }}
-    {% elif competicao %}
-      <dl class="lista-definicoes">
-        <dt>Posição por matrícula da educação básica no município</dt>
-        <dd>{% if competicao.rank is not none %}{{ competicao.rank }}.º{% else %}sem dado{% endif %}</dd>
-        <dt>Outras escolas privadas ativas no município e ano (exclui esta)</dt>
-        <dd>{{ competicao.n_concorrentes | fmt_nulo }}</dd>
-        <dt>Outras com matrícula observada</dt>
-        <dd>{{ competicao.n_com_matricula | fmt_nulo }}</dd>
-        <dt>Líder do município (maior matrícula observada)</dt>
-        <dd>
-          {# Sem link: `Competicao` expõe apenas `lider_no_entidade`, não o
-             `co_entidade` do líder — e nome de escola não é chave única.
-             Para linkar seria preciso um campo novo no contrato `/v1`. #}
-          {{ competicao.lider | fmt_nulo }}
-          {% if competicao.lider_matricula is not none %}({{ competicao.lider_matricula | fmt_contagem }} matrículas){% endif %}
-        </dd>
-        <dt>Diferença de matrícula para o líder (<code>gap_mat_bas_para_lider</code>; 0 = a escola lidera)</dt>
-        <dd class="gap-lider">{{ competicao.gap | fmt_gap_lider }}</dd>
-      </dl>
-      <div class="tabela-rolavel" role="region" aria-label="Concorrentes por etapa (tabela com rolagem)" tabindex="0">
-        <table>
-          <caption>Concorrentes privadas com matrícula observada por etapa — {{ competicao.ano | fmt_ano }}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Etapa</th>
-              <th scope="col">Concorrentes com matrícula observada</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for linha in competicao.por_etapa %}
-            <tr>
-              <th scope="row">{{ linha.rotulo }}</th>
-              <td>{{ linha.valor | fmt_contagem }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {{ recorte(meta_competidores) }}
-    {% endif %}
-  </section>
 </article>
 {% endblock %}

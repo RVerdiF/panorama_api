@@ -1,0 +1,27 @@
+{#
+  Cabeçalho comum das rotas da ficha: breadcrumb, título e identificação.
+
+  As duas rotas (`/app/escolas/{id}` e `/app/escolas/{id}/concorrencia`)
+  mostram o mesmo cabeçalho; o que muda é o breadcrumb (a seção atual) e o texto
+  de fallback do título quando a fonte não traz o nome. Por isso os três são
+  parâmetros — nenhuma tela reescreve a marcação da outra.
+
+  Uso:
+    {% from "partials/cabecalho_escola.html" import cabecalho_escola %}
+    {{ cabecalho_escola(cabecalho, migalhas, sem_nome) }}
+#}
+{% from "partials/breadcrumb.html" import breadcrumb %}
+{% macro cabecalho_escola(cabecalho, migalhas, sem_nome) -%}
+{{ breadcrumb(migalhas) }}
+<h1>{% if cabecalho.no_entidade %}{{ cabecalho.no_entidade }}{% else %}{{ sem_nome }}{% endif %}</h1>
+<p class="subtitulo">
+  Escola <code>{{ cabecalho.co_entidade }}</code> ·
+  {# Município é link para o mercado municipal; o código IBGE fica ao lado. #}
+  {%- if cabecalho.co_municipio %}
+  <a href="{{ app_prefix }}/mercados/{{ cabecalho.co_municipio }}">{{ cabecalho.no_municipio | fmt_nulo }}</a>
+  {%- else %}
+  {{ cabecalho.no_municipio | fmt_nulo }}
+  {%- endif %}
+  (código IBGE <code>{{ cabecalho.co_municipio | fmt_nulo }}</code>)
+</p>
+{%- endmacro %}
