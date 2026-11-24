@@ -174,3 +174,71 @@ def test_hero_mostra_a_copy_do_h1_e_do_subtitulo():
         "escolas" in html
     )
     assert "a partir do Censo Escolar da Educação Básica (INEP)." in html
+
+
+# -- busca no hero (card `t_e075a6f6`, spec §6) ------------------------------
+
+FORMULARIO = re.compile(r'<form class="hero__busca"[^>]*>.*?</form>', re.S)
+
+
+def _formulario(html: str) -> str:
+    """Marcação do `<form>` da barra de busca do hero."""
+    achado = FORMULARIO.search(html)
+    assert achado is not None, "barra de busca do hero ausente em `/`"
+    return achado.group(0)
+
+
+def test_hero_tem_form_get_para_a_busca_com_os_parametros_de_app():
+    """O hero não inventa rota: envia o mesmo GET de `/app/` (`q`, município)."""
+    html, repo = _pagina()
+    form = _formulario(html)
+
+    assert 'method="get"' in form
+    assert 'action="/app/"' in form
+    assert 'role="search"' in form
+    assert 'aria-label="Buscar escolas ou mercado municipal"' in form
+    # Nome da escola: rótulo visível, limite do contrato e dica associada.
+    assert '<label for="q">Nome da escola</label>' in form
+    assert re.search(
+        r'<input\s+type="search"\s+id="q"\s+name="q"\s+minlength="3"\s+maxlength="100"',
+        form,
+    )
+    assert 'aria-describedby="q-dica"' in form
+    assert 'id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>' in form
+    # Município: a mesma lista versionada da busca, com a opção "todos".
+    assert '<label for="co_municipio">Município</label>' in form
+    assert '<select id="co_municipio" name="co_municipio">' in form
+    assert '<option value="">Todos os municípios de MG</option>' in form
+    assert form.count('<option value="31') == len(municipios_mg()) == 853
+    # Sem campo de ano (o ano não filtra a busca) e sem `apenas_ativas`.
+    assert 'name="ano"' not in form
+    assert "apenas_ativas" not in form
+    # O select do hero é markup de apoio de tela: nenhuma consulta ao repositório.
+    assert repo.calls == []
+
+
+def test_hero_tem_os_dois_botoes_e_o_segundo_vai_ao_mercado():
+    html, _ = _pagina()
+    form = _formulario(html)
+
+    assert ">Buscar escolas</button>" in form
+    assert ">Ver mercado do município</button>" in form
+    # O atalho do mercado é um `<button formaction>` com `formnovalidate`: o
+    # `minlength` do nome não pode barrar a ida ao mercado.
+    assert 'formaction="/app/mercados"' in form
+    assert "formnovalidate" in form
+    # Os dois são submit; só o de mercado declara `formaction`/`formnovalidate`.
+    assert form.count('type="submit"') == 2
+    secundario = form[form.index("botao--secundario") : form.index("formnovalidate")]
+    assert 'formaction="/app/mercados"' in secundario
+    primario = form[form.index("botao--primario") : form.index("botao--secundario")]
+    assert "formaction" not in primario
+    assert "formnovalidate" not in primario
+
+
+def test_hero_mantem_um_unico_h1_e_o_alvo_do_ancora_do_campo_de_nome():
+    """O `#q` do campo é o alvo dos links "buscar uma escola" (L4)."""
+    html, _ = _pagina()
+
+    assert html.count("<h1") == 1
+    assert 'id="q"' in _formulario(html)

@@ -449,3 +449,89 @@ def test_erro_nao_tratado_nao_vaza_stack(mercado_repo):
     assert resposta.headers["cache-control"] == "no-store"
     assert "Traceback" not in resposta.text
     assert "RuntimeError" not in resposta.text
+
+
+# -- atalho do hero da landing: GET /app/mercados?co_municipio= ---------------
+#
+# Card `t_e075a6f6` (spec §6): o segundo botão da barra de busca do hero envia
+# o mesmo formulário `GET /app/` com `formaction="/app/mercados"`, então a rota
+# recebe `q` junto. Ela só redireciona: com município válido, 303 para a tela
+# de mercado; sem município, 422 em HTML que manda escolher um. Nenhum caminho
+# consulta o repositório.
+
+ATALHO = "/app/mercados"
+
+
+def test_atalho_com_municipio_valido_redireciona_303_sem_consultar_o_repositorio(
+    mercado_repo,
+):
+    resposta = _client(mercado_repo).get(
+        ATALHO,
+        params={"co_municipio": "3106200", "q": "x"},
+        follow_redirects=False,
+    )
+
+    assert resposta.status_code == 303
+    assert resposta.headers["location"] == "/app/mercados/3106200"
+    # O `q` do formulário é descartado: a tela de destino não é busca.
+    assert "q=" not in resposta.headers["location"]
+    # O cache de páginas só trata 200: redirect não ganha ETag nem cache.
+    assert "etag" not in resposta.headers
+    assert "cache-control" not in resposta.headers
+    assert mercado_repo.calls == []
+
+
+def test_atalho_ignora_parametros_extras_e_usa_so_o_municipio(mercado_repo):
+    resposta = _client(mercado_repo).get(
+        ATALHO,
+        params={"q": "qualquer coisa", "ano": "2019", "offset": "2000"},
+        # `follow_redirects` desligado: só o cabeçalho do atalho interessa.
+        follow_redirects=False,
+    )
+
+    # Sem município, os outros parâmetros não salvam a navegação: 422.
+    assert resposta.status_code == 422
+
+    com_municipio = _client(mercado_repo).get(
+        ATALHO,
+        params={"co_municipio": "3106200", "offset": "2000"},
+        follow_redirects=False,
+    )
+
+    assert com_municipio.status_code == 303
+    assert com_municipio.headers["location"] == "/app/mercados/3106200"
+
+
+@pytest.mark.parametrize(
+    "params",
+    [
+        {},
+        {"co_municipio": ""},
+        {"co_municipio": "   "},
+        {"co_municipio": "9999999"},
+        # Fora de MG: o atalho usa a mesma validação do `/v1`.
+        {"co_municipio": "3500000"},
+        {"co_municipio": "31062000"},
+    ],
+)
+def test_atalho_sem_municipio_valido_responde_422_html(mercado_repo, params):
+    resposta = _client(mercado_repo).get(ATALHO, params=params)
+
+    html = _html(resposta, 422)
+    assert "<h1>Escolha um município</h1>" in html
+    assert "Para ver o mercado, selecione um município no formulário." in html
+    assert '<a class="paginacao__link" href="/">Voltar ao início</a>' in html
+    assert resposta.headers["cache-control"] == "no-store"
+    assert "etag" not in resposta.headers
+    assert mercado_repo.calls == []
+
+
+def test_atalho_nao_entra_no_contrato_openapi(mercado_repo):
+    cliente = _client(mercado_repo)
+
+    paths = cliente.get("/openapi.json").json()["paths"]
+
+    assert ATALHO not in paths
+    assert "/" not in paths
+    # A tela de mercado continua no contrato como estava.
+    assert "/app/mercados/{co_municipio}" not in paths
