@@ -32,6 +32,9 @@ from panorama_api.schemas.indicators import IndicatorItem, IndicatorsResponse
 from panorama_api.schemas.schools import HistoryItem, HistoryResponse
 from panorama_api.web.conteudo import (
     DEFINICAO_CONCORRENCIA,
+    EXPLICACAO_ABAIXO_PORTE,
+    EXPLICACAO_OFERTA_DESCONHECIDA,
+    MOTIVO_ANO_AUSENTE,
     MOTIVO_FORA_DO_UNIVERSO_PRIVADO,
     MOTIVO_SECAO_COMPETIDORES,
     MOTIVO_SECAO_INDICADORES,
@@ -45,6 +48,31 @@ from panorama_api.web.conteudo import (
 #: Códigos INEP usados na classificação (os mesmos de `services/schools.py`).
 DEPENDENCIA_PRIVADA = "4"
 SITUACAO_ATIVA = "1"
+
+#: Rótulos completos dos códigos INEP de dependência administrativa
+#: (`TP_DEPENDENCIA`). O código continua visível ao lado; o rótulo é a leitura
+#: do código, nunca uma classificação inventada (não existe "não privada": 2 é
+#: Estadual, 3 é Municipal, 1 é Federal).
+ROTULOS_DEPENDENCIA: dict[str, str] = {
+    "1": "Federal",
+    "2": "Estadual",
+    "3": "Municipal",
+    "4": "Privada",
+}
+
+#: Rótulos completos dos códigos INEP de situação de funcionamento
+#: (`TP_SITUACAO_FUNCIONAMENTO`). "não ativa" colapsava 2 (paralisada) e 3
+#: (extinta) no mesmo texto; cada código tem sua leitura.
+ROTULOS_SITUACAO: dict[str, str] = {
+    "1": "Em atividade",
+    "2": "Paralisada",
+    "3": "Extinta",
+    "4": "Extinta no ano anterior",
+}
+
+#: Leitura de código ausente ou fora da tabela INEP — nunca deduzida.
+ROTULO_NAO_INFORMADO = "não informado"
+ROTULO_NAO_RECONHECIDO = "código não reconhecido"
 
 #: Aviso de `meta.avisos` que muda a leitura dos indicadores comparativos.
 AVISO_ABAIXO_PORTE = "IS_ABAIXO_PORTE"
@@ -154,17 +182,26 @@ def _motivo(flag: bool | None, nome_flag: str) -> str | None:
 
 
 def _rotulo_dependencia(codigo: str | None) -> str:
-    """Leitura do código INEP de dependência, sem inventar códigos novos."""
-    if codigo == DEPENDENCIA_PRIVADA:
-        return "privada"
-    return "não privada" if codigo else "não informada"
+    """Leitura do código INEP de dependência (1 Federal … 4 Privada).
+
+    Código ausente é "não informado" e código fora da tabela é "código não
+    reconhecido": nenhum dos dois vira "não privada", que colapsaria Federal,
+    Estadual e Municipal numa classificação que o INEP não usa.
+    """
+    if not codigo:
+        return ROTULO_NAO_INFORMADO
+    return ROTULOS_DEPENDENCIA.get(codigo, ROTULO_NAO_RECONHECIDO)
 
 
 def _rotulo_situacao(codigo: str | None) -> str:
-    """Leitura do código INEP de situação de funcionamento."""
-    if codigo == SITUACAO_ATIVA:
-        return "em atividade"
-    return "não ativa" if codigo else "não informada"
+    """Leitura do código INEP de situação de funcionamento.
+
+    Cada código tem seu texto (2 Paralisada e 3 Extinta não são o mesmo estado);
+    ausência e código desconhecido também não se confundem.
+    """
+    if not codigo:
+        return ROTULO_NAO_INFORMADO
+    return ROTULOS_SITUACAO.get(codigo, ROTULO_NAO_RECONHECIDO)
 
 
 def _celula(valor: Any, *, motivo: str | None = None, unidade: str = "") -> dict[str, Any]:
@@ -175,18 +212,40 @@ def _celula(valor: Any, *, motivo: str | None = None, unidade: str = "") -> dict
 def serie_matriculas(items: Sequence[HistoryItem]) -> dict[str, Any]:
     """Série de matrícula da educação básica + o SVG do gráfico.
 
+    A tabela (e o gráfico) cobre **todo ano entre o primeiro e o último da
+    série**, não só os anos que têm registro: um ano censitário ausente da
+    fonte continua visível com ``sem dado (ano ausente na fonte)``. Sem isso a
+    lacuna desaparece e o leitor lê a série como se fosse contínua (e nunca
+    como ``0``).
+
     `svg` é ``None`` quando não há **nenhum** ano com matrícula observada: o
     template mostra "sem dado" em vez de um gráfico de zeros.
     """
-    pontos = [
-        {
-            "ano": item.nu_ano_censo,
-            "valor": item.qt_mat_bas,
-            "motivo": _motivo(item.is_qt_mat_bas_missing, "is_qt_mat_bas_missing"),
-        }
-        for item in items
-    ]
+    pontos = _pontos_da_serie(items)
     return {"pontos": pontos, "svg": svg_serie(pontos)}
+
+
+def _pontos_da_serie(items: Sequence[HistoryItem]) -> list[dict[str, Any]]:
+    """Um ponto por ano do intervalo da série, com o registro quando existir."""
+    registros = {item.nu_ano_censo: item for item in items}
+    if not registros:
+        return []
+    primeiro, ultimo = min(registros), max(registros)
+    pontos: list[dict[str, Any]] = []
+    for ano in range(primeiro, ultimo + 1):
+        item = registros.get(ano)
+        pontos.append(
+            {
+                "ano": ano,
+                "valor": item.qt_mat_bas if item is not None else None,
+                "motivo": (
+                    _motivo(item.is_qt_mat_bas_missing, "is_qt_mat_bas_missing")
+                    if item is not None
+                    else MOTIVO_ANO_AUSENTE
+                ),
+            }
+        )
+    return pontos
 
 
 def _valor_bruto(valor: int) -> str:
@@ -452,6 +511,8 @@ def contexto_escola(
         "meta_indicadores": resumo_meta(indicadores.meta) if indicadores else None,
         "meta_competidores": resumo_meta(concorrentes.meta) if concorrentes else None,
         "definicao_concorrencia": DEFINICAO_CONCORRENCIA,
+        "texto_oferta_desconhecida": EXPLICACAO_OFERTA_DESCONHECIDA,
+        "texto_abaixo_porte": EXPLICACAO_ABAIXO_PORTE,
         "aviso_abaixo_porte": bool(
             indicadores is not None and AVISO_ABAIXO_PORTE in indicadores.meta.avisos
         ),

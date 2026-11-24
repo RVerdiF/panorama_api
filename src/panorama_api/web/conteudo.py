@@ -80,6 +80,49 @@ MOTIVO_ENTRADA_SAIDA = (
     "e saída de escolas aparecem como sem dado — nunca como zero."
 )
 
+#: Motivo da linha de um ano que existe no intervalo da série mas não tem
+#: registro na fonte (a mart não traz a linha daquele ano censitário). O ano
+#: continua visível para que a lacuna não desapareça da tabela.
+MOTIVO_ANO_AUSENTE = "ano ausente na fonte"
+
+#: Texto curto da oferta desconhecida (marcador inline de célula/lista). O
+#: nome é o mesmo do estado tri-estado ("Desconhecido"); a flag interna
+#: `is_oferta_desconhecida` nunca é exibida.
+TEXTO_OFERTA_DESCONHECIDA = "Oferta desconhecida"
+
+#: Explicação completa da oferta desconhecida, usada na ficha e na metodologia.
+EXPLICACAO_OFERTA_DESCONHECIDA = (
+    "Oferta desconhecida significa que a base não informou a oferta daquela "
+    "etapa no ano. Leia essas células como ausência de informação, não como "
+    "ausência de oferta."
+)
+
+#: Texto curto do porte mínimo de comparabilidade (célula de lista/tabela).
+TEXTO_ABAIXO_PORTE = "abaixo do porte mínimo de comparabilidade"
+
+#: Explicação completa do porte mínimo, usada na ficha e na metodologia.
+EXPLICACAO_ABAIXO_PORTE = (
+    "A escola está abaixo do porte mínimo de comparabilidade: os indicadores "
+    "comparativos existem, mas devem ser lidos com cautela."
+)
+
+#: Código do aviso de metodologia não comparável — o que aparece hoje nas
+#: fichas. É o único código que a metodologia exibe: é por ele que o usuário
+#: reconhece, na ficha, o aviso explicado lá.
+AVISO_METODOLOGIA_CODIGO = "METODOLOGIA_INCOMPARAVEL_2025"
+
+#: Por que a série de uma etapa deixa de ser comparável. Vem da macro
+#: `inep_metodologia_incomparavel` do dbt (educação profissional e EJA a partir
+#: de 2025): o aviso existe para que a comparação ano a ano não seja feita às
+#: cegas.
+EXPLICACAO_METODOLOGIA_INCOMPARAVEL = (
+    "Educação profissional e EJA mudaram a metodologia de coleta do Censo "
+    "Escolar a partir de 2025 (a matrícula passou a ser subdividida). A série "
+    "dessas duas etapas não é diretamente comparável entre 2024 e 2025: "
+    "compare 2020–2024 entre si e leia 2025 em diante como um novo patamar. "
+    "As demais etapas não são afetadas."
+)
+
 #: Nome de exibição da etapa que o seletor mostra quando não foi informada:
 #: `bas` é o total oficial do Censo (a leitura municipal padrão), não a soma das
 #: subetapas (`docs/api-v1.md`).
@@ -105,12 +148,11 @@ DEFINICOES: dict[str, str] = {
     "competidores": DEFINICAO_CONCORRENCIA,
 }
 
-#: Tradução dos códigos de `meta.avisos` para texto de tela. O código original
-#: sempre fica visível entre parênteses para conferência com o JSON da API.
+#: Tradução dos códigos de `meta.avisos` para texto de tela, em português.
+#: Nenhum código interno do contrato aparece como texto de aviso: o leitor vê a
+#: explicação (a conferência com o JSON fica na metodologia).
 _AVISOS: dict[str, str] = {
-    "IS_ABAIXO_PORTE": (
-        "Escola abaixo do porte mínimo de comparabilidade (IS_ABAIXO_PORTE)"
-    ),
+    "IS_ABAIXO_PORTE": "Escola abaixo do porte mínimo de comparabilidade",
 }
 _AVISO_METODOLOGIA = "Etapas com metodologia não comparável em {ano}"
 _PREFIXO_METODOLOGIA = "METODOLOGIA_INCOMPARAVEL_"
@@ -139,11 +181,29 @@ def traduzir_avisos(codigos: list[str] | None) -> list[str]:
     return [traduzir_aviso(codigo) for codigo in (codigos or ())]
 
 
+#: Avisos de `meta.avisos` que a metodologia explica. O rótulo é a leitura
+#: humana; o código do contrato aparece só na entrada de metodologia, porque é
+#: ele que a ficha exibe hoje (o usuário precisa reconhecê-lo).
+AVISOS_METODOLOGIA: tuple[tuple[str, str], ...] = (
+    ("Porte mínimo de comparabilidade", EXPLICACAO_ABAIXO_PORTE),
+    (
+        f"Metodologia não comparável ({AVISO_METODOLOGIA_CODIGO})",
+        EXPLICACAO_METODOLOGIA_INCOMPARAVEL,
+    ),
+)
+
+
 __all__ = [
+    "AVISOS_METODOLOGIA",
+    "AVISO_METODOLOGIA_CODIGO",
     "DEFINICAO_CONCORRENCIA",
     "DEFINICOES",
     "ETAPAS_ROTULOS",
     "ETAPA_PADRAO_MERCADO",
+    "EXPLICACAO_ABAIXO_PORTE",
+    "EXPLICACAO_METODOLOGIA_INCOMPARAVEL",
+    "EXPLICACAO_OFERTA_DESCONHECIDA",
+    "MOTIVO_ANO_AUSENTE",
     "MOTIVO_ENTRADA_SAIDA",
     "MOTIVO_ALEM_DO_FIM",
     "MOTIVO_FORA_DO_UNIVERSO_PRIVADO",
@@ -152,6 +212,8 @@ __all__ = [
     "MOTIVO_SEM_PRIVADAS",
     "NAO_SE_APLICA",
     "ROTULO_RETENCAO",
+    "TEXTO_ABAIXO_PORTE",
+    "TEXTO_OFERTA_DESCONHECIDA",
     "UNIVERSOS",
     "rotulo_etapa",
     "traduzir_aviso",

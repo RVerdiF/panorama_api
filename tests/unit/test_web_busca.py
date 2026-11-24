@@ -391,7 +391,9 @@ def test_valor_ausente_sai_como_sem_dado_e_oferta_desconhecida(
     assert "sem dado" in html
     # `oferta.bas = null` é "Desconhecido", nunca "Não" nem 0.
     assert "Desconhecido" in html
-    assert "is_oferta_desconhecida" in html
+    # E6: a flag interna não é exibida como texto; o leitor vê o português.
+    assert "is_oferta_desconhecida" not in html
+    assert "Oferta desconhecida" in html
 
 
 def test_busca_nao_usa_termos_geograficos_proibidos(client, repository):

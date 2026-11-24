@@ -126,7 +126,7 @@
           {% for ponto in serie.pontos %}
           <tr>
             <th scope="row">{{ ponto.ano | fmt_ano }}</th>
-            <td>{{ ponto.valor | fmt_nulo(ponto.motivo) }}</td>
+            <td>{{ ponto.valor | fmt_contagem(ponto.motivo) }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -143,11 +143,7 @@
       informou). <em>Desconhecido</em> não é "não oferta".
     </p>
     {% if recente.is_oferta_desconhecida %}
-    <p class="aviso">
-      O ano traz etapas com oferta desconhecida
-      (<code>is_oferta_desconhecida</code>): leia essas células como ausência
-      de informação, não como ausência de oferta.
-    </p>
+    <p class="aviso">{{ texto_oferta_desconhecida }}</p>
     {% endif %}
     <div class="tabela-rolavel" role="region" aria-label="Oferta e matrícula por etapa (tabela com rolagem)" tabindex="0">
       <table>
@@ -164,7 +160,7 @@
           <tr>
             <th scope="row">{{ etapa.rotulo }}</th>
             <td>{{ etapa.oferta | fmt_oferta }}</td>
-            <td>{{ etapa.matricula.valor | fmt_nulo(etapa.matricula.motivo) }}</td>
+            <td>{{ etapa.matricula | fmt_celula }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -196,7 +192,7 @@
           <tr>
             <th scope="row">{{ linha.ano | fmt_ano }}</th>
             {% for celula in linha.celulas %}
-            <td>{{ celula.valor | fmt_nulo(celula.motivo) }}{% if celula.valor is not none and celula.unidade %}{{ celula.unidade }}{% endif %}</td>
+            <td>{{ celula | fmt_celula }}</td>
             {% endfor %}
           </tr>
           {% endfor %}
@@ -212,16 +208,12 @@
       {{ bloco_nao_se_aplica(motivo_indicadores) }}
     {% elif indicadores %}
       {% if aviso_abaixo_porte %}
-      <p class="aviso">
-        Escola abaixo do porte mínimo de comparabilidade
-        (<code>IS_ABAIXO_PORTE</code>): leia os indicadores comparativos com
-        cautela.
-      </p>
+      <p class="aviso">{{ texto_abaixo_porte }}</p>
       {% endif %}
       <dl class="lista-definicoes">
         {% for linha in indicadores %}
         <dt>{{ linha.rotulo }}</dt>
-        <dd>{{ linha.valor | fmt_nulo(linha.motivo) }}{% if linha.valor is not none and linha.unidade %}{{ linha.unidade }}{% endif %}</dd>
+        <dd>{{ linha | fmt_celula }}</dd>
         {% endfor %}
       </dl>
       {{ recorte(meta_indicadores) }}
@@ -250,7 +242,7 @@
              `co_entidade` do líder — e nome de escola não é chave única.
              Para linkar seria preciso um campo novo no contrato `/v1`. #}
           {{ competicao.lider | fmt_nulo }}
-          {% if competicao.lider_matricula is not none %}({{ competicao.lider_matricula | fmt_nulo }} matrículas){% endif %}
+          {% if competicao.lider_matricula is not none %}({{ competicao.lider_matricula | fmt_contagem }} matrículas){% endif %}
         </dd>
         <dt>Diferença de matrícula para o líder (<code>gap_mat_bas_para_lider</code>; 0 = a escola lidera)</dt>
         <dd class="gap-lider">{{ competicao.gap | fmt_gap_lider }}</dd>
@@ -268,7 +260,7 @@
             {% for linha in competicao.por_etapa %}
             <tr>
               <th scope="row">{{ linha.rotulo }}</th>
-              <td>{{ linha.valor | fmt_nulo }}</td>
+              <td>{{ linha.valor | fmt_contagem }}</td>
             </tr>
             {% endfor %}
           </tbody>

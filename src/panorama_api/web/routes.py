@@ -29,15 +29,18 @@ from panorama_api.contract import (
     UNIVERSO_ESCOLAS_MG,
 )
 from panorama_api.core import validation
-from panorama_api.core.errors import ErrorCode, ProblemError, ano_fora_do_contrato
+from panorama_api.core.errors import ErrorCode, ProblemError, ano_fora_do_contrato, invalid
 from panorama_api.web import PREFIXO_WEB, dados
 from panorama_api.web.assets import CACHE_CONTROL_ASSET, AssetRegistry
 from panorama_api.web.conteudo import (
+    AVISOS_METODOLOGIA,
     DEFINICAO_CONCORRENCIA,
     DEFINICOES,
     ETAPAS_ROTULOS,
     ETAPA_PADRAO_MERCADO,
+    EXPLICACAO_OFERTA_DESCONHECIDA,
     ROTULO_RETENCAO,
+    TEXTO_OFERTA_DESCONHECIDA,
     UNIVERSOS,
     rotulo_etapa,
     traduzir_avisos,
@@ -47,7 +50,14 @@ from panorama_api.web.escola import (
     item_mais_recente,
     pertence_ao_universo_privado,
 )
-from panorama_api.web.filters import fmt_ano, fmt_gap_lider, fmt_nulo, fmt_oferta
+from panorama_api.web.filters import (
+    fmt_ano,
+    fmt_celula,
+    fmt_contagem,
+    fmt_gap_lider,
+    fmt_nulo,
+    fmt_oferta,
+)
 from panorama_api.web.mercado import contexto_mercado
 from panorama_api.web.municipios import municipios_mg
 from panorama_api.web.paginacao import montar as montar_paginacao
@@ -121,6 +131,8 @@ def templates() -> Jinja2Templates:
 def _templates() -> Jinja2Templates:
     ambiente = Jinja2Templates(directory=str(TEMPLATES_DIR))
     ambiente.env.filters["fmt_nulo"] = fmt_nulo
+    ambiente.env.filters["fmt_contagem"] = fmt_contagem
+    ambiente.env.filters["fmt_celula"] = fmt_celula
     ambiente.env.filters["fmt_oferta"] = fmt_oferta
     ambiente.env.filters["fmt_ano"] = fmt_ano
     ambiente.env.filters["fmt_gap_lider"] = fmt_gap_lider
@@ -351,6 +363,7 @@ def busca(
             apenas_ativas=apenas_ativas,
             filtros_pagina=filtros_pagina,
         ),
+        "texto_oferta_desconhecida": TEXTO_OFERTA_DESCONHECIDA,
     }
 
     if not termo and not municipio:
@@ -395,9 +408,10 @@ def metodologia(request: Request) -> Response:
         "definicao_retencao": DEFINICOES["retencao_liquida_proxy_pct"],
         "definicao_concorrencia": DEFINICAO_CONCORRENCIA,
         "definicoes": DEFINICOES,
-        "avisos_conhecidos": {
-            "IS_ABAIXO_PORTE": traduzir_avisos(["IS_ABAIXO_PORTE"])[0],
-        },
+        "explicacao_oferta_desconhecida": EXPLICACAO_OFERTA_DESCONHECIDA,
+        # Avisos explicados na metodologia: título em português + o que ele muda
+        # na leitura do número (código cru sozinho não é explicação).
+        "avisos_conhecidos": AVISOS_METODOLOGIA,
         "universos": UNIVERSOS,
     }
     return templates().TemplateResponse(request, "metodologia.html", contexto)
@@ -409,7 +423,7 @@ def metodologia(request: Request) -> Response:
     name="web_escola",
     summary="Visão da escola: série, oferta, rendimento e posição municipal",
 )
-def escola(co_entidade: str, request: Request) -> Response:
+def escola(co_entidade: str, request: Request, ano: int | None = None) -> Response:
     """Tela da escola (card F4).
 
     A série de `history` é obrigatória. Indicadores e comparação municipal só
@@ -419,7 +433,19 @@ def escola(co_entidade: str, request: Request) -> Response:
     seção "não se aplica" na própria página (200); qualquer outro erro (503,
     422, 500) sobe para o handler global, e a página inteira vira a página de
     erro — nunca uma renderização parcial.
+
+    `?ano=` não é um recorte válido desta tela: a ficha mostra a série inteira
+    e o ano de referência é o mais recente da própria série. Aceitar o
+    parâmetro e ignorá-lo faria a página responder 200 a um recorte que ela não
+    aplicou — por isso, presente, ele vira ``422`` `PARAMETRO_INVALIDO` em vez
+    de silêncio.
     """
+    if ano is not None:
+        raise invalid(
+            "a tela da escola mostra a série inteira; o parâmetro ano não é "
+            "suportado aqui — remova-o da URL",
+            loc=("query", "ano"),
+        )
     historico = dados.historico_escola(request, co_entidade=co_entidade)
 
     indicadores = concorrentes = None

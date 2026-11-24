@@ -152,7 +152,7 @@
             <td>{{ escola.tp_situacao_funcionamento | fmt_nulo }}</td>
             <td>
               {{ escola.oferta.bas | fmt_oferta }}
-              {% if escola.is_oferta_desconhecida %}<span class="nota">is_oferta_desconhecida</span>{% endif %}
+              {% if escola.is_oferta_desconhecida %}<span class="nota">{{ texto_oferta_desconhecida }}</span>{% endif %}
             </td>
             <td>{{ escola.nu_ano_ultimo_registro | fmt_ano }}</td>
           </tr>
