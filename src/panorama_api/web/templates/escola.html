@@ -75,27 +75,31 @@
     <p class="aviso">{{ texto_oferta_desconhecida }}</p>
     {% endif %}
     <div class="tabela-rolavel" role="region" aria-label="Oferta e matrícula por etapa (tabela com rolagem)" tabindex="0">
-      <table>
+      {# Ordenável no cliente (card `t_ee9b1eec`): só a coluna de matrícula tem
+         `data-tipo` — Oferta é tri-estado e não ordena. Cada `<tbody>` é um
+         grupo semântico, então a ordenação acontece **dentro** do grupo: o
+         cabeçalho dele e a linha de total (`data-fixa`) não se movem. #}
+      <table data-ordenavel>
         <caption>Oferta por etapa e matrícula observada em {{ recente.nu_ano_censo | fmt_ano }}</caption>
         <thead>
           <tr>
             <th scope="col">Etapa</th>
             <th scope="col">Oferta</th>
-            <th scope="col">Matrícula</th>
+            <th scope="col" data-tipo="numero">Matrícula</th>
           </tr>
         </thead>
         {# Um `<tbody>` por grupo semântico: somar as linhas de grupos
            diferentes não dá o total (card F11). #}
         {% for grupo in etapas %}
         <tbody>
-          <tr class="grupo-etapas">
+          <tr class="grupo-etapas" data-fixa>
             <th colspan="3" scope="rowgroup">{{ grupo.titulo }} — {{ grupo.nota }}</th>
           </tr>
           {% for linha in grupo.linhas %}
-          <tr>
+          <tr{% if grupo.fixa %} data-fixa{% endif %}>
             <th scope="row">{{ linha.rotulo }}</th>
             <td>{{ linha.oferta | fmt_oferta }}</td>
-            <td>{{ linha.matricula | fmt_celula }}</td>
+            <td data-valor="{{ linha.matricula.valor | fmt_bruto }}">{{ linha.matricula | fmt_celula }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -154,22 +158,25 @@
       <em>sem dado</em> com a flag de origem (<code>is_*_missing</code>).
     </p>
     <div class="tabela-rolavel" role="region" aria-label="Rendimento por ano (tabela com rolagem)" tabindex="0">
-      <table>
+      {# Ordenável no cliente (card `t_ee9b1eec`): Ano e cada taxa. A ordem
+         inicial é cronológica, então o `aria-sort` do servidor é verdade
+         também sem JS. #}
+      <table data-ordenavel>
         <caption>Rendimento escolar por ano censitário</caption>
         <thead>
           <tr>
-            <th scope="col">Ano</th>
+            <th scope="col" data-tipo="numero" aria-sort="ascending">Ano</th>
             {% for coluna in colunas_rendimento %}
-            <th scope="col">{{ coluna }}</th>
+            <th scope="col" data-tipo="numero">{{ coluna }}</th>
             {% endfor %}
           </tr>
         </thead>
         <tbody>
           {% for linha in rendimento %}
           <tr>
-            <th scope="row">{{ linha.ano | fmt_ano }}</th>
+            <th scope="row" data-valor="{{ linha.ano | fmt_bruto }}">{{ linha.ano | fmt_ano }}</th>
             {% for celula in linha.celulas %}
-            <td>{{ celula | fmt_celula }}</td>
+            <td data-valor="{{ celula.valor | fmt_bruto }}">{{ celula | fmt_celula }}</td>
             {% endfor %}
           </tr>
           {% endfor %}

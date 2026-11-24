@@ -60,6 +60,25 @@ def fmt_contagem(valor: Any, motivo: str | None = None) -> str:
     return fmt_nulo(valor, motivo)
 
 
+def fmt_bruto(valor: Any) -> str:
+    """Valor bruto para `data-valor` — o que o cliente ordena (card `t_ee9b1eec`).
+
+    A ordenação no cliente não pode ler o texto da célula: ``1.234,5`` não é
+    número em JavaScript. Por isso a célula ordenável carrega o valor **como
+    está** (ponto decimal, sem separador de milhar) e o texto formatado segue
+    sendo a leitura humana.
+
+    Ausência (``None`` — e ``bool``, que não é grandeza) vira **string vazia**:
+    o JS manda vazio para o fim nos dois sentidos de ordenação, nunca o lê
+    como zero (AGENTS.md §6).
+    """
+    if valor is None or isinstance(valor, bool):
+        return ""
+    if isinstance(valor, str):
+        return valor.strip()
+    return str(valor)
+
+
 def fmt_celula(celula: Mapping[str, Any]) -> str:
     """Célula de tabela ``{valor, motivo, unidade}`` (as que `web/escola.py` monta).
 

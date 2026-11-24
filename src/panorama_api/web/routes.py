@@ -53,6 +53,7 @@ from panorama_api.web.escola import (
 )
 from panorama_api.web.filters import (
     fmt_ano,
+    fmt_bruto,
     fmt_celula,
     fmt_contagem,
     fmt_gap_lider,
@@ -150,6 +151,7 @@ def _templates() -> Jinja2Templates:
     ambiente.env.filters["fmt_nulo"] = fmt_nulo
     ambiente.env.filters["fmt_contagem"] = fmt_contagem
     ambiente.env.filters["fmt_celula"] = fmt_celula
+    ambiente.env.filters["fmt_bruto"] = fmt_bruto
     ambiente.env.filters["fmt_oferta"] = fmt_oferta
     ambiente.env.filters["fmt_ano"] = fmt_ano
     ambiente.env.filters["fmt_gap_lider"] = fmt_gap_lider

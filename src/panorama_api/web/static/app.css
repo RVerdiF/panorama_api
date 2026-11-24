@@ -504,6 +504,11 @@ tbody th {
   font-weight: 600;
 }
 
+/* Ordenável (t_ee9b1eec): botão só com JS; ▲/▼ do aria-sort, não só cor. */
+th[data-tipo] button { display: inline-flex; min-height: 44px; min-width: 44px; border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+th[aria-sort] button::after { content: " ▲"; }
+th[aria-sort="descending"] button::after { content: " ▼"; }
+
 .gap-lider {
   font-weight: 700;
 }

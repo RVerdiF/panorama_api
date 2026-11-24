@@ -132,11 +132,18 @@ CAMPOS_MATRICULA: dict[Etapa, CampoMatricula] = {
 
 
 class GrupoEtapas(NamedTuple):
-    """Grupo semântico da tabela de oferta: título, nota e etapas."""
+    """Grupo semântico da tabela de oferta: título, nota e etapas.
+
+    ``fixa`` marca as etapas que **não** são parcelas comparáveis do grupo: o
+    total oficial do Censo (`bas`) fica na posição original quando o leitor
+    ordena a tabela no cliente (card `t_ee9b1eec`) — ele não é "mais uma
+    etapa" e não pode descer para o meio delas.
+    """
 
     titulo: str
     nota: str
     etapas: tuple[Etapa, ...]
+    fixa: bool = False
 
 
 #: Grupos da tabela "Oferta e matrícula por etapa" (card F11). As linhas não são
@@ -145,7 +152,7 @@ class GrupoEtapas(NamedTuple):
 #: nas duas linhas) e `esp` é modalidade transversal — nenhuma das duas entra na
 #: soma. Sem essa separação a escola 31005371 aparecia com 2.061 alunos em 680.
 GRUPOS_ETAPAS: tuple[GrupoEtapas, ...] = (
-    GrupoEtapas(TITULO_GRUPO_TOTAL, NOTA_GRUPO_TOTAL, ("bas",)),
+    GrupoEtapas(TITULO_GRUPO_TOTAL, NOTA_GRUPO_TOTAL, ("bas",), fixa=True),
     GrupoEtapas(
         TITULO_GRUPO_ETAPAS,
         NOTA_GRUPO_ETAPAS,
@@ -387,6 +394,7 @@ def etapas_do_ano(item: HistoryItem) -> list[dict[str, Any]]:
         {
             "titulo": grupo.titulo,
             "nota": grupo.nota,
+            "fixa": grupo.fixa,
             "linhas": [
                 _linha_etapa(item, CAMPOS_MATRICULA[etapa]) for etapa in grupo.etapas
             ],

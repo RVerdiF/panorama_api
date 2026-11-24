@@ -405,22 +405,31 @@ def test_oferta_tri_estado_na_pagina(client, repository):
 
 
 def _tabela(html: str, prefixo_caption: str) -> str:
-    """`<table>` cuja `<caption>` contém `prefixo_caption`."""
-    for tabela in re.findall(r"<table>.*?</table>", html, flags=re.S):
+    """`<table>` cuja `<caption>` contém `prefixo_caption`.
+
+    A abertura aceita atributos: a tabela de oferta passou a declarar
+    `data-ordenavel` (card `t_ee9b1eec`) e o recorte por `<table>` exato
+    deixaria de encontrá-la.
+    """
+    for tabela in re.findall(r"<table\b[^>]*>.*?</table>", html, flags=re.S):
         if prefixo_caption in tabela:
             return tabela
     raise AssertionError(f"tabela ausente: {prefixo_caption!r}")
 
 
 def _celulas_da_linha(tabela: str, rotulo: str) -> list[str]:
-    """Texto de cada `<td>` da linha cujo `<th scope="row">` é `rotulo`."""
+    """Texto de cada `<td>` da linha cujo `<th scope="row">` é `rotulo`.
+
+    O `<td>` pode carregar atributos — `data-valor` nas colunas ordenáveis
+    (card `t_ee9b1eec`) —, por isso o recorte aceita o que vier na abertura.
+    """
     linha = re.search(
         rf'<th scope="row">{re.escape(rotulo)}</th>(.*?)</tr>', tabela, flags=re.S
     )
     assert linha is not None, f"linha ausente na tabela: {rotulo!r}"
     return [
         re.sub(r"<[^>]+>", "", celula).strip()
-        for celula in re.findall(r"<td>(.*?)</td>", linha.group(1), flags=re.S)
+        for celula in re.findall(r"<td\b[^>]*>(.*?)</td>", linha.group(1), flags=re.S)
     ]
 
 

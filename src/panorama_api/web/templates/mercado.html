@@ -72,23 +72,26 @@
       em cada linha daria a impressão de nove números diferentes.
     </p>
     <div class="tabela-rolavel" role="region" aria-label="Composição do mercado por etapa (tabela com rolagem)" tabindex="0">
-      <table class="tabela">
+      {# Ordenável no cliente (card `t_ee9b1eec`): as três colunas de matrícula.
+         A coluna de etapa não ordena — a ordem canônica do servidor é a
+         leitura de referência e nada recebe `aria-sort` no HTML. #}
+      <table class="tabela" data-ordenavel>
         <caption>Tamanho do mercado por etapa — {{ ano_selecionado | fmt_ano }}</caption>
         <thead>
           <tr>
             <th scope="col">Etapa</th>
-            <th scope="col">Matrícula total</th>
-            <th scope="col">Matrícula privada</th>
-            <th scope="col">Privada no total</th>
+            <th scope="col" data-tipo="numero">Matrícula total</th>
+            <th scope="col" data-tipo="numero">Matrícula privada</th>
+            <th scope="col" data-tipo="numero">Privada no total</th>
           </tr>
         </thead>
         <tbody>
           {% for linha in etapas %}
           <tr>
             <th scope="row">{{ linha.rotulo }}</th>
-            <td>{{ linha.qt_mat_total | fmt_contagem }}</td>
-            <td>{{ linha.qt_mat_privada | fmt_contagem }}</td>
-            <td>{{ linha.pct_privada_no_total_pct | fmt_nulo }}{% if linha.pct_privada_no_total_pct is not none %}%{% endif %}</td>
+            <td data-valor="{{ linha.qt_mat_total | fmt_bruto }}">{{ linha.qt_mat_total | fmt_contagem }}</td>
+            <td data-valor="{{ linha.qt_mat_privada | fmt_bruto }}">{{ linha.qt_mat_privada | fmt_contagem }}</td>
+            <td data-valor="{{ linha.pct_privada_no_total_pct | fmt_bruto }}">{{ linha.pct_privada_no_total_pct | fmt_nulo }}{% if linha.pct_privada_no_total_pct is not none %}%{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>
