@@ -26,7 +26,12 @@ from panorama_api.config import Settings
 from panorama_api.main import create_app
 from panorama_api.web import routes as web_routes
 from panorama_api.web.municipios import Municipio, municipios_mg
-from tests.unit.conftest import FakeRepository
+from tests.unit.conftest import (
+    FakeRepository,
+    market_row,
+    municipio_row,
+    share_row,
+)
 
 ANOS = (2021, 2022, 2023, 2024, 2025)
 ANOS_CSV = ",".join(str(ano) for ano in ANOS)
@@ -242,3 +247,111 @@ def test_hero_mantem_um_unico_h1_e_o_alvo_do_ancora_do_campo_de_nome():
 
     assert html.count("<h1") == 1
     assert 'id="q"' in _formulario(html)
+
+
+# -- conteúdo da landing (card `t_2c2e564b`, spec §5) ------------------------
+
+
+def _texto(html: str) -> str:
+    """HTML com os espaços normalizados.
+
+    O template quebra linha no meio das frases: o que importa é a frase, não o
+    ``\\n`` do HTML.
+    """
+    return re.sub(r"\s+", " ", html)
+
+
+def test_landing_tem_as_tres_secoes_de_conteudo():
+    html, _ = _pagina()
+
+    assert '<h2 id="encontra-titulo">O que você encontra</h2>' in html
+    assert '<h2 id="fonte-titulo">De onde vêm os dados</h2>' in html
+    assert '<h2 id="publico-titulo">Para quem é</h2>' in html
+    # Os três itens da primeira seção abrem nível com `<h3>`.
+    for item in ("Ficha da escola", "Mercado municipal", "Metodologia"):
+        assert f"<h3>{item}</h3>" in html
+
+
+def test_copy_dos_itens_e_das_secoes_e_a_do_5():
+    plano = _texto(_pagina()[0])
+
+    for frase in (
+        "Série de matrículas, oferta por etapa e rendimento. Nas escolas "
+        "privadas ativas, também a posição da escola no município.",
+        "Tamanho do mercado, composição por etapa e participação das escolas "
+        "privadas, ano a ano.",
+        "De onde vem cada número, o que cada indicador mede e quais são os "
+        "limites de leitura.",
+        "Os números vêm do Censo Escolar da Educação Básica, levantamento "
+        "anual do INEP que cobre todas as escolas do país. O Panorama Escola "
+        "recorta Minas Gerais e publica os anos 2021–2025. Quando um dado não "
+        "existe na base, a tela mostra “sem dado”, e nunca zero.",
+        "Para quem acompanha a educação básica privada em Minas Gerais: gestão "
+        "e expansão de redes, direção de escolas e análise de mercado. O "
+        "Panorama não exibe dado individual de aluno.",
+    ):
+        assert frase in plano, frase
+
+
+def test_hierarquia_de_titulos_da_landing_nao_pula_nivel():
+    html, _ = _pagina()
+    niveis = [int(nivel) for nivel in re.findall(r"<h([1-6])[ >]", html)]
+
+    assert niveis.count(1) == 1
+    assert niveis[0] == 1
+    # Descer de h3 para h2 é legítimo (nova seção); subir de h1 para h3 não é.
+    for anterior, seguinte in zip(niveis, niveis[1:]):
+        assert seguinte - anterior <= 1, niveis
+
+
+def test_secao_de_fonte_usa_os_anos_da_config_nao_um_literal():
+    plano = _texto(_pagina(anos="2024,2025")[0])
+
+    assert "publica os anos 2024–2025." in plano
+    assert "2021" not in plano
+
+
+def test_links_da_landing_resolvem_no_front():
+    """`#q` aponta para um alvo real e as duas rotas de apoio respondem 200."""
+    html, _ = _pagina()
+
+    assert '<a href="#q">Buscar uma escola</a>' in html
+    assert 'id="q"' in html
+    assert '<a href="/app/metodologia">Ler a metodologia</a>' in html
+    assert (
+        '<a href="/app/metodologia">Como os números são calculados</a>' in html
+    )
+    assert (
+        '<a href="/app/mercados/3106200">Ver o mercado de Belo Horizonte</a>'
+        in html
+    )
+
+    # O exemplo de mercado é um código que existe na lista versionada — a
+    # landing não pode apontar para um município inventado.
+    municipios = {m.co_municipio: m.no_municipio for m in municipios_mg()}
+    assert municipios["3106200"] == "Belo Horizonte"
+
+    repo = FakeRepository(
+        municipios=[municipio_row()],
+        markets=[
+            market_row(nu_ano_censo=ano, etapa="bas") for ano in ANOS
+        ],
+        share=[share_row(nu_ano_censo=ano) for ano in ANOS],
+    )
+    app = create_app(settings=_settings(), repository=repo)
+    with TestClient(app) as cliente:
+        landing = cliente.request(
+            "GET", INICIO, headers={"Accept-Encoding": "identity", "Accept": "text/html"}
+        )
+        # A landing continua sem consultar o repositório (spec §7).
+        assert repo.calls == []
+        metodologia = cliente.request(
+            "GET", "/app/metodologia", headers={"Accept-Encoding": "identity"}
+        )
+        mercado = cliente.request(
+            "GET", "/app/mercados/3106200", headers={"Accept-Encoding": "identity"}
+        )
+
+    assert landing.status_code == 200
+    assert metodologia.status_code == 200
+    assert mercado.status_code == 200

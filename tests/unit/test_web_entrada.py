@@ -157,8 +157,10 @@ def test_raiz_usa_o_shell_com_um_unico_h1_e_landmarks(cliente: TestClient):
     assert '<main id="conteudo"' in html
     assert '<footer class="rodape">' in html
     # A landing não exibe valor nenhum: a nota de ausência do rodapé sairia como
-    # ruído (mesma regra da 1ª visita da busca, achado A3).
-    assert "sem dado" not in html.lower()
+    # ruído (mesma regra da 1ª visita da busca, achado A3). A copy da seção de
+    # fonte (card `t_2c2e564b`) fala de "sem dado" — a asserção é sobre a nota
+    # do rodapé, não sobre a expressão em qualquer lugar da página.
+    assert "Esta página nunca troca dado ausente por zero" not in html
 
 
 def test_raiz_sai_comprimida_com_gzip(cliente: TestClient):
@@ -241,12 +243,15 @@ def test_busca_sem_consulta_orienta_sobre_o_produto(cliente: TestClient):
     # Os anos publicados vêm de APP_ANOS_DISPONIVEIS, nunca de literal no template.
     for ano in ANOS:
         assert str(ano) in html
-    assert f'href="{METODOLOGIA}"' in html
-    # Atalhos do bloco de orientação: âncora para o formulário, âncora para o
-    # campo de município e a metodologia.
-    assert 'href="#formulario-busca"' in html
+    # O bloco de orientação encolheu no card `t_2c2e564b`: fica o parágrafo e o
+    # link para a landing. Os três atalhos de uso moraram para `/`, que agora
+    # apresenta o produto; `/app/` segue como porta de entrada por deep-link.
+    assert '<a href="/">Sobre o Panorama Escola</a>' in html
+    assert "orientacao__atalhos" not in html
+    assert 'href="#formulario-busca"' not in html
+    assert 'href="#co_municipio"' not in html
+    # Os alvos continuam no formulário, para os fluxos que os usam.
     assert 'id="formulario-busca"' in html
-    assert 'href="#co_municipio"' in html
     assert 'id="co_municipio"' in html
 
 
