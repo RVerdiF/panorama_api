@@ -43,6 +43,7 @@ from markupsafe import Markup
 from panorama_api.schemas.markets import MarketItem, MarketsResponse, ShareResponse
 from panorama_api.web.conteudo import (
     DEFINICAO_CONCORRENCIA,
+    ETAPA_PADRAO_MERCADO,
     MOTIVO_ALEM_DO_FIM,
     MOTIVO_ENTRADA_SAIDA,
     MOTIVO_SEM_PRIVADAS,
@@ -113,11 +114,17 @@ def _linhas_por_etapa(items: Sequence[MarketItem]) -> list[dict[str, Any]]:
     total do município em todas as etapas e repeti-lo linha a linha sugere nove
     números diferentes. O total aparece uma única vez no resumo da página
     (`denominadores`), tirado da linha da etapa selecionada.
+
+    `fixa` marca a linha que **não** é uma etapa do mercado: `bas` é o total
+    oficial do Censo (a mesma leitura de `routes.py`), então ela não participa
+    da ordenação no cliente e fica na posição original. A decisão vem da chave
+    da etapa, nunca do rótulo (`t_ee9b1eec`).
     """
     return [
         {
             "etapa": item.etapa,
             "rotulo": rotulo_etapa(item.etapa),
+            "fixa": item.etapa == ETAPA_PADRAO_MERCADO,
             "n_escolas_publicas": item.n_escolas_publicas,
             "qt_mat_total": item.qt_mat_total,
             "qt_mat_publica": item.qt_mat_publica,
