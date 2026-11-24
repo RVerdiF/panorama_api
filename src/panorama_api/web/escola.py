@@ -39,7 +39,15 @@ from panorama_api.web.conteudo import (
     MOTIVO_SECAO_COMPETIDORES,
     MOTIVO_SECAO_INDICADORES,
     NAO_SE_APLICA,
+    NOTA_GRUPO_ETAPAS,
+    NOTA_GRUPO_MODALIDADES,
+    NOTA_GRUPO_TOTAL,
+    ROTULO_POSICAO_CRESCIMENTO_MG,
+    ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO,
     ROTULO_RETENCAO,
+    TITULO_GRUPO_ETAPAS,
+    TITULO_GRUPO_MODALIDADES,
+    TITULO_GRUPO_TOTAL,
     UNIVERSOS,
     rotulo_etapa,
     traduzir_aviso,
@@ -105,6 +113,40 @@ MATRICULAS: tuple[CampoMatricula, ...] = (
     CampoMatricula("prof", "qt_mat_prof", "is_qt_mat_prof_missing"),
     CampoMatricula("eja", "qt_mat_eja", "is_qt_mat_eja_missing"),
     CampoMatricula("esp", "qt_mat_esp", "is_qt_mat_esp_missing"),
+)
+
+#: Etapa → campo do contrato + flag de ausência, derivado de `MATRICULAS`: o
+#: mapa campo/flag não é escrito duas vezes.
+CAMPOS_MATRICULA: dict[Etapa, CampoMatricula] = {
+    campo.etapa: campo for campo in MATRICULAS
+}
+
+
+class GrupoEtapas(NamedTuple):
+    """Grupo semântico da tabela de oferta: título, nota e etapas."""
+
+    titulo: str
+    nota: str
+    etapas: tuple[Etapa, ...]
+
+
+#: Grupos da tabela "Oferta e matrícula por etapa" (card F11). As linhas não são
+#: irmãs somáveis: `bas` é o total oficial do Censo; creche…médio e EJA são
+#: parcelas aditivas; `prof` acompanha o médio (o técnico integrado é contado
+#: nas duas linhas) e `esp` é modalidade transversal — nenhuma das duas entra na
+#: soma. Sem essa separação a escola 31005371 aparecia com 2.061 alunos em 680.
+GRUPOS_ETAPAS: tuple[GrupoEtapas, ...] = (
+    GrupoEtapas(TITULO_GRUPO_TOTAL, NOTA_GRUPO_TOTAL, ("bas",)),
+    GrupoEtapas(
+        TITULO_GRUPO_ETAPAS,
+        NOTA_GRUPO_ETAPAS,
+        ("creche", "pre", "fund_ai", "fund_af", "med", "eja"),
+    ),
+    GrupoEtapas(
+        TITULO_GRUPO_MODALIDADES,
+        NOTA_GRUPO_MODALIDADES,
+        ("prof", "esp"),
+    ),
 )
 
 #: Rendimento por ano. Nenhum rótulo é "evasão": `tx_aband_*` é taxa de
@@ -311,22 +353,36 @@ def svg_serie(pontos: Sequence[dict[str, Any]]) -> Markup | None:
     )
 
 
+def _linha_etapa(item: HistoryItem, campo: CampoMatricula) -> dict[str, Any]:
+    """Linha de etapa: rótulo, oferta tri-estado e matrícula com a flag."""
+    return {
+        "rotulo": rotulo_etapa(campo.etapa),
+        "oferta": getattr(item.oferta, campo.etapa),
+        "matricula": _celula(
+            getattr(item, campo.campo),
+            motivo=_motivo(getattr(item, campo.flag), campo.flag),
+        ),
+    }
+
+
 def etapas_do_ano(item: HistoryItem) -> list[dict[str, Any]]:
-    """Uma linha por etapa do ano de referência: oferta tri-estado + matrícula.
+    """Oferta e matrícula do ano, agrupadas pela natureza de cada linha.
 
     Oferta e matrícula vêm do MESMO item (mesmo ano censitário); a matrícula
-    carrega a flag de ausência para que `null` nunca vire `0`.
+    carrega a flag de ausência para que `null` nunca vire `0`. Os grupos
+    (`GRUPOS_ETAPAS`) existem para que total oficial, etapas aditivas e
+    modalidades/subconjuntos não sejam lidos como irmãos somáveis: somar as
+    nove linhas triplicava a matrícula da escola (card F11).
     """
     return [
         {
-            "rotulo": rotulo_etapa(campo.etapa),
-            "oferta": getattr(item.oferta, campo.etapa),
-            "matricula": _celula(
-                getattr(item, campo.campo),
-                motivo=_motivo(getattr(item, campo.flag), campo.flag),
-            ),
+            "titulo": grupo.titulo,
+            "nota": grupo.nota,
+            "linhas": [
+                _linha_etapa(item, CAMPOS_MATRICULA[etapa]) for etapa in grupo.etapas
+            ],
         }
-        for campo in MATRICULAS
+        for grupo in GRUPOS_ETAPAS
     ]
 
 
@@ -395,11 +451,16 @@ def contexto_indicadores(item: IndicatorItem | None) -> list[dict[str, Any]]:
             item.share_total_pct,
             unidade="%",
         ),
-        # A posição municipal por matrícula BAS vem de `/competitors`
-        # (seção própria); aqui só as posições específicas de creche, que não
-        # existem naquela mart.
-        linha("Posição por matrícula de creche no município", item.rank_crec_municipio),
-        linha("Posição por matrícula de creche em Minas Gerais", item.rank_crec_mg),
+        # `rank_crec_*` são posições por **crescimento** da matrícula
+        # (`crescimento_yoy_pct`), não por matrícula: a posição municipal por
+        # matrícula BAS vem de `/competitors`, em seção própria. O sufixo ".º"
+        # é o ordinal da posição; `null` continua "sem dado", nunca 0.º.
+        linha(
+            ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO,
+            item.rank_crec_municipio,
+            unidade=".º",
+        ),
+        linha(ROTULO_POSICAO_CRESCIMENTO_MG, item.rank_crec_mg, unidade=".º"),
     ]
     return linhas
 
