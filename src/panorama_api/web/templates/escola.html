@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/breadcrumb.html" import breadcrumb with context %}
 
 {% block titulo %}{{ escola.no_entidade or "Escola " ~ escola.co_entidade }} — Panorama Escola{% endblock %}
 
@@ -43,6 +44,16 @@
 
 {% block conteudo %}
 <article class="cartao">
+  {# Breadcrumb "Busca › município › escola" (achado B7). O município é link
+     para o mercado municipal — o mesmo destino do subtítulo, mas no caminho de
+     volta; o último item é esta ficha e não é link. #}
+  {% set itens_breadcrumb = [{"rotulo": "Busca", "href": href_busca}] %}
+  {% if escola.co_municipio %}
+    {% set _ = itens_breadcrumb.append({"rotulo": escola.no_municipio | fmt_nulo,
+                                       "href": app_prefix ~ "/mercados/" ~ escola.co_municipio}) %}
+  {% endif %}
+  {% set _ = itens_breadcrumb.append({"rotulo": escola.no_entidade | fmt_nulo}) %}
+  {{ breadcrumb(itens_breadcrumb) }}
   <h1>{{ escola.no_entidade | fmt_nulo }}</h1>
   <p class="subtitulo">
     Escola <code>{{ escola.co_entidade }}</code> ·
