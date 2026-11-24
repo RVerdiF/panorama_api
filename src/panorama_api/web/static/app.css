@@ -4,8 +4,7 @@
   --cor-superficie: #ffffff;
   /* Borda decorativa (cartão, topo, rodapé, tabela): não delimita controle. */
   --cor-borda: #d8d8d2;
-  /* Borda de controle (input/select): 3,47:1 sobre #ffffff — WCAG 1.4.11 pede
-     ≥3:1 para o limite do controle; a decorativa acima fica em 1,43:1. */
+  /* Borda de controle (input/select): 3,47:1 sobre #ffffff (WCAG 1.4.11). */
   --cor-borda-controle: #8a8a82;
   --cor-texto: #1d1d1b;
   --cor-texto-suave: #5a5a54;
@@ -49,8 +48,7 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
-/* Affordance de ponteiro: o estado muda cor **e** espessura do sublinhado —
-   cor sozinha não é o único sinal (WCAG 1.4.1). #164a6c dá 9,4:1 sobre branco. */
+/* Hover de ponteiro: muda cor **e** espessura do sublinhado (WCAG 1.4.1). */
 a:hover {
   color: #164a6c;
   text-decoration-thickness: 2px;
@@ -114,8 +112,7 @@ code {
   font-size: 0.95rem;
 }
 
-/* Alvo de toque ≥44px (antes ~23px, achado C6): `inline-flex` é o que faz o
-   `min-height` valer num elemento inline. */
+/* Alvo de toque ≥44px (achado C6): `inline-flex` faz o `min-height` valer. */
 .topo__nav a {
   display: inline-flex;
   align-items: center;
@@ -245,6 +242,16 @@ li {
 .breadcrumb [aria-current="page"] {
   color: var(--cor-texto);
 }
+
+/* Subnav de seções (spec §2.2): links em linha, sem JS; o ativo não é link
+   aparente (`aria-current="page"`). Alvo de toque ≥44px, como a navbar. */
+.subnav ul { display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; margin: 0 0 0.75rem; padding: 0; list-style: none; font-size: 0.95rem; }
+.subnav a { display: inline-flex; align-items: center; min-height: 44px; }
+.subnav [aria-current="page"] { color: var(--cor-texto); font-weight: 600; text-decoration: none; }
+.subnav__saida { margin-left: auto; }
+
+/* Índice por âncoras dentro da página (spec §2.2): uma linha, texto discreto. */
+.nesta-pagina p { margin: 0 0 1rem; font-size: 0.9rem; color: var(--cor-texto-suave); max-width: none; }
 
 .rodape {
   border-top: 1px solid var(--cor-borda);
@@ -530,9 +537,7 @@ tbody th {
   font-size: clamp(1.75rem, 4vw, 2.75rem);
 }
 
-/* Painel do recorte: tint da cor de ação e raio grande. O contraste de
-   `--cor-texto-suave` sobre #eaf1f6 é medido em `test_web_estilos.py`
-   (WCAG 1.4.3 pede ≥4,5:1 também aqui, não só sobre o branco). */
+/* Painel do recorte: tint da ação e raio grande; contraste medido no teste. */
 .hero .recorte {
   margin-top: 0;
   padding: 1.5rem;
@@ -576,8 +581,7 @@ tbody th {
   max-width: none;
 }
 
-/* Busca no hero (card `t_e075a6f6`, spec §6/§7): mesmo GET da busca, sem JS.
-   Abaixo de 48rem empilha, com 100% de largura e alvo de 44 px (WCAG 2.5.5). */
+/* Busca no hero (spec §6/§7): mesmo GET, sem JS; empilha abaixo de 48rem. */
 .hero__busca {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -656,9 +660,7 @@ tbody th {
     align-items: center;
   }
 
-  /* Pílula (raio 999 px) em dois blocos, como no wireframe da spec §5: campos
-     numa linha, botões na seguinte. O padding lateral mantém o conteúdo dentro
-     da curva; a dica do nome só sai do modo visual (segue para o `aria-describedby`). */
+  /* Pílula em dois blocos (spec §5): campos, depois botões. */
   .hero__busca {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 0.5rem 0.9rem;

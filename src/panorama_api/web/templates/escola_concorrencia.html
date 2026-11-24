@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% from "partials/cabecalho_escola.html" import cabecalho_escola with context %}
+{% from "partials/macros.html" import recorte, bloco_nao_se_aplica with context %}
+{% from "partials/subnav.html" import subnav with context %}
+
+{#
+  Indicadores e concorrência (spec §2.2, §5.1, §5.2) — rota própria da ficha.
+
+  Fonte única: `dados.indicadores_escola` (mart de indicadores + a linha de
+  `mart_competidores` do mesmo ano dentro de cada item). São **duas** consultas
+  e nenhuma delas é o `history`: o cabeçalho vem da própria resposta de
+  indicadores. Sem `competicao` no ano mais recente, a seção diz "sem dado" com
+  o motivo — nunca 0 (AGENTS.md §6).
+#}
+{% block titulo %}{{ cabecalho.no_entidade or "Escola " ~ cabecalho.co_entidade }} — {{ titulo_secao }} — Panorama Escola{% endblock %}
+
+{% block conteudo %}
+<article class="cartao">
+  {{ cabecalho_escola(cabecalho, migalhas, sem_nome) }}
+  {{ subnav(subnav_itens) }}
+
+  {% if nao_se_aplica %}
+  {# 404 de universo é estado legítimo da seção: página 200, motivo fixo e
+     caminho de volta — nunca erro inteiro, nunca seção vazia sem explicação. #}
+  {{ bloco_nao_se_aplica(nao_se_aplica_titulo, motivo) }}
+  <p><a href="{{ href_visao_geral }}">{{ texto_voltar }}</a></p>
+  {% else %}
+  <section aria-labelledby="indicadores">
+    <h2 id="indicadores">Indicadores</h2>
+    {% if aviso_abaixo_porte %}
+    <p class="aviso">{{ texto_abaixo_porte }}</p>
+    {% endif %}
+    <dl class="lista-definicoes">
+      {% for linha in indicadores %}
+      <dt>{{ linha.rotulo }}</dt>
+      <dd>{{ linha | fmt_celula }}</dd>
+      {% endfor %}
+    </dl>
+  </section>
+
+  <section aria-labelledby="comparacao">
+    <h2 id="comparacao">Comparação municipal</h2>
+    <p class="subtitulo">
+      <strong>Definição da comparação:</strong> {{ definicao_concorrencia }}.
+      A comparação é sempre municipal, no mesmo ano censitário.
+    </p>
+    {% if motivo_sem_comparacao %}
+    {# Ausência de linha de `mart_competidores` no ano dos indicadores: o
+       motivo diz o ano e nenhum número é fabricado. #}
+    <p class="sem-dado">sem dado — {{ motivo_sem_comparacao }}</p>
+    {% elif competicao %}
+    <dl class="lista-definicoes">
+      <dt>Posição por matrícula da educação básica no município</dt>
+      <dd>{% if competicao.rank is not none %}{{ competicao.rank }}.º{% else %}sem dado{% endif %}</dd>
+      <dt>Outras escolas privadas ativas no município e ano (exclui esta)</dt>
+      <dd>{{ competicao.n_concorrentes | fmt_nulo }}</dd>
+      <dt>Outras com matrícula observada</dt>
+      <dd>{{ competicao.n_com_matricula | fmt_nulo }}</dd>
+      <dt>Líder do município (maior matrícula observada)</dt>
+      <dd>
+        {# Sem link: `Competicao` expõe apenas `lider_no_entidade`, não o
+           `co_entidade` do líder — e nome de escola não é chave única.
+           Para linkar seria preciso um campo novo no contrato `/v1`. #}
+        {{ competicao.lider | fmt_nulo }}
+        {% if competicao.lider_matricula is not none %}({{ competicao.lider_matricula | fmt_contagem }} matrículas){% endif %}
+      </dd>
+      <dt>Diferença de matrícula para o líder (<code>gap_mat_bas_para_lider</code>; 0 = a escola lidera)</dt>
+      <dd class="gap-lider">{{ competicao.gap | fmt_gap_lider }}</dd>
+    </dl>
+    <div class="tabela-rolavel" role="region" aria-label="Concorrentes por etapa (tabela com rolagem)" tabindex="0">
+      <table>
+        <caption>Concorrentes privadas com matrícula observada por etapa — {{ competicao.ano | fmt_ano }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Etapa</th>
+            <th scope="col">Concorrentes com matrícula observada</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in competicao.por_etapa %}
+          <tr>
+            <th scope="row">{{ linha.rotulo }}</th>
+            <td>{{ linha.valor | fmt_contagem }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+  </section>
+
+  {# Um único bloco de recorte: a página consome **uma** resposta (indicadores,
+     que já traz a comparação municipal do mesmo ano). #}
+  {{ recorte(meta_indicadores) }}
+  {% endif %}
+</article>
+{% endblock %}
