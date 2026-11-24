@@ -148,10 +148,13 @@ def test_ranking_nao_renderiza_a_composicao(mercado_repo):
     assert "mart_market_share" in html
 
 
-def test_ranking_nao_tem_script(mercado_repo):
+def test_ranking_so_carrega_o_app_js_com_defer(mercado_repo):
+    """Card `t_71b25279`: a única tag de script é o `app.js` com hash e `defer`."""
     html = _html(_client(mercado_repo).get(ESCOLAS))
 
-    assert "<script" not in html
+    scripts = re.findall(r"<script\b[^>]*>\s*</script>", html)
+    assert len(scripts) == 1, scripts
+    assert re.search(r'src="/app/static/[0-9a-f]{12}-app\.js" defer', scripts[0]), scripts[0]
 
 
 # -- subnav, navbar, formulário e revalidação -------------------------------

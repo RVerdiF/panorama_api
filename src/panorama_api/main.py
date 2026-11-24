@@ -32,7 +32,10 @@ from panorama_api.core.startup import validate_schema
 from panorama_api.repositories.bigquery_repo import BigQueryServingRepository
 from panorama_api.repositories.serving import ServingRepository
 from panorama_api.web import PREFIXO_WEB, e_caminho_web
-from panorama_api.web.middleware import WebGZipMiddleware
+from panorama_api.web.middleware import (
+    WebGZipMiddleware,
+    WebSecurityHeadersMiddleware,
+)
 from panorama_api.web.observability import PageViewMiddleware
 from panorama_api.web.routes import RETRY_AFTER_SEGUNDOS, pagina_erro, pagina_inexistente
 from panorama_api.web.routes import router as web_router
@@ -107,6 +110,13 @@ def create_app(
     # publica em `request.scope` — e por fora do gzip, para medir a requisição
     # como um todo. Assets `/app/static/*` são ignorados: não são páginas.
     app.add_middleware(PageViewMiddleware)
+    # CSP + `nosniff` das respostas do front (card t_71b25279): o `app.js` é
+    # servido por `/app/static/*` e passou a existir JavaScript no navegador.
+    # Registrado **por último**, logo por fora de todas as camadas — em especial
+    # do `HttpCacheMiddleware` de páginas: assim *hit* do LRU, *miss* e 304 saem
+    # com o mesmo header constante. `/v1` e `/health` não recebem nada
+    # (`e_caminho_web`), porque o contrato público não ganha header novo.
+    app.add_middleware(WebSecurityHeadersMiddleware)
 
     app.add_exception_handler(ProblemError, _handle_problem)
     app.add_exception_handler(RequestValidationError, _handle_validation)

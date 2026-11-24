@@ -14,7 +14,8 @@ nenhuma rede/BigQuery):
 * o índice novo ``GET /app/mercados/`` (com barra) responde 200 com o select de
   municípios, 303 para o mercado escolhido e 422 no código inválido, sempre sem
   tocar no repositório;
-* zero JavaScript: nenhum ``<script>`` em template e nenhum `.js` em `static`;
+* o shell não depende de JS: a única tag de script é o `app.js` com `defer`
+  (card `t_71b25279`), sem inline em template nenhum;
 * o `<header>` renderizado cabe em 1,5 KB (spec §6: partials ≤ 1,5 KB).
 """
 
@@ -300,14 +301,24 @@ def test_atalho_sem_barra_continua_existindo_fora_do_indice(cliente: TestClient)
     assert resposta.headers["location"] == MERCADO
 
 
-# -- 5. zero JavaScript ------------------------------------------------------
+# -- 5. JavaScript: só o asset único, com `defer` ---------------------------
 
 
-def test_nenhum_template_tem_script_e_nenhum_asset_e_js():
+def test_script_unico_e_o_app_js_com_defer():
+    """Card `t_71b25279`: o front tem **uma** base de JS, o `app.js` com hash.
+
+    Substitui a guarda de "zero JavaScript" do NAV-1: o shell continua completo
+    sem JS, mas a única tag permitida é a do asset servido pelo `AssetRegistry`,
+    herdada de `base.html` — nada de `<script>` inline e nada de segundo `.js`.
+    """
     for caminho in sorted(TEMPLATES.rglob("*.html")):
-        assert "<script" not in caminho.read_text(encoding="utf-8"), caminho.name
+        texto = caminho.read_text(encoding="utf-8")
+        for tag in re.findall(r"<script\b[^>]*>", texto):
+            assert 'src="{{ js_url }}"' in tag, f"{caminho.name}: script sem src: {tag}"
+            assert "defer" in tag, f"{caminho.name}: script sem defer: {tag}"
+        assert texto.count("<script") <= 1, caminho.name
 
-    assert list(STATIC.rglob("*.js")) == []
+    assert sorted(p.name for p in STATIC.glob("*.js")) == ["app.js"]
 
 
 # -- 6. orçamento do partial -------------------------------------------------

@@ -9,10 +9,11 @@ review. Os limites são os da spec, em bytes:
 | HTML de `/` | 65.536 B | 14.336 B |
 | `app.css` | 14.336 B | 4.608 B |
 
-Além do peso, o orçamento inclui a forma do recurso: **2 requests** na primeira
-visita (o HTML e um único stylesheet), nenhum `<script>`, `<img>`, `<iframe>`,
-`@import` ou `url(` no CSS, e nenhuma origem externa — a página funciona sem JS
-e sem terceiros.
+Além do peso, o orçamento inclui a forma do recurso: **3 requests** na primeira
+visita (o HTML, um único stylesheet e o `app.js` com `defer` — card
+`t_71b25279`), nenhum `<img>`, `<iframe>`, `@import` ou `url(` no CSS, e nenhuma
+origem externa. A página continua funcionando sem JS: o script é só melhoria
+progressiva.
 
 As medições são impressas (rode com `-s` para vê-las) e aparecem no handoff do
 card. Nada aqui toca rede ou BigQuery: o HTML vem do `TestClient` com
@@ -49,6 +50,8 @@ NIVEL_GZIP = 6
 REFERENCIA = re.compile(r'(?:src|href)="([^"]*)"')
 ESTILO = re.compile(r"<link[^>]*rel=\"stylesheet\"[^>]*>")
 ASSET_CSS = re.compile(r'href="/app/static/[0-9a-f]{12}-app\.css"')
+SCRIPT = re.compile(r"<script\b[^>]*>\s*</script>")
+ASSET_JS = re.compile(r'src="/app/static/[0-9a-f]{12}-app\.js" defer')
 
 
 def _settings() -> Settings:
@@ -108,15 +111,17 @@ def test_css_do_front_cabe_no_orcamento():
     )
 
 
-# -- forma do recurso: 2 requests, sem JS, sem terceiros ---------------------
+# -- forma do recurso: 3 requests, sem terceiros -----------------------------
 
 
-def test_landing_nao_carrega_script_imagem_nem_iframe(html_da_landing: bytes):
-    html = html_da_landing.decode("utf-8").lower()
+def test_landing_carrega_so_o_app_js_local(html_da_landing: bytes):
+    html = html_da_landing.decode("utf-8")
 
-    assert "<script" not in html
-    assert "<img" not in html
-    assert "<iframe" not in html
+    scripts = SCRIPT.findall(html)
+    assert len(scripts) == 1, f"esperado 1 script, achei {len(scripts)}"
+    assert ASSET_JS.search(scripts[0]), scripts[0]
+    assert "<img" not in html.lower()
+    assert "<iframe" not in html.lower()
 
 
 def test_landing_tem_um_unico_stylesheet_versionado(html_da_landing: bytes):

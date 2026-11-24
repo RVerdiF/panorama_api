@@ -6,6 +6,10 @@
   <title>{% block titulo %}Panorama Escola{% endblock %}</title>
   <meta name="description" content="Panorama Escola — matrículas, oferta e mercado da educação básica em Minas Gerais (Censo Escolar/INEP).">
   <link rel="stylesheet" href="{{ css_url }}">
+  {# Base única de JS (card t_71b25279): asset com hash servido pelo
+     AssetRegistry, `defer` para não bloquear o parser, CSP estrita do /app.
+     Sem inline: a página continua idêntica e completa sem este arquivo. #}
+  <script src="{{ js_url }}" defer></script>
 </head>
 <body>
   <a class="pular-para-conteudo" href="#conteudo">Pular para o conteúdo</a>
