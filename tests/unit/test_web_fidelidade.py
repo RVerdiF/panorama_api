@@ -367,6 +367,7 @@ def _telas(repo: FakeRepository) -> dict[str, str]:
     return {
         "busca": _html(client.get(BUSCA, params={"co_municipio": "3106200"})),
         "escola": _html(client.get(ESCOLA)),
+        "concorrencia": _html(client.get(f"{ESCOLA}/concorrencia")),
         "mercado": _html(client.get(MERCADO)),
         "metodologia": _html(client.get(METODOLOGIA)),
     }
@@ -399,7 +400,8 @@ def test_nenhuma_tela_exibe_jargao_interno_como_texto():
     telas = _telas(repo)
     # O mesmo texto em português explica os dois estados.
     assert "abaixo do porte mínimo de comparabilidade" in telas["mercado"]
-    assert "abaixo do porte mínimo de comparabilidade" in telas["escola"]
+    # O aviso de porte é dos indicadores: mora na rota de concorrência (NAV-2).
+    assert "abaixo do porte mínimo de comparabilidade" in telas["concorrencia"]
     assert "Oferta desconhecida" in telas["busca"]
     assert "Oferta desconhecida" in telas["escola"]
 

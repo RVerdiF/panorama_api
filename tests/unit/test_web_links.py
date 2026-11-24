@@ -201,7 +201,8 @@ def test_escola_sem_municipio_nao_gera_link_quebrado(client_links, repo_links):
 
 def test_lider_da_comparacao_municipal_continua_texto(client_links):
     """Sem `co_entidade` do líder no payload, linkar seria adivinhar por nome."""
-    html = _html(client_links.get(ESCOLA))
+    # A comparação municipal vive na rota própria desde o NAV-2.
+    html = _html(client_links.get(f"{ESCOLA}/concorrencia"))
 
     achado = re.search(
         r"<dt>Líder do município[^<]*</dt>\s*<dd>(.*?)</dd>", html, flags=re.S

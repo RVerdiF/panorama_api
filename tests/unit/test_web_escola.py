@@ -1,19 +1,24 @@
-"""Tela da escola `/app/escolas/{co_entidade}` (card `t_49960786`).
+"""Visão geral da ficha `/app/escolas/{co_entidade}` (cards F4/F11; NAV-2).
+
+A ficha passou a ser a **Visão geral**: cabeçalho, identificação, oferta do ano
+recente, série (SVG + tabela) e rendimento — tudo da resposta de
+`get_school_history`, **uma** consulta. Indicadores e comparação municipal
+vivem em `/app/escolas/{id}/concorrencia` (`test_web_concorrencia.py`).
 
 Cobre o que o card exige como verificável sobre o HTML renderizado:
 
-* escola pública/inativa → repositório fake registra **0** chamadas de
-  `get_school_indicators`/`get_school_competidores` (classificação pelo item
-  mais recente do `history`);
-* 404 residual de universo (`/indicators`, `/competitors`) → seção "não se
-  aplica" com a página em 200;
-* `gap_mat_bas_para_lider = 0` → "a escola lidera";
-* rótulo do proxy de retenção contém "não é taxa de evasão";
-* 503 em qualquer consulta → **página inteira 503** (`no-store`,
-  `Retry-After`), nunca render parcial;
+* privada ativa e pública/inativa → exatamente 1 chamada ao repositório;
+* subnav sem JS: `<a>` + `aria-current="page"`, seção de concorrência só para
+  escola privada ativa, link de saída para o mercado;
+* nota "não se aplica" para pública/inativa, sem consultar as marts privadas;
+* HTML ≤ 25 KB **e** menor que o baseline medido na `main` (13.732 B);
+* `id`s `serie`, `oferta` e `rendimento` na ordem do contrato, com a linha
+  "Nesta página:" apontando para eles;
+* 503 em qualquer consulta → **página inteira 503** (`no-store`, `Retry-After`);
 * série com SVG inline no servidor + tabela equivalente acessível;
 * `null` → "sem dado" (com a flag de origem), oferta tri-estado;
-* meta obrigatória (ano, etapa, universo, fonte, avisos) e vocabulário proibido.
+* meta obrigatória (ano, etapa, universo, fonte, avisos) e vocabulário proibido;
+* revalidação com `If-None-Match` → 304 sem consultar o repositório.
 """
 
 from __future__ import annotations
@@ -23,19 +28,25 @@ import re
 import pytest
 
 from panorama_api.core.errors import UpstreamUnavailable
-from panorama_api.web.filters import fmt_ano, fmt_gap_lider
-from tests.unit.conftest import competidor_row, history_row, indicator_row, school_row
+from panorama_api.web.filters import fmt_ano
+from tests.unit.conftest import history_row, school_row
 
 ESCOLA = "/app/escolas/31000001"
 #: Termos proibidos como vocabulário de comparação geográfica (escopo-adiado-v1).
 TERMOS_PROIBIDOS = ("raio", "próximos", "proximos", "na região", "na regiao")
-#: Chamadas ao repositório que só podem existir no universo privadas ativas.
-METODOS_PRIVADAS = ("get_school_indicators", "get_school_competidores")
-#: Motivo exibido quando a escola está fora do universo de privadas ativas.
-MOTIVO_FORA_UNIVERSO = (
-    "Indicadores e comparação municipal existem apenas para escolas privadas "
-    "ativas (universo privadas_ativas_mg)."
-)
+#: Chamadas ao repositório que só existem na rota de indicadores.
+METODOS_PRIVADAS = ("get_school_indicators", "get_school_competidores", "get_school")
+#: Rótulo do item ativo do subnav na Visão geral.
+SUBNAV_VISAO_GERAL = '<a href="/app/escolas/31000001" aria-current="page">Visão geral</a>'
+
+#: Teto de peso pedido pelo card (25 KB) e o baseline da ficha na `main` antes
+#: desta entrega (medido com a fixture 31005371, `Accept-Encoding: identity`).
+TETO_HTML_BYTES = 25 * 1024
+BASELINE_FICHA_BYTES = 13_732
+
+#: Escola real do card F11 (COL COTEMIG BARROCA, BH): `qt_mat_creche = 0`.
+COTEMIG = "31005371"
+COTEMIG_URL = f"/app/escolas/{COTEMIG}"
 
 
 def _html(response, status: int = 200) -> str:
@@ -44,9 +55,16 @@ def _html(response, status: int = 200) -> str:
     return response.text
 
 
-def _serie(
-    *anos: int, overrides: dict[int, dict] | None = None
-) -> list[dict]:
+def _leituras(repository) -> list[str]:
+    """Leituras de dado da requisição (o `get_table_columns` é do boot)."""
+    return [
+        nome
+        for nome in repository.methods_called()
+        if nome != "get_table_columns"
+    ]
+
+
+def _serie(*anos: int, overrides: dict[int, dict] | None = None) -> list[dict]:
     """Série de `history` para os anos pedidos, com overrides por ano."""
     valores_por_ano = overrides or {}
     return [
@@ -58,22 +76,6 @@ def _serie(
         )
         for ano in anos
     ]
-
-
-#: Escola real do card F11 (COL COTEMIG BARROCA, BH): `qt_mat_creche = 0` e
-#: posição nos rankings de **crescimento** (`rank_crec_municipio = 487`,
-#: `rank_crec_mg = 2.134`). É a evidência que separa "creche" de "crescimento".
-COTEMIG = "31005371"
-COTEMIG_URL = f"/app/escolas/{COTEMIG}"
-#: Rótulos exigidos pelo card: crescimento anual + direção da posição.
-POSICAO_MUNICIPIO = (
-    "Posição por crescimento anual da matrícula no município "
-    "(1.º = maior crescimento ano a ano)"
-)
-POSICAO_MG = (
-    "Posição por crescimento anual da matrícula em Minas Gerais "
-    "(1.º = maior crescimento ano a ano)"
-)
 
 
 def _serie_cotemig() -> list[dict]:
@@ -104,70 +106,55 @@ def _serie_cotemig() -> list[dict]:
     ]
 
 
-def _indicador_cotemig(**overrides) -> dict:
-    """Linha de `mart_escola_indicadores` da 31005371 (números do diagnóstico)."""
-    valores = {
-        "co_entidade": COTEMIG,
-        "qt_mat_bas": 680,
-        "qt_mat_creche": 0,
-        "qt_mat_med": 680,
-        "qt_mat_prof": 680,
-        "qt_mat_esp": 21,
-        "crescimento_yoy_pct": 12.4,
-        "rank_crec_municipio": 487,
-        "rank_crec_mg": 2134,
-    }
-    valores.update(overrides)
-    return indicator_row(**valores)
-
-
 def _cotemig(client, repository) -> str:
-    """HTML da ficha da 31005371 (privada ativa, com indicadores e competição)."""
+    """HTML da Visão geral da 31005371 (privada ativa, só o `history`)."""
     repository.schools = [
         school_row(co_entidade=COTEMIG, no_entidade="COL COTEMIG BARROCA")
     ]
     repository.history = _serie_cotemig()
-    repository.indicators = [_indicador_cotemig()]
-    repository.competidores = [competidor_row(co_entidade=COTEMIG)]
     return _html(client.get(COTEMIG_URL))
 
 
-def _valor_da_definicao(html: str, termo: str) -> str:
-    """Texto do `<dd>` imediatamente após o `<dt>` cujo texto é `termo`."""
-    achado = re.search(
-        rf"<dt>{re.escape(termo)}</dt>\s*<dd>(.*?)</dd>", html, flags=re.S
-    )
-    assert achado is not None, f"linha ausente na ficha: {termo!r}"
-    return re.sub(r"<[^>]+>", "", achado.group(1)).strip()
+# -- 1 consulta: a ficha não paga indicadores ao abrir ------------------------
 
 
-# -- classificador de universo: 0 chamadas para pública/inativa -----------------
+def test_escola_privada_ativa_faz_uma_unica_consulta(client, repository):
+    repository.history = _serie(2024, 2025)
+
+    html = _html(client.get(ESCOLA))
+
+    assert _leituras(repository) == ["get_school_history"]
+    for metodo in METODOS_PRIVADAS:
+        assert metodo not in _leituras(repository), metodo
+    # A seção existe para esta escola: o subnav aponta para ela.
+    assert '<a href="/app/escolas/31000001/concorrencia">Indicadores e concorrência</a>' in html
+    assert "Série de matrículas" in html
 
 
-def test_escola_publica_nao_consulta_indicadores_nem_competidores(client, repository):
+def test_escola_publica_faz_uma_consulta_e_nao_linka_concorrencia(client, repository):
     repository.history = [
         history_row(tp_dependencia="3", tp_situacao_funcionamento="1")
     ]
 
     html = _html(client.get(ESCOLA))
 
-    chamadas = repository.methods_called()
-    assert not [metodo for metodo in METODOS_PRIVADAS if metodo in chamadas], chamadas
-    assert "get_school_history" in chamadas
-    # A ausência é explicada na tela, não silenciada.
-    assert "Não se aplica" in html
-    assert MOTIVO_FORA_UNIVERSO in html
+    assert _leituras(repository) == ["get_school_history"]
+    # A seção não existe para escola pública: nenhum link para a rota nova.
+    assert "/concorrencia" not in html
+    # A ausência é explicada na tela, não silenciada, e sem consulta extra.
+    assert "Indicadores e concorrência: não se aplica a escola pública." in html
 
 
-def test_escola_inativa_nao_consulta_indicadores_nem_competidores(client, repository):
+def test_escola_inativa_faz_uma_consulta_e_explica_a_ausencia(client, repository):
     repository.history = [
         history_row(tp_dependencia="4", tp_situacao_funcionamento="2")
     ]
 
-    _html(client.get(ESCOLA))
+    html = _html(client.get(ESCOLA))
 
-    chamadas = repository.methods_called()
-    assert not [metodo for metodo in METODOS_PRIVADAS if metodo in chamadas], chamadas
+    assert _leituras(repository) == ["get_school_history"]
+    assert "/concorrencia" not in html
+    assert "Indicadores e concorrência: não se aplica a escola inativa." in html
 
 
 def test_classificacao_usa_o_item_mais_recente_da_serie(client, repository):
@@ -181,181 +168,92 @@ def test_classificacao_usa_o_item_mais_recente_da_serie(client, repository):
         ),
     ]
 
-    _html(client.get(ESCOLA))
+    html = _html(client.get(ESCOLA))
 
-    chamadas = repository.methods_called()
-    assert not [metodo for metodo in METODOS_PRIVADAS if metodo in chamadas], chamadas
+    assert _leituras(repository) == ["get_school_history"]
+    assert "/concorrencia" not in html
+    assert "não se aplica a escola pública" in html
 
 
-def test_escola_sem_dependencia_declarada_nao_consulta_privadas(client, repository):
-    """Campo nulo não vira "privada": o front falha fechado e não gasta cota."""
+def test_escola_sem_dependencia_declarada_nao_linka_nem_classifica(client, repository):
+    """Campo nulo não vira "pública" nem "privada": a nota é a genérica."""
     repository.history = [
         history_row(tp_dependencia=None, tp_situacao_funcionamento="1")
     ]
 
-    _html(client.get(ESCOLA))
-
-    chamadas = repository.methods_called()
-    assert not [metodo for metodo in METODOS_PRIVADAS if metodo in chamadas], chamadas
-
-
-def test_escola_privada_ativa_consulta_indicadores_e_competidores(client, repository):
-    repository.history = _serie(2024, 2025, overrides={2024: {"qt_mat_bas": 110}})
-    repository.indicators = [indicator_row()]
-    repository.competidores = [competidor_row()]
-
     html = _html(client.get(ESCOLA))
 
-    chamadas = repository.methods_called()
-    assert all(metodo in chamadas for metodo in METODOS_PRIVADAS), chamadas
-    assert "Proxy de retenção líquida (não é taxa de evasão)" in html
+    assert _leituras(repository) == ["get_school_history"]
+    assert "/concorrencia" not in html
+    # Nem "pública" nem "inativa" seriam verdadeiras: a nota genérica aparece.
+    assert "Indicadores e comparação municipal existem apenas para escolas privadas ativas" in html
+    assert "não se aplica a escola pública" not in html
+    assert "não se aplica a escola inativa" not in html
 
 
-# -- 404 residual de universo: seção "não se aplica" na página 200 -------------
+# -- peso: 25 KB e menor que o baseline --------------------------------------
 
 
-def test_404_de_indicators_vira_secao_nao_se_aplica_com_pagina_200(
+def test_html_da_visao_geral_cabe_no_orcamento_e_encolhe_contra_o_baseline(
     client, repository
 ):
-    """Privada ativa sem linha nas marts: 404 do `/v1` é estado legítimo da seção."""
-    repository.schools = [school_row()]
-    repository.history = _serie(2025)
-    repository.indicators = []
-    repository.competidores = [competidor_row()]
-
-    html = _html(client.get(ESCOLA), status=200)
-
-    blocos = re.findall(r'<p class="nao-se-aplica">(.*?)</p>', html, flags=re.S)
-    assert len(blocos) == 1
-    assert "Não se aplica" in blocos[0]
-    # O motivo é a copy da tela, nunca o detail de diagnóstico da API.
-    assert "não pertence ao universo de indicadores" not in html
-    assert "matrícula da educação básica observada" in blocos[0]
-    # A escola É privada ativa: o texto não pode afirmar o contrário.
-    assert MOTIVO_FORA_UNIVERSO not in html
-    # A série continua visível: não é erro de página, é ausência de seção.
-    assert "Série de matrículas" in html
-    # E a comparação municipal, que existe, segue renderizada.
-    assert "Posição por matrícula da educação básica no município" in html
-    assert _gap_no_html(html)
-
-
-def test_404_de_competidores_nao_derruba_a_secao_de_indicadores(
-    client, repository
-):
-    repository.schools = [school_row()]
-    repository.history = _serie(2025)
-    repository.indicators = [indicator_row()]
-    repository.competidores = []
-
-    html = _html(client.get(ESCOLA), status=200)
-
-    assert "Não se aplica" in html
-    # Privada ativa sem linha na mart de competidores: a explicação correta é a
-    # de ausência de matrícula observada, não "fora do universo privado".
-    assert "comparação municipal só existe" in html
-    assert MOTIVO_FORA_UNIVERSO not in html
-    assert "Proxy de retenção líquida (não é taxa de evasão)" in html
-
-
-# -- posição municipal ---------------------------------------------------------
-
-
-def test_gap_zero_mostra_que_a_escola_lidera(client, repository):
-    repository.schools = [school_row()]
-    repository.history = _serie(2025)
-    repository.indicators = [indicator_row()]
-    repository.competidores = [
-        competidor_row(
-            lider_no_entidade="ESCOLA MODELO",
-            lider_qt_mat_bas=120,
-            gap_mat_bas_para_lider=0,
-        )
+    """Tirar indicadores e comparação da abertura encolhe a página de verdade."""
+    repository.schools = [
+        school_row(co_entidade=COTEMIG, no_entidade="COL COTEMIG BARROCA")
     ]
+    repository.history = _serie_cotemig()
 
-    html = _html(client.get(ESCOLA))
+    resposta = client.get(COTEMIG_URL, headers={"Accept-Encoding": "identity"})
+    tamanho = len(resposta.content)
+    print(f"Visão geral da {COTEMIG}: {tamanho} B (baseline {BASELINE_FICHA_BYTES} B)")
 
-    # Gap zero é medição válida: a própria escola é a líder, não ausência.
-    assert _gap_no_html(html) == "a escola lidera"
+    assert resposta.status_code == 200
+    assert tamanho <= TETO_HTML_BYTES, f"{tamanho} B > {TETO_HTML_BYTES} B"
+    assert tamanho < BASELINE_FICHA_BYTES, (
+        f"{tamanho} B não encolheu contra o baseline de {BASELINE_FICHA_BYTES} B"
+    )
 
 
-def test_gap_positivo_e_exibido_como_numero(client, repository):
-    repository.schools = [school_row()]
+# -- subnav e âncoras de seção -----------------------------------------------
+
+
+def test_subnav_marca_a_visao_geral_como_pagina_atual(client, repository):
     repository.history = _serie(2025)
-    repository.indicators = [indicator_row()]
-    repository.competidores = [
-        competidor_row(lider_qt_mat_bas=300, gap_mat_bas_para_lider=180)
-    ]
 
     html = _html(client.get(ESCOLA))
 
-    assert _gap_no_html(html) == "180"
+    assert '<nav class="subnav" aria-label="Seções da escola">' in html
+    assert SUBNAV_VISAO_GERAL in html
+    # O item ativo é "page" no subnav; `role="tablist"` não existe (sem JS/abas).
+    assert 'role="tablist"' not in html
+    assert '<a href="/app/mercados/3106200">Mercado de BELO HORIZONTE →</a>' in html
 
 
-def _gap_no_html(html: str) -> str:
-    """Conteúdo da célula do saldo para o líder (uma única, sempre renderizada)."""
-    achado = re.search(r'<dd class="gap-lider">([^<]*)</dd>', html)
-    assert achado is not None, "saldo para o líder ausente na comparação municipal"
-    return achado.group(1).strip()
-
-
-@pytest.mark.parametrize(
-    ("valor", "esperado"),
-    [(0, "a escola lidera"), (180, "180"), (None, "sem dado")],
-)
-def test_filtro_de_gap_para_lider(valor, esperado):
-    assert fmt_gap_lider(valor) == esperado
-
-
-def test_comparacao_municipal_mostra_a_definicao(client, repository):
-    repository.schools = [school_row()]
-    repository.history = _serie(2025)
-    repository.indicators = [indicator_row()]
-    repository.competidores = [competidor_row()]
-
-    html = _html(client.get(ESCOLA))
-
-    assert "Escolas privadas ativas no mesmo município e ano censitário (MG)" in html
-    # A posição no município é exibida junto do líder.
-    assert "ESCOLA LIDER" in html
-
-
-# -- posição por crescimento da matrícula (F11) -------------------------------
-
-
-def test_posicao_por_crescimento_nao_e_rotulada_de_creche(client, repository):
-    """`rank_crec_*` é posição por crescimento: a 31005371 nem tem creche.
-
-    O bug exibia "Posição por matrícula de creche" (487/2.134) para uma escola
-    com `qt_mat_creche = 0`, porque `crec` foi lido como "creche". O teste falha
-    se o rótulo voltar (ou se qualquer "posição" voltar a mencionar creche).
-    """
+def test_visao_geral_tem_os_ids_de_contrato_na_ordem_e_ancoras(client, repository):
     html = _cotemig(client, repository)
 
-    rotulos = re.findall(r"<dt>(.*?)</dt>", html, flags=re.S)
-    posicoes = [rotulo for rotulo in rotulos if rotulo.startswith("Posição por")]
-    assert posicoes, "nenhuma posição exibida na ficha"
-    assert all("creche" not in rotulo.lower() for rotulo in posicoes), posicoes
-
-    # Crescimento anual explícito, com a direção da posição.
-    assert POSICAO_MUNICIPIO in html
-    assert POSICAO_MG in html
-    assert _valor_da_definicao(html, POSICAO_MUNICIPIO) == "487.º"
-    assert _valor_da_definicao(html, POSICAO_MG) == "2.134.º"
+    for ancora in ("#oferta", "#serie", "#rendimento"):
+        assert f'href="{ancora}"' in html, ancora
+    assert "Nesta página:" in html
+    # A ordem é contrato: resumo → oferta → série → rendimento.
+    posicoes = [html.index(f'id="{secao}"') for secao in ("oferta", "serie", "rendimento")]
+    assert posicoes == sorted(posicoes), posicoes
 
 
-def test_posicao_por_crescimento_sem_dado_nao_vira_zero(client, repository):
-    """`null` na posição é "sem dado" (AGENTS.md §6) — nunca `0.º`."""
-    repository.history = _serie_cotemig()
-    repository.indicators = [
-        _indicador_cotemig(rank_crec_municipio=None, rank_crec_mg=None)
-    ]
+# -- revalidação condicional: 304 sem consultar o repositório ----------------
 
-    html = _html(client.get(COTEMIG_URL))
 
-    assert _valor_da_definicao(html, POSICAO_MUNICIPIO) == "sem dado"
-    assert _valor_da_definicao(html, POSICAO_MG) == "sem dado"
-    assert "0.º" not in html
+def test_revalidacao_com_if_none_match_nao_consulta(client, repository):
+    repository.history = _serie(2025)
+    primeira = client.get(ESCOLA)
+    assert primeira.status_code == 200
+    etag = primeira.headers["etag"]
+
+    repository.calls.clear()
+    segunda = client.get(ESCOLA, headers={"If-None-Match": etag})
+
+    assert segunda.status_code == 304
+    assert repository.calls == []
 
 
 # -- 503: página inteira, nunca parcial ---------------------------------------
@@ -373,31 +271,6 @@ def test_503_na_serie_derruba_a_pagina_inteira(client, repository):
     html = _html(resposta, status=503)
     # Nenhuma seção de dados é renderizada parcialmente.
     assert "Série de matrículas" not in html
-    assert "não é taxa de evasão" not in html
-
-
-def test_503_nos_indicadores_derruba_a_pagina_inteira(client, repository):
-    repository.history = _serie(2025)
-    repository.errors["get_school_indicators"] = UpstreamUnavailable()
-
-    resposta = client.get(ESCOLA)
-
-    assert resposta.status_code == 503
-    assert resposta.headers["cache-control"] == "no-store"
-    assert resposta.headers["retry-after"] == "300"
-    html = _html(resposta, status=503)
-    assert "Série de matrículas" not in html
-
-
-def test_503_nos_competidores_derruba_a_pagina_inteira(client, repository):
-    repository.history = _serie(2025)
-    repository.indicators = [indicator_row()]
-    repository.errors["get_school_competidores"] = UpstreamUnavailable()
-
-    resposta = client.get(ESCOLA)
-
-    assert resposta.status_code == 503
-    assert "não se aplica" not in _html(resposta, status=503).lower()
 
 
 # -- série: SVG no servidor + tabela equivalente acessível --------------------
@@ -479,7 +352,7 @@ def test_matricula_nula_nao_vira_zero_no_meio_da_serie(client, repository):
     assert ">0<" not in html
 
 
-# -- oferta tri-estado ---------------------------------------------------------
+# -- oferta tri-estado --------------------------------------------------------
 
 
 def test_oferta_tri_estado_na_pagina(client, repository):
@@ -642,19 +515,12 @@ def test_filtro_de_ano(valor, esperado):
 
 
 def test_pagina_nao_usa_vocabulario_proibido(client, repository):
-    repository.schools = [school_row()]
     repository.history = _serie(2025)
-    repository.indicators = [indicator_row()]
-    repository.competidores = [competidor_row()]
 
     html = _html(client.get(ESCOLA))
 
     for termo in TERMOS_PROIBIDOS:
         assert termo not in html.lower(), f"termo proibido no HTML: {termo!r}"
-
-    # "evasão" só pode aparecer na negação exigida pelo rótulo do proxy:
-    # nenhuma métrica é rotulada como taxa de evasão.
-    assert html.count("evasão") == html.count("não é taxa de evasão") > 0
 
 
 # -- erro de escola inexistente ------------------------------------------------
