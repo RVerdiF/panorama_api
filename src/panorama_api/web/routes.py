@@ -149,13 +149,24 @@ def _templates() -> Jinja2Templates:
     return ambiente
 
 
-def contexto_base(request: Request, *, pagina: str | None = None) -> dict[str, Any]:
+def contexto_base(
+    request: Request,
+    *,
+    pagina: str | None = None,
+    area: str | None = None,
+) -> dict[str, Any]:
     """Contexto comum a toda página: versões, CSS versionado e prefixo público.
 
-    ``pagina`` é a tela ativa do nav principal (``"busca"``/``"metodologia"``).
-    Ela vira ``aria-current="page"`` no link correspondente; escola e mercado não
-    aparecem no nav, então não marcam nenhum item (marcar "Busca" numa ficha de
-    escola diria que o usuário está na busca, o que é falso).
+    ``pagina`` é a tela ativa do nav principal — uma das três entradas
+    (``"escolas"``/``"municipios"``/``"metodologia"``). Ela vira
+    ``aria-current="page"`` no item correspondente.
+
+    ``area`` marca a **área** dona de uma tela-filha (ficha → ``"escolas"``;
+    mercado → ``"municipios"``); o item da área recebe ``aria-current="true"``.
+    É marcação mais fraca que ``"page"`` de propósito: a tela não é o índice da
+    área, mas pertence a ela. Antes os itens nomeavam telas e a ficha não podia
+    marcar nada (spec §2.1). ``inicio`` e as páginas de erro não passam nenhum
+    dos dois: não pertencem a nenhuma área da navbar.
     """
     settings = _settings(request)
     return {
@@ -173,7 +184,11 @@ def contexto_base(request: Request, *, pagina: str | None = None) -> dict[str, A
         "href_inicio": CAMINHO_INICIO,
         # Busca é a página principal do front (caminho relativo, sem `url_for`).
         "href_busca": f"{PREFIXO_WEB}/",
+        # Índice de municípios (spec §1): escolher o mercado de um município.
+        # A barra final é a rota do índice, não a do atalho `/app/mercados`.
+        "href_mercados": f"{PREFIXO_WEB}/mercados/",
         "pagina_atual": pagina,
+        "area_atual": area,
     }
 
 
@@ -395,7 +410,7 @@ def busca(
     }
 
     contexto: dict[str, Any] = {
-        **contexto_base(request, pagina="busca"),
+        **contexto_base(request, pagina="escolas"),
         "filtros": {
             "q": termo,
             "co_municipio": municipio,
@@ -526,7 +541,7 @@ def escola(co_entidade: str, request: Request, ano: int | None = None) -> Respon
             nao_se_aplica.append("competidores")
 
     contexto = {
-        **contexto_base(request),
+        **contexto_base(request, area="escolas"),
         **contexto_escola(
             historico=historico,
             indicadores=indicadores,
@@ -596,6 +611,45 @@ def mercado_atalho(request: Request, co_municipio: str | None = None) -> Respons
 
 
 @router.get(
+    "/mercados/",
+    response_class=HTMLResponse,
+    name="web_mercados_indice",
+    summary="Índice de municípios: escolher o mercado",
+)
+def mercados_indice(request: Request, co_municipio: str | None = None) -> Response:
+    """Índice de municípios (spec §1): a página que escolhe o mercado a abrir.
+
+    Sem ``co_municipio``, responde ``200`` com o formulário de escolha; com um
+    código válido (``^31\\d{5}$``), **303** para ``/app/mercados/{co}``, para que
+    recarregar não reenvie o formulário; com código inválido, ``422`` em HTML
+    com a volta para este índice.
+
+    Nenhum caminho consulta o repositório: a lista sai de ``municipios_mg()``
+    (arquivo versionado de apoio de tela) e o código é só sintaxe de URL — quem
+    valida a existência do recorte é a tela de destino. Zero BigQuery.
+    """
+    if co_municipio is None:
+        contexto = {
+            **contexto_base(request, pagina="municipios"),
+            "municipios": municipios_mg(),
+        }
+        return templates().TemplateResponse(request, "mercados_indice.html", contexto)
+
+    try:
+        codigo = validation.co_municipio(co_municipio, loc="query")
+    except ProblemError as erro:
+        return pagina_erro(
+            request,
+            erro,
+            acao={
+                "href": f"{PREFIXO_WEB}/mercados/",
+                "rotulo": "Escolher um município",
+            },
+        )
+    return RedirectResponse(url=f"{PREFIXO_WEB}/mercados/{codigo}", status_code=303)
+
+
+@router.get(
     "/mercados/{co_municipio}",
     response_class=HTMLResponse,
     name="web_mercado",
@@ -624,7 +678,7 @@ def mercado(
     filtros_pagina = {"ano": "", "etapa": etapa_ref}
 
     contexto: dict[str, Any] = {
-        **contexto_base(request),
+        **contexto_base(request, area="municipios"),
         "municipio": co_municipio,
         "anos_disponiveis": list(anos),
         "ano_selecionado": None,

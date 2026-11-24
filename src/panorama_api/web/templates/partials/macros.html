@@ -11,11 +11,14 @@
     num único lugar e é usada pela busca `/app/` e pela barra do hero da landing.
     O markup sai byte a byte igual ao que a busca tinha inline — o teste compara
     com o texto gerado pelo template anterior. `selecionado` é o código já
-    escolhido (vazio na 1ª visita e no hero). Importar com `with context` é o que
-    deixa a macro enxergar `municipios`; `id` também é o `name` do campo. -#}
-{% macro select_municipios(id, selecionado) -%}
+    escolhido (vazio na 1ª visita e no hero). `rotulo_vazio` troca só o texto
+    da opção neutra (o índice de municípios pede "Escolha um município"); o
+    default preserva byte a byte a saída dos chamadores existentes. Importar com
+    `with context` é o que deixa a macro enxergar `municipios`; `id` também é o
+    `name` do campo. -#}
+{% macro select_municipios(id, selecionado, rotulo_vazio="Todos os municípios de MG") -%}
 <select id="{{ id }}" name="{{ id }}">
-        <option value="">Todos os municípios de MG</option>
+        <option value="">{{ rotulo_vazio }}</option>
         {% for municipio in municipios %}
         <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == selecionado %} selected{% endif %}>{{ municipio.no_municipio }}</option>
         {% endfor %}

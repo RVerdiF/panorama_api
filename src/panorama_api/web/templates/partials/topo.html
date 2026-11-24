@@ -1,0 +1,21 @@
+{# Shell de navegação único do front. #}
+<header class="topo">
+  <div class="topo__interno">
+    <a class="topo__marca" href="{{ href_inicio }}">Panorama Escola</a>
+    <nav class="topo__nav" aria-label="Navegação principal">
+      <a href="{{ href_busca }}"{% if pagina_atual == "escolas" %} aria-current="page"{% elif area_atual == "escolas" %} aria-current="true"{% endif %}>Escolas</a>
+      <a href="{{ href_mercados }}"{% if pagina_atual == "municipios" %} aria-current="page"{% elif area_atual == "municipios" %} aria-current="true"{% endif %}>Municípios</a>
+      <details class="topo__submenu">
+        <summary{% if pagina_atual == "metodologia" %} aria-current="page"{% endif %}>Metodologia</summary>
+        <ul class="topo__painel">
+          <li><a href="{{ href_metodologia }}">Visão geral da metodologia</a></li>
+          <li><a href="{{ href_metodologia }}#versao">Versão dos dados</a></li>
+          <li><a href="{{ href_metodologia }}#regras">Regras de leitura</a></li>
+          <li><a href="{{ href_metodologia }}#definicoes">Definições</a></li>
+          <li><a href="{{ href_metodologia }}#avisos">Avisos dos dados</a></li>
+          <li><a href="{{ href_metodologia }}#universo">Universos e fontes</a></li>
+        </ul>
+      </details>
+    </nav>
+  </div>
+</header>

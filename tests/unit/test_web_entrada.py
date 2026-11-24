@@ -292,16 +292,23 @@ def test_logo_do_topo_e_link_para_a_entrada(cliente: TestClient):
 
 
 def test_aria_current_marca_a_tela_ativa(cliente: TestClient):
+    """Um item — e só um — recebe `aria-current` em cada página (spec §2.1)."""
     busca = _get(cliente, BUSCA).text
     metodologia = _get(cliente, METODOLOGIA).text
 
-    assert 'aria-current="page"' in busca
-    assert 'aria-current="page"' in metodologia
-    # Uma única tela ativa por página: o link de busca não se marca na metodologia.
+    # A busca é a tela de nível 1 "Escolas": `page` no link da área.
+    assert '<a href="/app/" aria-current="page">Escolas</a>' in busca
     assert busca.count('aria-current="page"') == 1
+    # Metodologia é disclosure: o item ativo é o `<summary>` do submenu.
+    assert '<summary aria-current="page">Metodologia</summary>' in metodologia
     assert metodologia.count('aria-current="page"') == 1
-    assert 'aria-current="page" href="/app/metodologia"' not in busca
-    assert 'aria-current="page" href="/app/"' not in metodologia
+    # Os itens não ativos não marcam nada (nem `page`, nem `true`).
+    assert '<a href="/app/mercados/" aria-current' not in busca
+    assert '<summary aria-current' not in busca
+    assert '<a href="/app/" aria-current' not in metodologia
+    assert '<a href="/app/mercados/" aria-current' not in metodologia
+    assert 'aria-current="true"' not in busca
+    assert 'aria-current="true"' not in metodologia
 
 
 # -- B7: breadcrumb com links ------------------------------------------------

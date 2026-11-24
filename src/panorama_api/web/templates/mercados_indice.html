@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "partials/macros.html" import select_municipios with context %}
+
+{% block titulo %}Mercados municipais — Panorama Escola{% endblock %}
+
+{# A página não exibe valor nenhum: a nota de ausência do rodapé sairia como
+   ruído (mesma regra da landing e da 1ª visita da busca, achado A3). #}
+{% block rodape_nota %}{% endblock %}
+
+{% block conteudo %}
+<article class="cartao">
+  <h1>Municípios</h1>
+  <p class="subtitulo">
+    Escolha um município de Minas Gerais para ver o mercado da educação básica:
+    tamanho, composição, cobertura e movimento do setor privado.
+  </p>
+
+  <form class="formulario" method="get" action="{{ href_mercados }}" role="search">
+    <div class="campo">
+      <label for="co_municipio">Município</label>
+      {{ select_municipios("co_municipio", "", rotulo_vazio="Escolha um município") }}
+      <p class="dica">São {{ municipios|length }} municípios de MG.</p>
+    </div>
+
+    <div class="campo campo--acao">
+      <button type="submit">Ver mercado</button>
+    </div>
+  </form>
+</article>
+{% endblock %}

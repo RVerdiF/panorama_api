@@ -244,3 +244,25 @@ def test_foco_visivel_continua_valendo_para_os_botoes():
 
     assert "button:focus-visible" in css
     assert "outline: 3px solid var(--cor-destaque)" in css
+
+
+# -- navbar com submenu nativo (card NAV-1 `t_d31ce632`, spec §2.1/§2.3) ------
+
+
+def test_summary_do_submenu_tem_alvo_de_44px():
+    """O `<summary>` é item de navegação como os links: alvo ≥44px (achado C6)."""
+    regra = _regra(".topo__submenu > summary")
+    altura = re.search(r"min-height:\s*(\d+)px", regra)
+
+    assert "inline-flex" in regra, "`.topo__submenu > summary` precisa de inline-flex"
+    assert altura is not None, "`.topo__submenu > summary` sem min-height explícito"
+    assert int(altura.group(1)) >= ALVO_MINIMO_PX
+
+
+def test_painel_do_submenu_fica_em_fluxo_e_nao_sobreposto():
+    """Spec §2.3: o painel empurra o conteúdo — nada de `position: absolute`."""
+    painel = _regra(".topo__painel")
+
+    assert "position: absolute" not in painel
+    assert "position" not in painel
+    assert "border-left: 1px solid var(--cor-borda)" in painel
