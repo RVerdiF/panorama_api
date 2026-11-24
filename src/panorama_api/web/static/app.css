@@ -13,6 +13,8 @@
   --cor-erro: #8b2c1f;
   --espaco: 1rem;
   --raio: 6px;
+  /* Raio do painel do recorte da landing (spec §4): 16 px, o "grande" da escala. */
+  --raio-grande: 16px;
   --largura-max: 68rem;
 }
 
@@ -509,6 +511,77 @@ tbody th {
 
 .recorte {
   margin-top: 1rem;
+}
+
+/* Hero da landing (card `t_437796c3`, spec §3/§4): texto à esquerda e painel do
+   recorte à direita a partir de 48rem. Abaixo disso empilha — o texto primeiro,
+   o painel depois, porque o `h1` é o que apresenta o produto. `minmax(0, 1fr)`
+   na coluna única e no par evita rolagem horizontal: o conteúdo encolhe em vez
+   de estourar a linha em tela estreita. */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.hero h1 {
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+}
+
+/* Painel do recorte: fundo tint da cor de ação e raio grande. Os rótulos e a
+   linha da fonte usam `--cor-texto-suave`, medido sobre #eaf1f6 em
+   `test_web_estilos.py` (WCAG 1.4.3 pede ≥4,5:1 também aqui, não só no branco). */
+.hero .recorte {
+  margin-top: 0;
+  padding: 1.5rem;
+  background: #eaf1f6;
+  border-radius: var(--raio-grande);
+}
+
+.hero .recorte h2 {
+  margin-top: 0;
+}
+
+.recorte__lista {
+  display: grid;
+  gap: 1.25rem;
+  margin: 0;
+}
+
+/* Número em cima do rótulo sem inverter a ordem do `dl`: o número segue sendo
+   o `dd` (valor) e o rótulo o `dt` (termo) para o leitor de tela. */
+.recorte__item {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.15rem;
+}
+
+.recorte__rotulo {
+  color: var(--cor-texto-suave);
+  max-width: none;
+}
+
+.recorte__valor {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.recorte__fonte {
+  margin: 1.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--cor-texto-suave);
+  max-width: none;
+}
+
+@media (min-width: 48rem) {
+  .hero {
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 1.5rem 2.5rem;
+    align-items: center;
+  }
 }
 
 .nao-se-aplica {

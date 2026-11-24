@@ -8,12 +8,38 @@
 {% block rodape_nota %}{% endblock %}
 
 {% block conteudo %}
-<section class="cartao">
-  <h1>Escolas e mercados da educação básica em Minas Gerais</h1>
-  <p class="subtitulo">
-    Matrículas, oferta por etapa, rendimento e participação de mercado das escolas
-    mineiras, a partir do Censo Escolar da Educação Básica (INEP).
-  </p>
-  <p><a href="{{ href_busca }}">Ir para a busca</a></p>
+<section class="hero">
+  <div class="hero__texto">
+    <h1>Escolas e mercados da educação básica em Minas Gerais</h1>
+    <p class="subtitulo">
+      Matrículas, oferta por etapa, rendimento e participação de mercado das escolas
+      mineiras, a partir do Censo Escolar da Educação Básica (INEP).
+    </p>
+    <p><a href="{{ href_busca }}">Ir para a busca</a></p>
+  </div>
+
+  {# Painel do recorte (spec §4): ocupa a coluna direita no lugar da foto da
+     referência visual. Os três números saem do código e da config — nenhum
+     literal aqui, e nenhuma contagem de escolas: `COUNT(*)` é proibido pela
+     arquitetura. `bas` não entra na contagem de etapas porque é o total do
+     Censo, não uma etapa do mercado. #}
+  <section class="recorte" aria-labelledby="recorte-titulo">
+    <h2 id="recorte-titulo">Recorte dos dados</h2>
+    <dl class="recorte__lista">
+      <div class="recorte__item">
+        <dt class="recorte__rotulo">municípios de Minas Gerais</dt>
+        <dd class="recorte__valor">{{ recorte_municipios }}</dd>
+      </div>
+      <div class="recorte__item">
+        <dt class="recorte__rotulo">anos do Censo Escolar publicados</dt>
+        <dd class="recorte__valor">{{ recorte_anos }}</dd>
+      </div>
+      <div class="recorte__item">
+        <dt class="recorte__rotulo">etapas e modalidades no mercado</dt>
+        <dd class="recorte__valor">{{ recorte_etapas }}</dd>
+      </div>
+    </dl>
+    <p class="recorte__fonte">Fonte: Censo Escolar da Educação Básica (INEP).</p>
+  </section>
 </section>
 {% endblock %}
