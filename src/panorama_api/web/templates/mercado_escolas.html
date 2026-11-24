@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% from "partials/mercado.html" import cabecalho_mercado, recorte_mercado, seletor_mercado with context %}
+{% from "partials/subnav.html" import subnav with context %}
+
+{# **Escolas do mercado** (card NAV-3, spec §5.3): o ranking de share paginado,
+   que antes abria junto com a composição. Esta rota consulta **só**
+   `dados.share_mercado` — a composição por etapa não é recomputada a cada
+   página. A paginação, o aviso de teto (offset 1000) e o estado vazio do N3
+   mantêm a regra; os links para a ficha da escola continuam como estão. #}
+
+{% block titulo %}Escolas do mercado de {{ municipio_nome }} — Panorama Escola{% endblock %}
+
+{% block conteudo %}
+<article class="cartao">
+  {{ cabecalho_mercado(migalhas, municipio, municipio_nome) }}
+  {{ subnav(subnav_itens, "Seções do mercado") }}
+  {# O `action` é a rota atual e o formulário não carrega `offset`: trocar o
+     recorte recomeça na primeira página do ranking. #}
+  {{ seletor_mercado(href_base, anos_disponiveis, ano_selecionado, etapas_disponiveis, etapa_selecionada,
+                     "O share é sempre de uma etapa.") }}
+
+  {% if sem_dados_ano %}
+  <section aria-labelledby="sem-dados-ano" class="cartao--erro">
+    <h2 id="sem-dados-ano">{{ pagina_erro_titulo }}</h2>
+    <p class="aviso aviso--temporario">
+      {{ detalhe }} — o recorte escolhido não está publicado. Selecione outro ano
+      ou etapa acima; nada foi exibido parcialmente.
+    </p>
+    <p class="nota">Código de erro <code>{{ codigo }}</code>.</p>
+  </section>
+  {% else %}
+
+  <section aria-labelledby="share">
+    <h2 id="share">Share de matrícula — {{ etapa_rotulo }}</h2>
+    <p class="subtitulo">
+      Participação de cada <strong>escola</strong> na matrícula da etapa
+      (<code>entidade_tipo=escola</code>), em {{ ano_selecionado | fmt_ano }}.
+    </p>
+
+    <p class="aviso">
+      Escola ausente desta tabela <strong>não</strong> tem 0% de share: a
+      ausência significa matrícula não observada para a etapa. Share nulo
+      aparece como <em>sem dado</em>.
+    </p>
+
+    {% if alem_do_fim %}
+    <p class="sem-dado">{{ motivo_alem_do_fim }}</p>
+    <p>
+      <a class="paginacao__link" href="{{ url_primeira_pagina }}">Voltar à primeira página</a>
+    </p>
+    {% elif sem_privadas %}
+    <p class="sem-dado">{{ motivo_sem_privadas }}.</p>
+    {% else %}
+    <p class="paginacao__contagem">Mostrando {{ paginacao.mostrando }}.</p>
+    <div class="tabela-rolavel" role="region" aria-label="Share de matrícula por escola (tabela com rolagem)" tabindex="0">
+      <table class="tabela">
+        <caption>Share de matrícula por escola na etapa {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Posição</th>
+            <th scope="col">Escola</th>
+            <th scope="col">Código INEP</th>
+            <th scope="col">Matrícula</th>
+            <th scope="col">Share na matrícula privada</th>
+            <th scope="col">Share na matrícula total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas_share %}
+          <tr>
+            <th scope="row">{{ linha.posicao }}.º</th>
+            <td>
+              {# O nome é o link da ficha; o código INEP continua em `<code>`. #}
+              {% if linha.id_entidade %}
+              <a href="{{ app_prefix }}/escolas/{{ linha.id_entidade }}">{{ linha.no_entidade | fmt_nulo }}</a>
+              {% else %}
+              {{ linha.no_entidade | fmt_nulo }}
+              {% endif %}
+              {% if linha.is_abaixo_porte %}<span class="nota">{{ texto_abaixo_porte }}</span>{% endif %}
+            </td>
+            <td><code>{{ linha.id_entidade }}</code></td>
+            <td>{{ linha.mat_entidade | fmt_contagem }}</td>
+            <td>{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}</td>
+            <td>{{ linha.share_total_pct | fmt_nulo }}{% if linha.share_total_pct is not none %}%{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="paginacao" aria-label="Paginação do share">
+      {% if paginacao.url_anterior %}
+      <a class="paginacao__link" href="{{ paginacao.url_anterior }}" rel="prev">Anterior</a>
+      {% endif %}
+      {% if paginacao.url_proxima %}
+      <a class="paginacao__link" href="{{ paginacao.url_proxima }}" rel="next">Próxima</a>
+      {% endif %}
+    </nav>
+    {% if paginacao.refinar %}
+    <p class="aviso">
+      Limite de paginação atingido. Escolha outra etapa para continuar a leitura.
+    </p>
+    {% endif %}
+    {% endif %}
+  </section>
+
+  <section aria-labelledby="recorte-share">
+    <h2 id="recorte-share">Recorte do share</h2>
+    {{ recorte_mercado(meta_share, "Recorte de mart_market_share") }}
+  </section>
+  {% endif %}
+</article>
+{% endblock %}
