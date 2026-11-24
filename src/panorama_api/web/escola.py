@@ -522,23 +522,32 @@ VISAO_GERAL = "visao_geral"
 CONCORRENCIA = "concorrencia"
 
 
-def motivo_concorrencia_nao_se_aplica(item: Any | None) -> str:
+def motivo_concorrencia_nao_se_aplica(
+    item: Any | None, *, padrao: str = MOTIVO_FORA_DO_UNIVERSO_PRIVADO
+) -> str:
     """Por que a rota de indicadores não existe para esta escola (sem consulta).
 
     A decisão sai do item mais recente da série (`history`): dependência
     diferente de privada é escola **pública**; privada que não está em atividade
-    é **inativa**. Campo ausente não vira rótulo de terceiro estado — cai na
-    explicação genérica do universo de privadas ativas.
+    é **inativa**. Campo ausente não vira rótulo de terceiro estado — cai em
+    ``padrao``, a explicação de quem chamou:
+
+    * Visão geral (`history`) → ``MOTIVO_FORA_DO_UNIVERSO_PRIVADO``: a escola não
+      é privada ativa **ou** a série não traz os campos;
+    * rota de concorrência (`get_school` já disse privada ativa) →
+      ``MOTIVO_SECAO_INDICADORES``: o universo está certo, falta a linha da mart.
+      Dizer "fora do universo" aqui afirmaria o contrário do que a própria
+      consulta de identidade respondeu.
     """
     if item is None:
-        return MOTIVO_FORA_DO_UNIVERSO_PRIVADO
+        return padrao
     dependencia = getattr(item, "tp_dependencia", None)
     situacao = getattr(item, "tp_situacao_funcionamento", None)
     if dependencia and dependencia != DEPENDENCIA_PRIVADA:
         return MOTIVO_SECAO_ESCOLA_PUBLICA
     if dependencia == DEPENDENCIA_PRIVADA and situacao and situacao != SITUACAO_ATIVA:
         return MOTIVO_SECAO_ESCOLA_INATIVA
-    return MOTIVO_FORA_DO_UNIVERSO_PRIVADO
+    return padrao
 
 
 def _campos_do_cabecalho(escola: Any) -> dict[str, Any]:
@@ -727,6 +736,10 @@ def contexto_concorrencia_nao_se_aplica(
     aplica", explica o motivo e oferece a volta para a Visão geral. `escola`
     ausente (nada além do código INEP) mantém o cabeçalho como
     ``Escola {co_entidade}``.
+
+    `escola` presente e **privada ativa** significa que o universo está certo e
+    o que falta é a linha da mart de indicadores: o motivo é
+    ``MOTIVO_SECAO_INDICADORES``, nunca ``MOTIVO_FORA_DO_UNIVERSO_PRIVADO``.
     """
     dados_escola: dict[str, Any] = {
         "co_entidade": co_entidade,
@@ -737,7 +750,9 @@ def contexto_concorrencia_nao_se_aplica(
     motivo = MOTIVO_SECAO_INDICADORES
     if escola is not None:
         dados_escola.update(_campos_do_cabecalho(escola))
-        motivo = motivo_concorrencia_nao_se_aplica(escola)
+        motivo = motivo_concorrencia_nao_se_aplica(
+            escola, padrao=MOTIVO_SECAO_INDICADORES
+        )
 
     return {
         "escola": None,

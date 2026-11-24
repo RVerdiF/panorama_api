@@ -27,6 +27,7 @@ import re
 
 import pytest
 
+from panorama_api.contract import OFERTA_ETAPAS
 from panorama_api.core.errors import UpstreamUnavailable
 from panorama_api.web.filters import fmt_ano
 from tests.unit.conftest import history_row, school_row
@@ -238,6 +239,31 @@ def test_visao_geral_tem_os_ids_de_contrato_na_ordem_e_ancoras(client, repositor
     # A ordem é contrato: resumo → oferta → série → rendimento.
     posicoes = [html.index(f'id="{secao}"') for secao in ("oferta", "serie", "rendimento")]
     assert posicoes == sorted(posicoes), posicoes
+
+
+def test_ids_de_contrato_sobrevivem_a_uma_serie_sem_oferta_nem_rendimento(
+    client, repository
+):
+    """Com 200, as três âncoras de "Nesta página" sempre têm destino.
+
+    ``#oferta`` só é renderizado quando há etapas a listar; a série sem oferta
+    e sem rendimento é o caso extremo — o `id` continua lá (tabela com "sem
+    dado"), então a âncora nunca aponta para o nada. Série **vazia** nem chega
+    aqui: a rota responde 404 (não há ficha sem ano de referência).
+    """
+    repository.history = [
+        history_row(
+            nu_ano_censo=2025,
+            tp_dependencia="4",
+            tp_situacao_funcionamento="1",
+            **{f"of_{etapa}": None for etapa in OFERTA_ETAPAS},
+        )
+    ]
+
+    html = _html(client.get(ESCOLA))
+
+    for secao in ("oferta", "serie", "rendimento"):
+        assert f'id="{secao}"' in html, secao
 
 
 # -- revalidação condicional: 304 sem consultar o repositório ----------------

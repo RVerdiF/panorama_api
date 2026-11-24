@@ -59,6 +59,16 @@ POSICAO_MG = (
 )
 #: Motivo da ausência de comparação, com o ano dos indicadores.
 MOTIVO_SEM_COMPARACAO = "sem linha de comparação municipal para 2025"
+#: Motivo quando a escola É privada ativa mas a mart não tem a linha do ano.
+MOTIVO_SECAO_INDICADORES = (
+    "Os indicadores só existem para escolas privadas ativas com matrícula da "
+    "educação básica observada no ano de referência."
+)
+#: Motivo de quem está **fora** do universo de privadas ativas.
+MOTIVO_FORA_UNIVERSO = (
+    "Indicadores e comparação municipal existem apenas para escolas privadas "
+    "ativas (universo privadas_ativas_mg)."
+)
 
 
 def _html(response, status: int = 200) -> str:
@@ -345,6 +355,38 @@ def test_escola_inativa_vira_nao_se_aplica(client, repository):
 
     assert "Indicadores e concorrência: não se aplica a escola inativa." in html
     assert f'<a href="{VISAO_GERAL_URL}">Voltar para a Visão geral</a>' in html
+
+
+def test_privada_ativa_sem_linha_na_mart_explica_a_ausencia_da_secao(
+    client, repository
+):
+    """Privada ativa sem linha em `mart_escola_indicadores`: 404 do `/v1` é estado da seção.
+
+    O universo está certo — `get_school` respondeu `tp_dependencia=4` e
+    `tp_situacao_funcionamento=1` — e o que falta é a linha da mart. Dizer
+    "fora do universo de privadas ativas" contradiria a própria consulta de
+    identidade, então o motivo é o da seção (teste herdado do F11, que travava
+    exatamente essa frase).
+    """
+    repository.schools = [
+        school_row(
+            co_entidade=ESCOLA, tp_dependencia="4", tp_situacao_funcionamento="1"
+        )
+    ]
+    repository.indicators = []
+
+    html = _html(client.get(CONCORRENCIA), status=200)
+
+    assert "Não se aplica" in html
+    # O motivo é a copy da tela, nunca o detail de diagnóstico da API.
+    assert MOTIVO_SECAO_INDICADORES in html
+    assert "não pertence ao universo de indicadores" not in html
+    # A escola É privada ativa: o texto não pode afirmar o contrário.
+    assert MOTIVO_FORA_UNIVERSO not in html
+    # A página oferece o caminho de volta e não inventa seção de dados.
+    assert f'<a href="{VISAO_GERAL_URL}">Voltar para a Visão geral</a>' in html
+    assert "Crescimento ano a ano" not in html
+    assert "Comparação municipal" not in html
 
 
 # -- erros: 404, 422 e 503 ----------------------------------------------------
