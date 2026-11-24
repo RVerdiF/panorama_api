@@ -42,6 +42,7 @@ from panorama_api.web.conteudo import (
     ROTULO_RETENCAO,
     TEXTO_OFERTA_DESCONHECIDA,
     UNIVERSOS,
+    anos_publicados,
     rotulo_etapa,
     traduzir_avisos,
 )
@@ -246,18 +247,37 @@ router_inicio = APIRouter(include_in_schema=False)
     summary="Página de entrada (landing)",
 )
 def inicio(request: Request) -> Response:
-    """Landing em `/`: shell do front com a entrada para a busca.
+    """Landing em `/`: hero do produto com o painel do recorte (card `t_437796c3`).
 
     Substitui o redirect `307` → `/app/` (card `t_0c84b91f`): quem chega na
     raiz vê a apresentação do produto e o link para a busca, e quem tem `/app/`
     em favorito ou link compartilhado continua caindo direto nas escolas.
 
-    Zero consultas ao repositório — a página não exibe número nenhum. Como
-    :func:`panorama_api.web.e_caminho_web` inclui a raiz, a resposta ganha gzip,
-    `ETag`/`Cache-Control: private, no-cache` com 304 e a linha `page_view`, e um
-    erro inesperado aqui vira página HTML (nunca `application/problem+json`).
+    O painel da coluna direita troca a foto da referência visual por três
+    números que saem do **código e da config**, nunca de literal no template:
+
+    * municípios: `len(municipios_mg())` — lista IBGE versionada, arquivo de
+      apoio de tela, sem BigQuery;
+    * anos: `settings.anos_disponiveis` (`APP_ANOS_DISPONIVEIS`), já validado e
+      canônico no boot;
+    * etapas e modalidades: chaves de `ETAPAS_ROTULOS` sem `"bas"`, que é o
+      total do Censo e não uma etapa (spec §4).
+
+    Nenhum desses números custa consulta: não há contagem de escolas porque
+    `COUNT(*)` é proibido (`repositories/bigquery/pagination.py:1-5`). Zero
+    chamadas ao repositório. Como :func:`panorama_api.web.e_caminho_web` inclui
+    a raiz, a resposta ganha gzip, `ETag`/`Cache-Control: private, no-cache` com
+    304 e a linha `page_view`, e um erro inesperado aqui vira página HTML
+    (nunca `application/problem+json`).
     """
-    return templates().TemplateResponse(request, "inicio.html", contexto_base(request))
+    contexto = contexto_base(request)
+    contexto.update(
+        recorte_municipios=len(municipios_mg()),
+        recorte_anos=anos_publicados(_settings(request).anos_disponiveis),
+        # `"bas"` é o total oficial do Censo, não uma etapa do mercado.
+        recorte_etapas=sum(1 for etapa in ETAPAS_ROTULOS if etapa != "bas"),
+    )
+    return templates().TemplateResponse(request, "inicio.html", contexto)
 
 
 def _sugestoes_busca_vazia(

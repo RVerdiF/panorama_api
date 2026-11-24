@@ -13,7 +13,7 @@ Proibições que este módulo materializa:
 
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Mapping, Sequence
 
 from panorama_api.contract import (
     DEFINICAO_RETENCAO,
@@ -200,6 +200,20 @@ def rotulo_etapa(etapa: str | None) -> str:
     return ETAPAS_ROTULOS.get(etapa, etapa)  # type: ignore[arg-type]
 
 
+def anos_publicados(anos: Sequence[int]) -> str:
+    """Anos do Censo como o painel do recorte os exibe (spec §4).
+
+    Lista contínua vira faixa com meia-risca (``2021–2025``): diz o mesmo que os
+    cinco anos e ocupa menos na coluna do painel. Um buraco na lista força os
+    anos separados por vírgula — a faixa prometeria um ano não publicado.
+    """
+    if len(anos) > 1 and all(
+        seguinte - atual == 1 for atual, seguinte in zip(anos, anos[1:])
+    ):
+        return f"{anos[0]}–{anos[-1]}"
+    return ", ".join(str(ano) for ano in anos)
+
+
 def traduzir_aviso(codigo: str) -> str:
     """Traduz um código de `meta.avisos`; código desconhecido é exibido cru."""
     if codigo in _AVISOS:
@@ -258,6 +272,7 @@ __all__ = [
     "TITULO_GRUPO_MODALIDADES",
     "TITULO_GRUPO_TOTAL",
     "UNIVERSOS",
+    "anos_publicados",
     "rotulo_etapa",
     "traduzir_aviso",
     "traduzir_avisos",
