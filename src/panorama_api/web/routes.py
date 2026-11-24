@@ -611,6 +611,45 @@ def mercado_atalho(request: Request, co_municipio: str | None = None) -> Respons
 
 
 @router.get(
+    "/mercados/",
+    response_class=HTMLResponse,
+    name="web_mercados_indice",
+    summary="Índice de municípios: escolher o mercado",
+)
+def mercados_indice(request: Request, co_municipio: str | None = None) -> Response:
+    """Índice de municípios (spec §1): a página que escolhe o mercado a abrir.
+
+    Sem ``co_municipio``, responde ``200`` com o formulário de escolha; com um
+    código válido (``^31\\d{5}$``), **303** para ``/app/mercados/{co}``, para que
+    recarregar não reenvie o formulário; com código inválido, ``422`` em HTML
+    com a volta para este índice.
+
+    Nenhum caminho consulta o repositório: a lista sai de ``municipios_mg()``
+    (arquivo versionado de apoio de tela) e o código é só sintaxe de URL — quem
+    valida a existência do recorte é a tela de destino. Zero BigQuery.
+    """
+    if co_municipio is None:
+        contexto = {
+            **contexto_base(request, pagina="municipios"),
+            "municipios": municipios_mg(),
+        }
+        return templates().TemplateResponse(request, "mercados_indice.html", contexto)
+
+    try:
+        codigo = validation.co_municipio(co_municipio, loc="query")
+    except ProblemError as erro:
+        return pagina_erro(
+            request,
+            erro,
+            acao={
+                "href": f"{PREFIXO_WEB}/mercados/",
+                "rotulo": "Escolher um município",
+            },
+        )
+    return RedirectResponse(url=f"{PREFIXO_WEB}/mercados/{codigo}", status_code=303)
+
+
+@router.get(
     "/mercados/{co_municipio}",
     response_class=HTMLResponse,
     name="web_mercado",
