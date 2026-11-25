@@ -1,9 +1,9 @@
 {#
-  Subnav de seções de uma tela (spec §2.2) — navegação **sem JS**.
+  Subnav de seções de uma tela (card V2 `t_cbd54a92`) — âncoras diretas, como o
+  protótipo (`nav.subnav > a`, sem `ul/li` e sem `role="tablist"`).
 
-  Uma lista de links, sem `role="tablist"`: o item da tela atual leva
-  `aria-current="page"`. A macro é genérica de propósito: a ficha usa com
-  "Seções da escola" e o NAV-3 reutiliza no mercado com outro rótulo.
+  O item da tela atual leva `aria-current="page"`. A macro é genérica: a ficha
+  usa com "Seções da escola" e o mercado com "Seções do mercado".
 
   Uso:
     {% from "partials/subnav.html" import subnav with context %}
@@ -15,10 +15,8 @@
 #}
 {% macro subnav(itens, rotulo="Seções da escola") -%}
 <nav class="subnav" aria-label="{{ rotulo }}">
-  <ul>
-    {%- for item in itens %}
-    <li{% if item.classe %} class="{{ item.classe }}"{% endif %}><a href="{{ item.href }}"{% if item.ativo %} aria-current="page"{% endif %}>{{ item.rotulo }}</a></li>
-    {%- endfor %}
-  </ul>
+  {%- for item in itens %}
+  <a href="{{ item.href }}"{% if item.classe %} class="{{ item.classe }}"{% endif %}{% if item.ativo %} aria-current="page"{% endif %}>{{ item.rotulo }}</a>
+  {%- endfor %}
 </nav>
 {%- endmacro %}

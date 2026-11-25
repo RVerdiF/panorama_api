@@ -1774,16 +1774,7 @@ td .barra-share__trilho {
   font-weight: 600;
 }
 
-/* --- app-only: subnav em lista e índice da página --- */
-.subnav ul {
-  display: flex;
-  gap: 2px;
-  flex-wrap: wrap;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  border-bottom: 1px solid var(--border);
-}
+/* --- app-only: índice da página e saída da subnav --- */
 .subnav__saida {
   margin-left: auto;
 }
@@ -1795,14 +1786,8 @@ td .barra-share__trilho {
   max-width: none;
 }
 
-/* Item ativo restrito à subnav em lista (o protótipo usa âncoras diretas). */
-.subnav ul [aria-current="page"] {
-  background: var(--surface);
-  color: var(--accent);
-  border-color: var(--border);
-  border-bottom-color: var(--surface);
-  text-decoration: none;
-}
+/* Âncoras diretas, como o protótipo: o estado ativo já vem do bloco herdado
+   (`.subnav a[aria-current]`); nada específico da lista fica aqui. */
 
 /* --- app-only: paginação do SSR --- */
 .paginacao__link {

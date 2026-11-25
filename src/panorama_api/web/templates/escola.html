@@ -4,19 +4,29 @@
 
 {% block titulo %}{{ escola.no_entidade or "Escola " ~ escola.co_entidade }} — Panorama Escola{% endblock %}
 
+{# Estado da oferta no componente do protótipo (`div.grupos-oferta`): o
+   tri-estado `true/false/None` vira `data-estado` + rótulo, como o
+   `celulaOferta` do `app.js` do protótipo. #}
+{% macro span_oferta(valor) -%}
+{% if valor is true %}{% set estado = "sim" %}{% elif valor is false %}{% set estado = "nao" %}{% else %}{% set estado = "desconhecido" %}{% endif %}
+<span class="oferta" data-estado="{{ estado }}"><span class="oferta__ponto" aria-hidden="true"></span>{{ valor | fmt_oferta }}</span>
+{%- endmacro %}
+
 {# A nota de ausência do rodapé fala de dado exibido: a ficha tem dado, então
    herda a nota do `base.html`. #}
 
-{#
-  Ficha consolidada (card V2 `t_cbd54a92`): a Visão geral e os indicadores/
-  concorrência passaram a viver numa **única** página, com âncoras internas
-  `#resumo` e `#concorrencia` (o endereço antigo `/escolas/{id}/concorrencia`
-  responde `301` para cá). Ordem das seções: resumo (KPIs) → série → oferta/
-  rendimento (duas colunas) → posição no município → ranking municipal.
+{# 
+  Ficha consolidada (card V2 `t_cbd54a92`): estrutura do protótipo
+  (`panorama-escola-escola.html`), dados do SSR. `section#resumo` só com
+  `div.kpis` (o link de comparar é parágrafo simples) → `section#serie` →
+  `div.duas-col` (oferta em `div.grupos-oferta` | rendimento + `#concorrencia`
+  na coluna direita) → ranking municipal em `ul.ranking` → rodapé.
 
   Um dado que a base não publica aparece como `sem dado` — nunca 0. Em
   especial a lista nominal de concorrentes do ranking: `mart_competidores`
-  publica a posição e as contagens, não os nomes das outras escolas.
+  publica a posição e as contagens, não os nomes das outras escolas (a lista
+  completa exigiria a consulta cara de `mart_market_share` em cada ficha;
+  ela vive no ranking de share do mercado).
 #}
 {% block conteudo %}
 <div class="tela">
@@ -25,9 +35,10 @@
     {{ subnav(subnav_itens) }}
   </div>
 
-  <section class="painel painel--inicial" id="resumo" aria-label="Resumo da escola">
+  <section id="resumo" aria-label="Resumo da escola">
     {#- Entrada da comparação lado a lado: a ficha já tem o id e abre a página
-        com um id, onde se busca a segunda escola sem JS. -#}
+        com um id, onde se busca a segunda escola sem JS. Parágrafo simples:
+        o protótipo não tem painel nem bloco de definição aqui. -#}
     <p><a href="{{ href_comparar }}">{{ rotulo_comparar }}</a></p>
 
     <div class="kpis">
@@ -39,28 +50,6 @@
       </div>
       {% endfor %}
     </div>
-
-    {% if recente %}
-    <dl class="lista-definicoes">
-      <dt>Dependência administrativa (código INEP)</dt>
-      <dd>
-        <code>{{ recente.tp_dependencia | fmt_nulo }}</code> — {{ dependencia_rotulo }}
-      </dd>
-      <dt>Situação de funcionamento (código INEP)</dt>
-      <dd>
-        <code>{{ recente.tp_situacao_funcionamento | fmt_nulo }}</code> — {{ situacao_rotulo }}
-      </dd>
-      <dt>Anos na série</dt>
-      <dd>
-        {{ itens | length }}
-        {%- if ano_inicial is not none and ano_inicial != recente.nu_ano_censo %}
-        (de {{ ano_inicial | fmt_ano }} a {{ recente.nu_ano_censo | fmt_ano }})
-        {%- else %}
-        ({{ recente.nu_ano_censo | fmt_ano }})
-        {%- endif %}
-      </dd>
-    </dl>
-    {% endif %}
   </section>
 
   <section class="painel" id="serie" aria-labelledby="titulo-serie">
@@ -113,42 +102,32 @@
           modalidades que <strong>não</strong> somam.
         </p>
       </div>
-      <p class="subtitulo">
-        Oferta é tri-estado: <em>Sim</em> (matrícula maior que zero),
-        <em>Não</em> (zero declarado) e <em>Desconhecido</em> (a base não
-        informou). <em>Desconhecido</em> não é "não oferta".
-      </p>
       {% if recente and recente.is_oferta_desconhecida %}
       <p class="aviso">{{ texto_oferta_desconhecida }}</p>
       {% endif %}
       {% if etapas %}
-      <div class="tabela-rolagem" role="region" aria-label="Oferta por etapa (tabela com rolagem)" tabindex="0">
-        {# Ordenável no cliente: só a coluna de matrícula tem `data-tipo`;
-           a ordenação acontece **dentro** de cada grupo (`data-fixa`). #}
-        <table class="tabela" data-ordenavel>
-          <caption>Oferta por etapa e matrícula observada em {{ recente.nu_ano_censo | fmt_ano }}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Etapa</th>
-              <th scope="col">Oferta</th>
-              <th scope="col" data-tipo="numero">Matrícula</th>
-            </tr>
-          </thead>
-          {% for grupo in etapas %}
-          <tbody>
-            <tr class="grupo-etapas" data-fixa>
-              <th colspan="3" scope="rowgroup">{{ grupo.titulo }} — {{ grupo.nota }}</th>
-            </tr>
-            {% for linha in grupo.linhas %}
-            <tr{% if grupo.fixa %} data-fixa{% endif %}>
-              <th scope="row">{{ linha.rotulo }}</th>
-              <td>{{ linha.oferta | fmt_oferta }}</td>
-              <td data-valor="{{ linha.matricula.valor | fmt_bruto }}">{{ linha.matricula | fmt_celula }}</td>
-            </tr>
+      {# Componente do protótipo: total oficial, etapas que somam e
+         modalidades que não somam — `dl`s, não tabela ordenável. O estado da
+         oferta viaja em `data-estado` (sim/nao/desconhecido). #}
+      <div class="grupos-oferta">
+        <div class="grupo-oferta grupo-oferta--total">
+          <p class="grupo-oferta__titulo">{{ etapas[0].titulo }} <small>{{ etapas[0].nota }}</small></p>
+          <dl class="grupo-oferta__total">
+            {% for linha in etapas[0].linhas %}
+            <div><dt>{{ linha.rotulo }}</dt><dd class="metrica">{{ linha.matricula | fmt_celula }}</dd></div>
             {% endfor %}
-          </tbody>
-          {% endfor %}
-        </table>
+          </dl>
+        </div>
+        {% for grupo in etapas[1:] %}
+        <div class="grupo-oferta">
+          <p class="grupo-oferta__titulo">{{ grupo.titulo }} <small>{{ grupo.nota }}</small></p>
+          <dl>
+            {% for linha in grupo.linhas %}
+            <div><dt>{{ linha.rotulo }}</dt><dd>{{ span_oferta(linha.oferta) }}</dd></div>
+            {% endfor %}
+          </dl>
+        </div>
+        {% endfor %}
       </div>
       {% else %}
       <p class="sem-dado">sem dado de oferta para o ano de referência</p>
@@ -202,47 +181,47 @@
           mede saída de alunos do sistema.
         </div>
       </section>
+
+      <section class="painel" id="concorrencia" aria-labelledby="titulo-posicao">
+        <div class="painel__cabecalho">
+          <h2 id="titulo-posicao">Posição no município</h2>
+          <p class="painel__nota">
+            Sempre municipal e no mesmo ano censitário dos indicadores.
+          </p>
+        </div>
+        {% if motivo_concorrencia %}
+        <p class="nao-se-aplica"><strong>{{ nao_se_aplica_titulo }}.</strong> {{ motivo_concorrencia }}</p>
+        {% else %}
+        {% if aviso_abaixo_porte %}
+        <p class="aviso">{{ texto_abaixo_porte }}</p>
+        {% endif %}
+        {% if motivo_sem_comparacao %}
+        <p class="sem-dado">sem dado — {{ motivo_sem_comparacao }}</p>
+        {% endif %}
+        <div id="posicao-crescimento">
+          <dl class="lista-posicao">
+            <div>
+              <dt>{{ rotulo_posicao_municipio }}</dt>
+              <dd>
+                {% if posicao.municipio.rank is not none %}{{ posicao.municipio.rank | fmt_contagem }}.º{% if posicao.municipio.total %} de {{ posicao.municipio.total | fmt_contagem }}{% endif %} <small>1.º = maior crescimento</small>{% else %}sem dado{% endif %}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ rotulo_posicao_mg }}</dt>
+              <dd>
+                {% if posicao.mg.rank is not none %}{{ posicao.mg.rank | fmt_contagem }}.º <small>1.º = maior crescimento</small>{% else %}sem dado{% endif %}
+              </dd>
+            </div>
+          </dl>
+        </div>
+        <div class="definicao">
+          <strong>Concorrência</strong> = {{ definicao_concorrencia }} O ranking de
+          share usa a matrícula de educação básica do ano de referência.
+        </div>
+        {% endif %}
+      </section>
     </div>
   </div>
-
-  <section class="painel" id="concorrencia" aria-labelledby="titulo-posicao">
-    <div class="painel__cabecalho">
-      <h2 id="titulo-posicao">Posição no município</h2>
-      <p class="painel__nota">
-        Sempre municipal e no mesmo ano censitário dos indicadores.
-      </p>
-    </div>
-    {% if motivo_concorrencia %}
-    <p class="nao-se-aplica"><strong>{{ nao_se_aplica_titulo }}.</strong> {{ motivo_concorrencia }}</p>
-    {% else %}
-    {% if aviso_abaixo_porte %}
-    <p class="aviso">{{ texto_abaixo_porte }}</p>
-    {% endif %}
-    {% if motivo_sem_comparacao %}
-    <p class="sem-dado">sem dado — {{ motivo_sem_comparacao }}</p>
-    {% endif %}
-    <div id="posicao-crescimento">
-      <dl class="lista-posicao">
-        <div>
-          <dt>{{ rotulo_posicao_municipio }}</dt>
-          <dd>
-            {% if posicao.municipio.rank is not none %}{{ posicao.municipio.rank }}.º{% if posicao.municipio.total %} de {{ posicao.municipio.total }}{% endif %}{% else %}sem dado{% endif %}
-          </dd>
-        </div>
-        <div>
-          <dt>{{ rotulo_posicao_mg }}</dt>
-          <dd>
-            {% if posicao.mg.rank is not none %}{{ posicao.mg.rank }}.º{% else %}sem dado{% endif %}
-          </dd>
-        </div>
-      </dl>
-    </div>
-    <div class="definicao">
-      <strong>Concorrência</strong> = {{ definicao_concorrencia }} O ranking de
-      share usa a matrícula de educação básica do ano de referência.
-    </div>
-    {% endif %}
-  </section>
 
   {% if not motivo_concorrencia %}
   <section class="painel" aria-labelledby="titulo-ranking">

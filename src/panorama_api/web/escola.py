@@ -246,7 +246,7 @@ def _motivo(flag: bool | None, nome_flag: str) -> str | None:
     return nome_flag if flag else None
 
 
-def _rotulo_dependencia(codigo: str | None) -> str:
+def rotulo_dependencia(codigo: str | None) -> str:
     """Leitura do código INEP de dependência (1 Federal … 4 Privada).
 
     Código ausente é "não informado" e código fora da tabela é "código não
@@ -258,7 +258,7 @@ def _rotulo_dependencia(codigo: str | None) -> str:
     return ROTULOS_DEPENDENCIA.get(codigo, ROTULO_NAO_RECONHECIDO)
 
 
-def _rotulo_situacao(codigo: str | None) -> str:
+def rotulo_situacao(codigo: str | None) -> str:
     """Leitura do código INEP de situação de funcionamento.
 
     Cada código tem seu texto (2 Paralisada e 3 Extinta não são o mesmo estado);
@@ -912,10 +912,10 @@ def contexto_visao_geral(*, historico: HistoryResponse) -> dict[str, Any]:
         "recente": recente,
         "ano_inicial": min((item.nu_ano_censo for item in itens), default=None),
         "dependencia_rotulo": (
-            _rotulo_dependencia(recente.tp_dependencia) if recente else None
+            rotulo_dependencia(recente.tp_dependencia) if recente else None
         ),
         "situacao_rotulo": (
-            _rotulo_situacao(recente.tp_situacao_funcionamento) if recente else None
+            rotulo_situacao(recente.tp_situacao_funcionamento) if recente else None
         ),
         "serie": serie_matriculas(itens),
         "etapas": etapas_do_ano(recente) if recente is not None else [],
@@ -1215,10 +1215,10 @@ def _escola_unica(historico: HistoryResponse) -> dict[str, Any]:
         "itens": itens,
         "serie": serie_matriculas(itens),
         "dependencia_rotulo": (
-            _rotulo_dependencia(recente.tp_dependencia) if recente is not None else None
+            rotulo_dependencia(recente.tp_dependencia) if recente is not None else None
         ),
         "situacao_rotulo": (
-            _rotulo_situacao(recente.tp_situacao_funcionamento)
+            rotulo_situacao(recente.tp_situacao_funcionamento)
             if recente is not None
             else None
         ),
@@ -1296,6 +1296,8 @@ __all__ = [
     "pertence_ao_universo_privado",
     "posicao_crescimento",
     "ranking_municipal",
+    "rotulo_dependencia",
+    "rotulo_situacao",
     "serie_comparada",
     "texto_variacao",
     "total_privadas_ativas",
