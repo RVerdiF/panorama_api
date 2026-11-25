@@ -54,6 +54,8 @@ from panorama_api.web.conteudo import (
     traduzir_aviso,
 )
 
+from panorama_api.web.filters import SEM_DADO, fmt_ano, fmt_contagem, fmt_nulo
+
 #: Identificador de cada seção do mercado no subnav (spec §2.2).
 VISAO_GERAL = "visao_geral"
 ESCOLAS = "escolas"
@@ -208,6 +210,53 @@ def _linhas_share(share: ShareResponse) -> list[dict[str, Any]]:
     ]
 
 
+def kpis_mercado(
+    *, denominadores: dict[str, Any], ano: int | None
+) -> list[dict[str, Any]]:
+    """Os quatro KPIs do topo do mercado (card V2 `t_cbd54a92`).
+
+    Matrícula privada, escolas privadas ativas, cobertura privada
+    (`qt_mat_privada / qt_mat_total`) e a variação anual. A tela cobre **um**
+    ano (a composição é por etapa, não por ano), então não há ano anterior no
+    próprio recorte para a variação: ela sai como ``sem dado`` com o motivo —
+    nunca ``0`` nem um número de outro recorte.
+    """
+    priv = denominadores.get("qt_mat_privada")
+    total = denominadores.get("qt_mat_total")
+    cobertura = (priv / total * 100) if priv is not None and total else None
+    return [
+        {
+            "rotulo": f"Matrícula privada {fmt_ano(ano)}",
+            "valor": fmt_contagem(priv),
+            "classe": "",
+            "nota": "soma das escolas privadas ativas do recorte",
+        },
+        {
+            "rotulo": "Escolas privadas ativas",
+            "valor": fmt_contagem(denominadores.get("n_escolas_privadas")),
+            "classe": "",
+            "nota": "no município e no ano",
+        },
+        {
+            "rotulo": "Cobertura privada",
+            "valor": (
+                f"{fmt_nulo(cobertura)}%" if cobertura is not None else SEM_DADO
+            ),
+            "classe": "",
+            "nota": "matrícula privada sobre a matrícula total do município",
+        },
+        {
+            "rotulo": "Variação anual",
+            "valor": SEM_DADO,
+            "classe": "",
+            "nota": (
+                "o recorte desta tela é de um único ano — sem ano anterior "
+                "para comparar"
+            ),
+        },
+    ]
+
+
 def contexto_visao_geral(*, mercado: MarketsResponse, etapa: str) -> dict[str, Any]:
     """Contexto da **Visão geral** — tudo sai de `dados.mercado` (3 consultas).
 
@@ -333,4 +382,5 @@ __all__ = [
     "contexto_escolas_mercado",
     "contexto_visao_geral",
     "itens_subnav",
+    "kpis_mercado",
 ]

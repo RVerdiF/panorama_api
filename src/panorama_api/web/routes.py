@@ -39,6 +39,7 @@ from panorama_api.web.conteudo import (
     ETAPAS_ROTULOS,
     ETAPA_PADRAO_MERCADO,
     EXPLICACAO_OFERTA_DESCONHECIDA,
+    MOTIVO_SECAO_INDICADORES,
     ROTULO_COMPARAR_COM_ESTA,
     ROTULO_RETENCAO,
     TEXTO_OFERTA_DESCONHECIDA,
@@ -48,10 +49,15 @@ from panorama_api.web.conteudo import (
     traduzir_avisos,
 )
 from panorama_api.web.escola import (
+    AVISO_ABAIXO_PORTE,
     contexto_comparacao,
     contexto_concorrencia,
+    contexto_concorrencia_na_ficha,
     contexto_concorrencia_nao_se_aplica,
     contexto_visao_geral,
+    item_mais_recente,
+    kpis_da_escola,
+    texto_variacao,
 )
 from panorama_api.web.filters import (
     fmt_ano,
@@ -69,6 +75,7 @@ from panorama_api.web.mercado import (
     contexto_escolas_mercado,
     contexto_visao_geral as contexto_mercado_visao_geral,
     itens_subnav,
+    kpis_mercado,
 )
 from panorama_api.web.municipios import municipios_mg
 from panorama_api.web.paginacao import montar as montar_paginacao
@@ -162,6 +169,7 @@ def _templates() -> Jinja2Templates:
     ambiente.env.filters["fmt_oferta"] = fmt_oferta
     ambiente.env.filters["fmt_ano"] = fmt_ano
     ambiente.env.filters["fmt_gap_lider"] = fmt_gap_lider
+    ambiente.env.filters["variacao_texto"] = texto_variacao
     return ambiente
 
 
@@ -551,10 +559,49 @@ def escola(co_entidade: str, request: Request, ano: int | None = None) -> Respon
         )
     historico = dados.historico_escola(request, co_entidade=co_entidade)
 
-    contexto = {
+    contexto: dict[str, Any] = {
         **contexto_base(request, area="escolas"),
         **contexto_visao_geral(historico=historico),
+        "rotulo_retencao": ROTULO_RETENCAO,
     }
+
+    # Fusão da Visão geral com indicadores/concorrência (card V2 `t_cbd54a92`):
+    # a ficha é uma página só, com âncoras `#resumo`/`#concorrencia`. Para escola
+    # privada ativa, uma segunda consulta (`indicadores_escola`) alimenta KPIs,
+    # posição por crescimento e ranking; pública/inativa não paga essa consulta
+    # (falha fechada). Um `404` do `/v1` aqui é ausência de linha na mart — a
+    # seção diz "não se aplica" com o motivo, nunca 0.
+    indicador = None
+    competicao = None
+    aviso_abaixo_porte = False
+    if contexto["motivo_concorrencia"] is None:
+        try:
+            resposta_indicadores = dados.indicadores_escola(
+                request, co_entidade=co_entidade
+            )
+        except ProblemError as erro:
+            if erro.code is not ErrorCode.NAO_ENCONTRADO:
+                raise
+            contexto["motivo_concorrencia"] = MOTIVO_SECAO_INDICADORES
+        else:
+            recente_indicador = item_mais_recente(list(resposta_indicadores.data.items))
+            indicador = recente_indicador
+            competicao = (
+                recente_indicador.competicao if recente_indicador is not None else None
+            )
+            aviso_abaixo_porte = AVISO_ABAIXO_PORTE in resposta_indicadores.meta.avisos
+
+    contexto["kpis"] = kpis_da_escola(
+        recente=contexto["recente"], item=indicador, competicao=competicao
+    )
+    contexto.update(
+        contexto_concorrencia_na_ficha(
+            item=indicador,
+            competicao=competicao,
+            cabecalho=contexto["cabecalho"],
+            aviso_abaixo_porte=aviso_abaixo_porte,
+        )
+    )
     return templates().TemplateResponse(request, "escola.html", contexto)
 
 
@@ -562,63 +609,31 @@ def escola(co_entidade: str, request: Request, ano: int | None = None) -> Respon
     "/escolas/{co_entidade}/concorrencia",
     response_class=HTMLResponse,
     name="web_escola_concorrencia",
-    summary="Indicadores e concorrência da escola (privada ativa)",
+    summary="Rota legada: redireciona para #concorrencia na ficha",
 )
 def escola_concorrencia(
     co_entidade: str, request: Request, ano: int | None = None
 ) -> Response:
-    """Indicadores e concorrência da escola (spec §2.2, §5.1, §5.2).
+    """Endereço legado de indicadores/concorrência → ``301`` para a ficha.
 
-    Fonte única: ``dados.indicadores_escola`` — a resposta já traz a linha de
-    `mart_competidores` do ano dentro de cada item, então a comparação municipal
-    sai de `items[-1].competicao` e **não** existe chamada a `concorrentes_escola`
-    (2 consultas no total, sem leitura duplicada da mart).
-
-    O cabeçalho vem da própria resposta de indicadores (nome, município): o
-    `history` não é consultado nesta rota.
-
-    Um ``404 NAO_ENCONTRADO`` do `/v1` é ambíguo por contrato: pode ser escola
-    inexistente no recorte MG, ou escola existente fora do universo de
-    indicadores. A distinção é feita com **uma** consulta de identidade
-    (`buscar_escolas(co_entidade=...)`, a mesma da busca) só nesse caminho:
-    escola existente → página 200 "não se aplica" com a volta para a Visão
-    geral; escola inexistente → 404 inteiro. ``503``/``422``/``500`` continuam
-    sendo a página de erro inteira.
-
-    `?ano=` responde ``422`` `PARAMETRO_INVALIDO` antes de qualquer consulta —
-    a página mostra o ano mais recente da mart, e aceitar o parâmetro fingindo
-    aplicá-lo seria mentir sobre o recorte.
+    Os indicadores e a comparação municipal passaram a viver na **própria**
+    ficha, na âncora ``#concorrencia`` (card V2 `t_cbd54a92`). O endereço antigo
+    continua **válido** como ``301`` — links compartilhados e favoritos chegam à
+    seção certa, e nenhuma página duplicada é servida. `?ano=` continua ``422``
+    (a ficha ignora recorte de ano) e o código INEP é validado no formato antes
+    do redirecionamento, sem consultar o repositório.
     """
     if ano is not None:
         raise invalid(
-            "a rota de indicadores mostra o ano mais recente publicado; o "
-            "parâmetro ano não é suportado aqui — remova-o da URL",
+            "a ficha mostra a série inteira; o parâmetro ano não é suportado "
+            "aqui — remova-o da URL",
             loc=("query", "ano"),
         )
-    try:
-        indicadores = dados.indicadores_escola(request, co_entidade=co_entidade)
-    except ProblemError as erro:
-        if erro.code is not ErrorCode.NAO_ENCONTRADO:
-            raise
-        escola_mg = _escola_do_recorte(request, co_entidade)
-        if escola_mg is None:
-            # Não existe no recorte MG: o 404 do `/v1` está certo.
-            raise erro
-        contexto = {
-            **contexto_base(request, area="escolas"),
-            **contexto_concorrencia_nao_se_aplica(
-                co_entidade=co_entidade, escola=escola_mg
-            ),
-        }
-        return templates().TemplateResponse(
-            request, "escola_concorrencia.html", contexto
-        )
-
-    contexto = {
-        **contexto_base(request, area="escolas"),
-        **contexto_concorrencia(indicadores=indicadores),
-    }
-    return templates().TemplateResponse(request, "escola_concorrencia.html", contexto)
+    validation.co_entidade(co_entidade)
+    return RedirectResponse(
+        url=f"{PREFIXO_WEB}/escolas/{co_entidade}#concorrencia",
+        status_code=301,
+    )
 
 
 def _escola_do_recorte(request: Request, co_entidade: str) -> Any | None:
@@ -923,6 +938,9 @@ def mercado(
         )
 
     contexto.update(contexto_mercado_visao_geral(mercado=resposta_mercado, etapa=etapa_ref))
+    contexto["kpis"] = kpis_mercado(
+        denominadores=contexto["denominadores"], ano=contexto["ano_selecionado"]
+    )
     # A identidade do município vem da resposta do `/v1` nesta rota (a lista
     # local só cobre o ranking, cuja resposta de share não traz o nome). Sem
     # nome publicado, o código IBGE ocupa o lugar — nunca um título sem
