@@ -135,6 +135,24 @@ def test_ficha_mostra_crescimento_definicao_e_rank(client, repository):
     # Posição municipal por matrícula (KPI) = rank 3 de 11 privadas ativas.
     assert "3.º" in html
     assert "de 11 escolas privadas ativas" in html
+    # Sem share no indicador: a barra não existe e o valor é "sem dado".
+    assert "barra-share__preenche" not in html
+    # Ilha JSON da série para hidratação no cliente (`app.js` lê por textContent).
+    assert '<script type="application/json" id="dados-serie">' in html
+    assert '"anos": [2025]' in html
+
+
+def test_ficha_com_share_mostra_barra_com_width(client, repository):
+    """Ranking em CSS do protótipo: trilho + preenche com o share real."""
+    repository.history = [
+        history_row(nu_ano_censo=2025, tp_dependencia="4", tp_situacao_funcionamento="1")
+    ]
+    repository.indicators = [indicator_row(share_privado_pct=12.5)]
+    repository.competidores = [competidor_row()]
+
+    html = _html(client.get(VISAO_GERAL_URL))
+
+    assert '<span class="barra-share__preenche" style="width:12.5%">' in html
 
 
 def test_posicao_por_crescimento_nao_e_rotulada_de_creche(client, repository):
