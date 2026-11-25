@@ -8,23 +8,39 @@
 {% block rodape_nota %}{% endblock %}
 
 {% block conteudo %}
-<article class="cartao">
-  <h1>Municípios</h1>
-  <p class="subtitulo">
-    Escolha um município de Minas Gerais para ver o mercado da educação básica:
-    tamanho, composição, cobertura e movimento do setor privado.
-  </p>
+<div class="tela">
+  <div class="tela-topo">
+    <p class="trilha">
+      <a href="{{ href_inicio }}">Início</a>
+      <span aria-hidden="true">›</span>
+      <span>Municípios</span>
+    </p>
+    <h1>Municípios</h1>
+    <p class="subtitulo">
+      Escolha um município de Minas Gerais para ver o mercado da educação básica:
+      tamanho, composição, cobertura e movimento do setor privado.
+    </p>
+  </div>
 
-  <form class="formulario" method="get" action="{{ href_mercados }}" role="search">
-    <div class="campo">
-      <label for="co_municipio">Município</label>
-      {{ select_municipios("co_municipio", "", rotulo_vazio="Escolha um município") }}
-      <p class="dica">São {{ municipios|length }} municípios de MG.</p>
+  <section class="painel painel--inicial" aria-labelledby="escolher-municipio">
+    <div class="painel__cabecalho">
+      <h2 id="escolher-municipio">Escolha um município</h2>
+      <p class="painel__nota">
+        A lista cobre os municípios de MG publicados nesta versão dos dados.
+      </p>
     </div>
 
-    <div class="campo campo--acao">
-      <button type="submit">Ver mercado</button>
-    </div>
-  </form>
-</article>
+    <form class="formulario" method="get" action="{{ href_mercados }}" role="search">
+      <div class="campo">
+        <label for="co_municipio">Município</label>
+        {{ select_municipios("co_municipio", "", rotulo_vazio="Escolha um município") }}
+        <p class="dica">São {{ municipios|length }} municípios de MG.</p>
+      </div>
+
+      <div class="campo campo--acao">
+        <button type="submit">Ver mercado</button>
+      </div>
+    </form>
+  </section>
+</div>
 {% endblock %}

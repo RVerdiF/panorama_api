@@ -37,12 +37,18 @@ class WebGZipMiddleware(GZipMiddleware):
         await super().__call__(scope, receive, send)
 
 #: Política do front (spec `interatividade.md` §6): nada implícito, script,
-#: estilo, imagem, `fetch` e formulário só da própria origem.
+#: estilo, imagem, fonte, `fetch` e formulário só da própria origem.
+#:
+#: `font-src 'self'` entrou no card V1 (`t_423aa547`) junto com as fontes
+#: self-hosted: com `default-src 'none'` e sem essa diretiva o navegador
+#: bloquearia cada `.woff2` servido por `/app/static/…` e o `@font-face` cairia
+#: na fonte de fallback. Continua fechado — só a própria origem, nada de CDN.
 CSP_WEB = (
     "default-src 'none'; "
     "script-src 'self'; "
     "style-src 'self'; "
     "img-src 'self'; "
+    "font-src 'self'; "
     "connect-src 'self'; "
     "form-action 'self'; "
     "base-uri 'none'; "

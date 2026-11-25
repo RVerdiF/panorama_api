@@ -2,18 +2,34 @@
 
 {% block titulo %}Metodologia — Panorama Escola{% endblock %}
 
+{# Card V1 `t_423aa547`: cabeçalho em `.tela-topo` e cada seção em `.painel`
+   com `.painel__cabecalho` — a mesma hierarquia da ficha e do mercado. Os `id`s
+   de âncora do submenu da navbar (`#versao`, `#regras`, `#definicoes`,
+   `#avisos`, `#universo`) não mudaram. #}
 {% block conteudo %}
-<article class="cartao">
-  <h1>Metodologia</h1>
-  <p class="subtitulo">
-    De onde vem cada número do Panorama Escola, de que ano, e com que limitações.
-    Todas as telas mostram o mesmo recorte: <strong>Minas Gerais</strong>, Censo Escolar (INEP).
-  </p>
+<div class="tela">
+  <div class="tela-topo">
+    <p class="trilha">
+      <a href="{{ href_inicio }}">Início</a>
+      <span aria-hidden="true">›</span>
+      <span>Metodologia</span>
+    </p>
+    <h1>Metodologia</h1>
+    <p class="subtitulo">
+      De onde vem cada número do Panorama Escola, de que ano, e com que limitações.
+      Todas as telas mostram o mesmo recorte: <strong>Minas Gerais</strong>, Censo Escolar (INEP).
+    </p>
+  </div>
 
-  <section aria-labelledby="versao">
-    <h2 id="versao">Versão dos dados</h2>
+  <section class="painel painel--inicial" aria-labelledby="versao">
+    <div class="painel__cabecalho">
+      <h2 id="versao">Versão dos dados</h2>
+      <p class="painel__nota">
+        O que está publicado agora; o ano de referência varia por consulta.
+      </p>
+    </div>
     <dl class="lista-definicoes">
-      <dt>Dados publicados (DATA_VERSION)</dt>
+      <dt>Dados publicados</dt>
       <dd><code>{{ data_version }}</code></dd>
       <dt>Contrato de serving</dt>
       <dd><code>{{ contract }} / {{ contract_version }}</code></dd>
@@ -22,8 +38,13 @@
     </dl>
   </section>
 
-  <section aria-labelledby="regras">
-    <h2 id="regras">Regras de leitura dos números</h2>
+  <section class="painel" aria-labelledby="regras">
+    <div class="painel__cabecalho">
+      <h2 id="regras">Regras de leitura dos números</h2>
+      <p class="painel__nota">
+        As cinco regras que mudam a leitura de qualquer número do Panorama.
+      </p>
+    </div>
     <ul class="lista-regras">
       <li>
         <strong>Ausência de dado não é zero.</strong> Quando a base não informa um valor,
@@ -52,8 +73,13 @@
     </ul>
   </section>
 
-  <section aria-labelledby="definicoes">
-    <h2 id="definicoes">Definições semânticas</h2>
+  <section class="painel" aria-labelledby="definicoes">
+    <div class="painel__cabecalho">
+      <h2 id="definicoes">Definições semânticas</h2>
+      <p class="painel__nota">
+        O significado de cada campo, na chave do contrato de serving.
+      </p>
+    </div>
     {% if definicoes %}
     <dl class="lista-definicoes">
       {% for chave, texto in definicoes.items() %}
@@ -66,13 +92,15 @@
     {% endif %}
   </section>
 
-  <section aria-labelledby="avisos">
-    <h2 id="avisos">Avisos que podem aparecer nas telas</h2>
-    <p class="subtitulo">
-      Cada aviso é um código do contrato que muda a leitura de um número. O
-      código fica visível para conferência com o JSON da API; a explicação ao
-      lado é o que a ficha mostra ao leitor.
-    </p>
+  <section class="painel" aria-labelledby="avisos">
+    <div class="painel__cabecalho">
+      <h2 id="avisos">Avisos que podem aparecer nas telas</h2>
+      <p class="painel__nota">
+        Cada aviso é um código do contrato que muda a leitura de um número. O
+        código fica visível para conferência com o JSON da API; a explicação ao
+        lado é o que a ficha mostra ao leitor.
+      </p>
+    </div>
     {% if avisos_conhecidos %}
     <dl class="lista-definicoes">
       {% for titulo, texto in avisos_conhecidos %}
@@ -85,8 +113,13 @@
     {% endif %}
   </section>
 
-  <section aria-labelledby="universo">
-    <h2 id="universo">Universos e fontes</h2>
+  <section class="painel" aria-labelledby="universo">
+    <div class="painel__cabecalho">
+      <h2 id="universo">Universos e fontes</h2>
+      <p class="painel__nota">
+        Quais escolas entram em cada recorte publicado.
+      </p>
+    </div>
     <dl class="lista-definicoes">
       {% for universo, descricao in universos.items() %}
       <dt><code>{{ universo }}</code></dt>
@@ -94,5 +127,5 @@
       {% endfor %}
     </dl>
   </section>
-</article>
+</div>
 {% endblock %}

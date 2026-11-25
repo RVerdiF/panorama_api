@@ -9,120 +9,122 @@
 {% block rodape_nota %}{% endblock %}
 
 {% block conteudo %}
-<section class="hero">
-  <div class="hero__texto">
-    <h1>Escolas e mercados da educação básica em Minas Gerais</h1>
-    <p class="subtitulo">
-      Matrículas, oferta por etapa, rendimento e participação de mercado das escolas
-      mineiras, a partir do Censo Escolar da Educação Básica (INEP).
-    </p>
+<div class="tela">
+  <section class="hero">
+    <div class="hero__texto">
+      <h1>Escolas e mercados da educação básica em Minas Gerais</h1>
+      <p class="subtitulo">
+        Matrículas, oferta por etapa, rendimento e participação de mercado das escolas
+        mineiras, a partir do Censo Escolar da Educação Básica (INEP).
+      </p>
 
-    {# Busca no hero (card `t_e075a6f6`, spec §6): o mesmo GET de `/app/`, com os
-       mesmos nomes de parâmetro (`q` e `co_municipio`) e a mesma validação —
-       não é rota nova de busca. O segundo botão é um `<button formaction>` com
-       `formnovalidate`: leva ao mercado do município pelo atalho
-       `GET /app/mercados?co_municipio=`, sem o `minlength` do nome barrar a
-       navegação. Nada de JS, nada de ano (o ano não filtra a busca) e nada de
-       `apenas_ativas` (refinamento da tela de resultados). #}
-    <form class="hero__busca" method="get" action="{{ app_prefix }}/" role="search" aria-label="Buscar escolas ou mercado municipal">
-      <div class="hero__campo">
-        <label for="q">Nome da escola</label>
-        <input
-          type="search"
-          id="q"
-          name="q"
-          minlength="3"
-          maxlength="100"
-          autocomplete="off"
-          aria-describedby="q-dica">
-        <p class="dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
-      </div>
+      {# Busca no hero (card `t_e075a6f6`, spec §6): o mesmo GET de `/app/`, com os
+         mesmos nomes de parâmetro (`q` e `co_municipio`) e a mesma validação —
+         não é rota nova de busca. O segundo botão é um `<button formaction>` com
+         `formnovalidate`: leva ao mercado do município pelo atalho
+         `GET /app/mercados?co_municipio=`, sem o `minlength` do nome barrar a
+         navegação. Nada de JS, nada de ano (o ano não filtra a busca) e nada de
+         `apenas_ativas` (refinamento da tela de resultados). #}
+      <form class="hero__busca" method="get" action="{{ app_prefix }}/" role="search" aria-label="Buscar escolas ou mercado municipal">
+        <div class="hero__campo">
+          <label for="q">Nome da escola</label>
+          <input
+            type="search"
+            id="q"
+            name="q"
+            minlength="3"
+            maxlength="100"
+            autocomplete="off"
+            aria-describedby="q-dica">
+          <p class="dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
+        </div>
 
-      <div class="hero__campo">
-        <label for="co_municipio">Município</label>
-        {{ select_municipios("co_municipio", "") }}
-      </div>
+        <div class="hero__campo">
+          <label for="co_municipio">Município</label>
+          {{ select_municipios("co_municipio", "") }}
+        </div>
 
-      <div class="hero__acoes">
-        <button type="submit" class="botao botao--primario">Buscar escolas</button>
-        {# `formnovalidate` só neste botão: ir ao mercado não exige nome. #}
-        <button
-          type="submit"
-          class="botao botao--secundario"
-          formaction="{{ app_prefix }}/mercados"
-          formnovalidate>Ver mercado do município</button>
-      </div>
-    </form>
-  </div>
+        <div class="hero__acoes">
+          <button type="submit" class="botao botao--primario">Buscar escolas</button>
+          {# `formnovalidate` só neste botão: ir ao mercado não exige nome. #}
+          <button
+            type="submit"
+            class="botao botao--secundario"
+            formaction="{{ app_prefix }}/mercados"
+            formnovalidate>Ver mercado do município</button>
+        </div>
+      </form>
+    </div>
 
-  {# Painel do recorte (spec §4): ocupa a coluna direita no lugar da foto da
-     referência visual. Os três números saem do código e da config — nenhum
-     literal aqui, e nenhuma contagem de escolas: `COUNT(*)` é proibido pela
-     arquitetura. `bas` não entra na contagem de etapas porque é o total do
-     Censo, não uma etapa do mercado. #}
-  <section class="recorte" aria-labelledby="recorte-titulo">
-    <h2 id="recorte-titulo">Recorte dos dados</h2>
-    <dl class="recorte__lista">
-      <div class="recorte__item">
-        <dt class="recorte__rotulo">municípios de Minas Gerais</dt>
-        <dd class="recorte__valor">{{ recorte_municipios }}</dd>
-      </div>
-      <div class="recorte__item">
-        <dt class="recorte__rotulo">anos do Censo Escolar publicados</dt>
-        <dd class="recorte__valor">{{ recorte_anos }}</dd>
-      </div>
-      <div class="recorte__item">
-        <dt class="recorte__rotulo">etapas e modalidades no mercado</dt>
-        <dd class="recorte__valor">{{ recorte_etapas }}</dd>
-      </div>
-    </dl>
-    <p class="recorte__fonte">Fonte: Censo Escolar da Educação Básica (INEP).</p>
+    {# Painel do recorte (spec §4): ocupa a coluna direita no lugar da foto da
+       referência visual. Os três números saem do código e da config — nenhum
+       literal aqui, e nenhuma contagem de escolas: `COUNT(*)` é proibido pela
+       arquitetura. `bas` não entra na contagem de etapas porque é o total do
+       Censo, não uma etapa do mercado. #}
+    <section class="recorte" aria-labelledby="recorte-titulo">
+      <h2 id="recorte-titulo">Recorte dos dados</h2>
+      <dl class="recorte__lista">
+        <div class="recorte__item">
+          <dt class="recorte__rotulo">municípios de Minas Gerais</dt>
+          <dd class="recorte__valor">{{ recorte_municipios }}</dd>
+        </div>
+        <div class="recorte__item">
+          <dt class="recorte__rotulo">anos do Censo Escolar publicados</dt>
+          <dd class="recorte__valor">{{ recorte_anos }}</dd>
+        </div>
+        <div class="recorte__item">
+          <dt class="recorte__rotulo">etapas e modalidades no mercado</dt>
+          <dd class="recorte__valor">{{ recorte_etapas }}</dd>
+        </div>
+      </dl>
+      <p class="recorte__fonte">Fonte: Censo Escolar da Educação Básica (INEP).</p>
+    </section>
   </section>
-</section>
 
-{# Conteúdo da landing (card `t_2c2e564b`, spec §5): o que dá para consultar,
-   de onde vêm os dados e para quem é. Copy institucional, sem superlativo e
-   sem CTA de piloto — a landing pública da Fase 2 do `plano.md` é outra. Os
-   anos da seção de fonte saem de `settings.anos_disponiveis` já formatados em
-   `recorte_anos`; nada de literal de ano aqui. #}
-<section aria-labelledby="encontra-titulo">
-  <h2 id="encontra-titulo">O que você encontra</h2>
-  <div class="encontra">
-    <div>
-      <h3>Ficha da escola</h3>
-      <p>Série de matrículas, oferta por etapa e rendimento. Nas escolas privadas ativas, também a posição da escola no município.</p>
-      <a href="#q">Buscar uma escola</a>
+  {# Conteúdo da landing (card `t_2c2e564b`, spec §5): o que dá para consultar,
+     de onde vêm os dados e para quem é. Copy institucional, sem superlativo e
+     sem CTA de piloto — a landing pública da Fase 2 do `plano.md` é outra. Os
+     anos da seção de fonte saem de `settings.anos_disponiveis` já formatados em
+     `recorte_anos`; nada de literal de ano aqui. #}
+  <section class="secao" aria-labelledby="encontra-titulo">
+    <h2 id="encontra-titulo">O que você encontra</h2>
+    <div class="encontra">
+      <div>
+        <h3>Ficha da escola</h3>
+        <p>Série de matrículas, oferta por etapa e rendimento. Nas escolas privadas ativas, também a posição da escola no município.</p>
+        <a href="#q">Buscar uma escola</a>
+      </div>
+      <div>
+        <h3>Mercado municipal</h3>
+        <p>Tamanho do mercado, composição por etapa e participação das escolas privadas, ano a ano.</p>
+        <a href="{{ app_prefix }}/mercados/3106200">Ver o mercado de Belo Horizonte</a>
+      </div>
+      <div>
+        <h3>Metodologia</h3>
+        <p>De onde vem cada número, o que cada indicador mede e quais são os limites de leitura.</p>
+        <a href="{{ href_metodologia }}">Ler a metodologia</a>
+      </div>
     </div>
-    <div>
-      <h3>Mercado municipal</h3>
-      <p>Tamanho do mercado, composição por etapa e participação das escolas privadas, ano a ano.</p>
-      <a href="{{ app_prefix }}/mercados/3106200">Ver o mercado de Belo Horizonte</a>
-    </div>
-    <div>
-      <h3>Metodologia</h3>
-      <p>De onde vem cada número, o que cada indicador mede e quais são os limites de leitura.</p>
-      <a href="{{ href_metodologia }}">Ler a metodologia</a>
-    </div>
-  </div>
-</section>
+  </section>
 
-<section aria-labelledby="fonte-titulo">
-  <h2 id="fonte-titulo">De onde vêm os dados</h2>
-  <p>
-    Os números vêm do Censo Escolar da Educação Básica, levantamento anual do
-    INEP que cobre todas as escolas do país. O Panorama Escola recorta Minas
-    Gerais e publica os anos {{ recorte_anos }}. Quando um dado não existe na
-    base, a tela mostra “sem dado”, e nunca zero.
-  </p>
-  <p><a href="{{ href_metodologia }}">Como os números são calculados</a></p>
-</section>
+  <section class="secao" aria-labelledby="fonte-titulo">
+    <h2 id="fonte-titulo">De onde vêm os dados</h2>
+    <p>
+      Os números vêm do Censo Escolar da Educação Básica, levantamento anual do
+      INEP que cobre todas as escolas do país. O Panorama Escola recorta Minas
+      Gerais e publica os anos {{ recorte_anos }}. Quando um dado não existe na
+      base, a tela mostra “sem dado”, e nunca zero.
+    </p>
+    <p><a href="{{ href_metodologia }}">Como os números são calculados</a></p>
+  </section>
 
-<section aria-labelledby="publico-titulo">
-  <h2 id="publico-titulo">Para quem é</h2>
-  <p>
-    Para quem acompanha a educação básica privada em Minas Gerais: gestão e
-    expansão de redes, direção de escolas e análise de mercado. O Panorama não
-    exibe dado individual de aluno.
-  </p>
-</section>
+  <section class="secao" aria-labelledby="publico-titulo">
+    <h2 id="publico-titulo">Para quem é</h2>
+    <p>
+      Para quem acompanha a educação básica privada em Minas Gerais: gestão e
+      expansão de redes, direção de escolas e análise de mercado. O Panorama não
+      exibe dado individual de aluno.
+    </p>
+  </section>
+</div>
 {% endblock %}

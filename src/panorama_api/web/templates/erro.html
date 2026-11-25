@@ -3,40 +3,42 @@
 {% block titulo %}{{ titulo }} — Panorama Escola{% endblock %}
 
 {% block conteudo %}
-<article class="cartao cartao--erro" role="alert" aria-live="polite">
-  <p class="cartao__codigo">HTTP {{ status }}</p>
-  <h1>{{ titulo }}</h1>
-  <p class="subtitulo">{{ detalhe }}</p>
+<div class="tela">
+  <article class="painel painel--erro" role="alert" aria-live="polite">
+    <p class="codigo-erro">HTTP {{ status }}</p>
+    <h1>{{ titulo }}</h1>
+    <p class="subtitulo">{{ detalhe }}</p>
 
-  {% if retry_after %}
-  <p class="aviso aviso--temporario">
-    Tente novamente em alguns minutos (nova tentativa sugerida em {{ retry_after }} segundos).
-    Nada foi exibido parcialmente: a página inteira é recarregada quando a fonte voltar.
-  </p>
-  {% elif sugestao %}
-  <p class="aviso">{{ sugestao }}</p>
-  {% endif %}
+    {% if retry_after %}
+    <p class="aviso aviso--temporario">
+      Tente novamente em alguns minutos (nova tentativa sugerida em {{ retry_after }} segundos).
+      Nada foi exibido parcialmente: a página inteira é recarregada quando a fonte voltar.
+    </p>
+    {% elif sugestao %}
+    <p class="aviso">{{ sugestao }}</p>
+    {% endif %}
 
-  {% if acao %}
-  <p><a class="paginacao__link" href="{{ acao.href }}">{{ acao.rotulo }}</a></p>
-  {% endif %}
+    {% if acao %}
+    <p><a class="paginacao__link" href="{{ acao.href }}">{{ acao.rotulo }}</a></p>
+    {% endif %}
 
-  {% if erros %}
-  <section aria-labelledby="detalhes-erro">
-    <h2 id="detalhes-erro">O que precisa ser corrigido</h2>
-    <ul class="lista-regras">
-      {% for erro in erros %}
-      <li>
-        {% if erro.loc %}<code>{{ erro.loc | join('.') }}</code>: {% endif %}{{ erro.msg }}
-      </li>
-      {% endfor %}
-    </ul>
-  </section>
-  {% endif %}
+    {% if erros %}
+    <section aria-labelledby="detalhes-erro">
+      <h2 id="detalhes-erro">O que precisa ser corrigido</h2>
+      <ul class="lista-regras">
+        {% for erro in erros %}
+        <li>
+          {% if erro.loc %}<code>{{ erro.loc | join('.') }}</code>: {% endif %}{{ erro.msg }}
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
 
-  <p class="rodape-erro">
-    Se o problema persistir, informe o código <code>{{ codigo }}</code> e o caminho
-    <code>{{ instancia }}</code>.
-  </p>
-</article>
+    <p class="rodape-erro">
+      Se o problema persistir, informe o código <code>{{ codigo }}</code> e o caminho
+      <code>{{ instancia }}</code>.
+    </p>
+  </article>
+</div>
 {% endblock %}

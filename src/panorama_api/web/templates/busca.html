@@ -9,84 +9,127 @@
 {% block rodape_nota %}{% if houve_consulta %}{{ super() }}{% endif %}{% endblock %}
 
 {% block conteudo %}
-<article class="cartao">
-  <h1>Busca de escolas</h1>
-  {# Entrada orientadora (achados A2/A3): o que é, recorte, anos publicados e
-     fonte. Os três atalhos saíram no card `t_2c2e564b`: o caminho de uso agora
-     mora na landing, e `/app/` — que continua sendo porta de entrada por
-     deep-link — mantém só uma linha de orientação e o link para `/`. #}
-  <section class="orientacao" aria-labelledby="orientacao">
-    <h2 id="orientacao" class="visualmente-oculto">O que é o Panorama Escola</h2>
-    <p class="subtitulo">
-      O <strong>Panorama Escola</strong> reúne matrícula, oferta e mercado da educação
-      básica das escolas de <strong>Minas Gerais</strong>, a partir do Censo Escolar
-      (<abbr title="Instituto Nacional de Estudos e Pesquisas Educacionais Anísio Teixeira">INEP</abbr>).
-      Anos publicados: {% for ano in anos_disponiveis %}{{ ano }}{% if not loop.last %}, {% endif %}{% endfor %}.
+<div class="tela">
+  {# Cabeçalho de tela no vocabulário do protótipo (card V1 `t_423aa547`):
+     trilha, título e subtítulo. A trilha é navegação real (o `›` é decorativo),
+     não enfeite. #}
+  <div class="tela-topo">
+    <p class="trilha">
+      <a href="{{ href_inicio }}">Início</a>
+      <span aria-hidden="true">›</span>
+      <span>Escolas</span>
     </p>
-    <p><a href="{{ href_inicio }}">Sobre o Panorama Escola</a></p>
-  </section>
+    <h1>Busca de escolas</h1>
+    <p class="subtitulo">
+      Cruze nome, município e situação de funcionamento. Matrícula e oferta
+      por etapa aparecem na mesma linha.
+    </p>
+  </div>
 
-  <form id="formulario-busca" class="formulario" method="get" action="{{ app_prefix }}/" role="search">
-    <div class="campo">
-      <label for="q">Nome da escola</label>
-      <input
-        type="search"
-        id="q"
-        name="q"
-        value="{{ filtros.q }}"
-        minlength="3"
-        maxlength="100"
-        autocomplete="off"
-        aria-describedby="q-dica">
-      <p class="dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
+  <section class="painel painel--inicial" aria-labelledby="filtros-titulo">
+    <div class="painel__cabecalho">
+      <h2 id="filtros-titulo">Filtros de busca</h2>
+      <p class="painel__nota">
+        Nome <em>ou</em> município. Os dois vazios listam o recorte inteiro.
+      </p>
     </div>
 
-    <div class="campo">
-      <label for="co_municipio">Município</label>
-      {{ select_municipios("co_municipio", filtros.co_municipio) }}
-    </div>
+    {# Entrada orientadora (achados A2/A3): o que é, recorte, anos publicados e
+       fonte. Os três atalhos saíram no card `t_2c2e564b`: o caminho de uso agora
+       mora na landing, e `/app/` — que continua sendo porta de entrada por
+       deep-link — mantém só uma linha de orientação e o link para `/`. #}
+    <section class="orientacao" aria-labelledby="orientacao">
+      <h2 id="orientacao" class="visualmente-oculto">O que é o Panorama Escola</h2>
+      <p class="subtitulo">
+        O <strong>Panorama Escola</strong> reúne matrícula, oferta e mercado da educação
+        básica das escolas de <strong>Minas Gerais</strong>, a partir do Censo Escolar
+        (<abbr title="Instituto Nacional de Estudos e Pesquisas Educacionais Anísio Teixeira">INEP</abbr>).
+        Anos publicados: {% for ano in anos_disponiveis %}{{ ano }}{% if not loop.last %}, {% endif %}{% endfor %}.
+      </p>
+      <p><a href="{{ href_inicio }}">Sobre o Panorama Escola</a></p>
+    </section>
 
-    <div class="campo campo--booleano">
-      <input
-        type="checkbox"
-        id="apenas_ativas"
-        name="apenas_ativas"
-        value="true"
-        {% if filtros.apenas_ativas %}checked{% endif %}>
-      <label for="apenas_ativas">Somente escolas ativas</label>
-    </div>
+    <form id="formulario-busca" class="formulario" method="get" action="{{ app_prefix }}/" role="search">
+      <div class="campo">
+        <label for="q">Nome da escola</label>
+        <input
+          type="search"
+          id="q"
+          name="q"
+          value="{{ filtros.q }}"
+          minlength="3"
+          maxlength="100"
+          autocomplete="off"
+          aria-describedby="q-dica">
+        <p class="dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
+      </div>
 
-    <div class="campo campo--acao">
-      <button type="submit">Buscar</button>
-      {% if filtros.q or filtros.co_municipio or filtros.apenas_ativas %}
-      {#- Saída do beco sem saída quando um filtro esconde o resultado (achado
-          C3): só aparece com filtro ativo, então não é um link morto na 1ª
-          visita. Limpa tudo, inclusive o offset (o `action` do form). -#}
-      <a class="limpar-filtros" href="{{ app_prefix }}/">Limpar filtros</a>
+      <div class="campo">
+        <label for="co_municipio">Município</label>
+        {{ select_municipios("co_municipio", filtros.co_municipio) }}
+      </div>
+
+      <div class="campo campo--booleano">
+        <input
+          type="checkbox"
+          id="apenas_ativas"
+          name="apenas_ativas"
+          value="true"
+          {% if filtros.apenas_ativas %}checked{% endif %}>
+        <label for="apenas_ativas">Somente escolas ativas</label>
+      </div>
+
+      <div class="campo campo--acao">
+        <button type="submit">Buscar</button>
+        {% if filtros.q or filtros.co_municipio or filtros.apenas_ativas %}
+        {#- Saída do beco sem saída quando um filtro esconde o resultado (achado
+            C3): só aparece com filtro ativo, então não é um link morto na 1ª
+            visita. Limpa tudo, inclusive o offset (o `action` do form). -#}
+        <a class="limpar-filtros" href="{{ app_prefix }}/">Limpar filtros</a>
+        {% endif %}
+      </div>
+    </form>
+
+    {# Chips de filtro ativo (linguagem do protótipo, card V1): mostram **o que**
+       está aplicado, não só o link de limpar. Só existem com filtro aplicado. #}
+    {% if filtros.q or filtros.co_municipio or filtros.apenas_ativas %}
+    <ul class="chips" aria-label="Filtros aplicados">
+      {% if filtros.q %}
+      <li class="chip">nome: <strong>{{ filtros.q }}</strong></li>
       {% endif %}
-    </div>
-  </form>
+      {% if filtros.co_municipio %}
+      <li class="chip">município: <strong>{{ filtros.co_municipio }}</strong></li>
+      {% endif %}
+      {% if filtros.apenas_ativas %}
+      <li class="chip">somente ativas</li>
+      {% endif %}
+    </ul>
+    {% endif %}
+  </section>
 
   {# O recorte descreve a consulta feita (ano, etapa, universo, fonte, avisos).
      Sem consulta não há recorte a declarar — e `ano_referencia` nulo sairia
      como "sem dado", sugerindo base faltando (achado A3). #}
   {% if houve_consulta %}
-  <section aria-labelledby="recorte">
-    <h2 id="recorte">Recorte da busca</h2>
+  <section class="painel" aria-labelledby="recorte">
+    <div class="painel__cabecalho">
+      <h2 id="recorte">Recorte da busca</h2>
+      <p class="painel__nota">A origem de cada número da tabela de escolas.</p>
+    </div>
     <dl class="lista-definicoes">
       <dt>Ano de referência</dt>
       <dd>{{ meta.ano_referencia | fmt_ano }}</dd>
       <dt>Etapa</dt>
       <dd>{{ etapa_rotulo }}</dd>
-      <dt>Universo (meta.universo)</dt>
+      <dt>Universo</dt>
       <dd><code>{{ meta.universo }}</code>{% if universo_descricao %} — {{ universo_descricao }}{% endif %}</dd>
-      <dt>Fonte (meta.fonte)</dt>
+      <dt>Fonte</dt>
       <dd>{{ meta.fonte.orgao }} · {{ meta.fonte.base }} · <code>{{ meta.fonte.tabela }}</code></dd>
       {% if filtros.apenas_ativas %}
       <dt>Filtro de situação</dt>
       <dd>somente escolas ativas (<code>situacao_funcionamento = '1'</code>)</dd>
       {% endif %}
-      <dt>Avisos (meta.avisos)</dt>
+      <dt>Avisos</dt>
       <dd>
         {% if avisos %}
         <ul class="lista-regras">
@@ -102,28 +145,34 @@
   </section>
   {% endif %}
 
-  <section aria-labelledby="escolas">
-    <h2 id="escolas">Escolas</h2>
+  <section class="painel" aria-labelledby="escolas">
+    <div class="painel__cabecalho">
+      <h2 id="escolas">Escolas</h2>
+      <p class="painel__nota">
+        Uma linha por escola do recorte. O nome abre a ficha; o município abre o
+        mercado municipal.
+      </p>
+    </div>
     {% if resposta and escolas %}
     <p class="paginacao__contagem">Mostrando {{ paginacao.mostrando }}.</p>
-    <div class="tabela-rolavel">
+    <div class="tabela-rolavel" role="region" aria-label="Escolas encontradas (tabela com rolagem)" tabindex="0">
       <table class="tabela">
         <caption class="visualmente-oculto">Escolas encontradas nesta página</caption>
         <thead>
           <tr>
-            <th scope="col">Escola</th>
-            <th scope="col">Código INEP</th>
+            <th scope="col" class="nome-escola">Escola</th>
+            <th scope="col" class="num">Código INEP</th>
             <th scope="col">Município</th>
-            <th scope="col">Dependência (código INEP)</th>
-            <th scope="col">Situação (código INEP)</th>
+            <th scope="col" class="num">Dependência (código INEP)</th>
+            <th scope="col" class="num">Situação (código INEP)</th>
             <th scope="col">Oferta — educação básica</th>
-            <th scope="col">Último registro</th>
+            <th scope="col" class="num">Último registro</th>
           </tr>
         </thead>
         <tbody>
           {% for escola in escolas %}
           <tr>
-            <td>
+            <td class="nome-escola">
               {# O nome é o link da ficha; o código INEP continua em `<code>`. #}
               {% if escola.co_entidade %}
               <a href="{{ app_prefix }}/escolas/{{ escola.co_entidade }}">{{ escola.no_entidade | fmt_nulo }}</a>
@@ -131,7 +180,7 @@
               {{ escola.no_entidade | fmt_nulo }}
               {% endif %}
             </td>
-            <td><code>{{ escola.co_entidade }}</code></td>
+            <td class="num"><code>{{ escola.co_entidade }}</code></td>
             <td>
               {# Município leva ao mercado municipal; o código IBGE fica ao lado. #}
               {% if escola.co_municipio %}
@@ -141,13 +190,13 @@
               {{ escola.no_municipio | fmt_nulo }}
               {% endif %}
             </td>
-            <td>{{ escola.tp_dependencia | fmt_nulo }}</td>
-            <td>{{ escola.tp_situacao_funcionamento | fmt_nulo }}</td>
+            <td class="num">{{ escola.tp_dependencia | fmt_nulo }}</td>
+            <td class="num">{{ escola.tp_situacao_funcionamento | fmt_nulo }}</td>
             <td>
               {{ escola.oferta.bas | fmt_oferta }}
               {% if escola.is_oferta_desconhecida %}<span class="nota">{{ texto_oferta_desconhecida }}</span>{% endif %}
             </td>
-            <td>{{ escola.nu_ano_ultimo_registro | fmt_ano }}</td>
+            <td class="num">{{ escola.nu_ano_ultimo_registro | fmt_ano }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -172,7 +221,7 @@
     <p class="sem-dado">Nenhuma escola encontrada para esta busca.</p>
     {#- Estado vazio com próximo passo: o critério pode estar escondendo o
         resultado, e a página não pode ser um beco sem saída (achado C4). -#}
-    <div class="cartao--vazio">
+    <div class="estado-vazio">
       <h3>O que tentar</h3>
       <ul class="lista-regras">
         {% for sugestao in sugestoes_vazio %}
@@ -188,5 +237,5 @@
     </p>
     {% endif %}
   </section>
-</article>
+</div>
 {% endblock %}

@@ -45,7 +45,7 @@
       <option value="{{ ano }}"{% if ano == ano_selecionado %} selected{% endif %}>{{ ano | fmt_ano }}</option>
       {% endfor %}
     </select>
-    <p class="dica" id="ano-dica">Anos publicados para o front (<code>APP_ANOS_DISPONIVEIS</code>).</p>
+    <p class="dica" id="ano-dica">Anos publicados nesta versão dos dados.</p>
   </div>
 
   <div class="campo">
@@ -64,21 +64,24 @@
 </form>
 {%- endmacro %}
 
-{# Recorte obrigatório (plano §1): ano, etapa, universo, fonte e avisos. #}
+{# Recorte obrigatório (plano §1): ano, etapa, universo, fonte e avisos.
+   Card V1 `t_423aa547`: os rótulos mostram o **nome do dado**, não o caminho no
+   contrato (`meta.universo`) — a chave técnica continua visível no valor e na
+   metodologia, onde serve a quem audita o JSON. #}
 {% macro recorte_mercado(m, titulo) -%}
 <dl class="lista-definicoes recorte" aria-label="{{ titulo }}">
   <dt>Ano de referência</dt>
   <dd>{{ m.ano_referencia | fmt_ano }}</dd>
   <dt>Etapa</dt>
   <dd>{{ m.etapa }}</dd>
-  <dt>Universo (meta.universo)</dt>
+  <dt>Universo</dt>
   <dd>
     <code>{{ m.universo }}</code>
     {%- if m.universo_texto %} — {{ m.universo_texto }}{% endif %}
   </dd>
-  <dt>Fonte (meta.fonte)</dt>
+  <dt>Fonte</dt>
   <dd>{{ m.orgao }} · {{ m.base }} · <code>{{ m.tabela }}</code></dd>
-  <dt>Avisos (meta.avisos)</dt>
+  <dt>Avisos</dt>
   <dd>
     {% if m.avisos %}
     <ul class="lista-regras">

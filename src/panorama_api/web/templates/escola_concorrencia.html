@@ -3,6 +3,9 @@
 {% from "partials/macros.html" import recorte, bloco_nao_se_aplica with context %}
 {% from "partials/subnav.html" import subnav with context %}
 
+{# Um único bloco de recorte: a página consome **uma** resposta (indicadores,
+   que já traz a comparação municipal do mesmo ano). #}
+
 {#
   Indicadores e concorrência (spec §2.2, §5.1, §5.2) — rota própria da ficha.
 
@@ -11,22 +14,32 @@
   e nenhuma delas é o `history`: o cabeçalho vem da própria resposta de
   indicadores. Sem `competicao` no ano mais recente, a seção diz "sem dado" com
   o motivo — nunca 0 (AGENTS.md §6).
+
+  Card V1 `t_423aa547`: cabeçalho em `.tela-topo` e cada seção em `.painel`,
+  como na ficha e no protótipo. Nenhum `id` de seção mudou.
 #}
 {% block titulo %}{{ cabecalho.no_entidade or "Escola " ~ cabecalho.co_entidade }} — {{ titulo_secao }} — Panorama Escola{% endblock %}
 
 {% block conteudo %}
-<article class="cartao">
-  {{ cabecalho_escola(cabecalho, migalhas, sem_nome) }}
-  {{ subnav(subnav_itens) }}
+<div class="tela">
+  <div class="tela-topo">
+    {{ cabecalho_escola(cabecalho, migalhas, sem_nome) }}
+    {{ subnav(subnav_itens) }}
+  </div>
 
   {% if nao_se_aplica %}
   {# 404 de universo é estado legítimo da seção: página 200, motivo fixo e
      caminho de volta — nunca erro inteiro, nunca seção vazia sem explicação. #}
-  {{ bloco_nao_se_aplica(nao_se_aplica_titulo, motivo) }}
-  <p><a href="{{ href_visao_geral }}">{{ texto_voltar }}</a></p>
+  <section class="painel painel--inicial">
+    {{ bloco_nao_se_aplica(nao_se_aplica_titulo, motivo) }}
+    <p><a href="{{ href_visao_geral }}">{{ texto_voltar }}</a></p>
+  </section>
   {% else %}
-  <section aria-labelledby="indicadores">
-    <h2 id="indicadores">Indicadores</h2>
+  <section class="painel painel--inicial" aria-labelledby="indicadores">
+    <div class="painel__cabecalho">
+      <h2 id="indicadores">Indicadores</h2>
+      <p class="painel__nota">Indicadores do recorte mais recente publicado.</p>
+    </div>
     {% if aviso_abaixo_porte %}
     <p class="aviso">{{ texto_abaixo_porte }}</p>
     {% endif %}
@@ -38,11 +51,15 @@
     </dl>
   </section>
 
-  <section aria-labelledby="comparacao">
-    <h2 id="comparacao">Comparação municipal</h2>
+  <section class="painel" aria-labelledby="comparacao">
+    <div class="painel__cabecalho">
+      <h2 id="comparacao">Comparação municipal</h2>
+      <p class="painel__nota">
+        Sempre municipal e no mesmo ano censitário dos indicadores.
+      </p>
+    </div>
     <p class="subtitulo">
       <strong>Definição da comparação:</strong> {{ definicao_concorrencia }}.
-      A comparação é sempre municipal, no mesmo ano censitário.
     </p>
     {% if motivo_sem_comparacao %}
     {# Ausência de linha de `mart_competidores` no ano dos indicadores: o
@@ -68,7 +85,7 @@
       <dd class="gap-lider">{{ competicao.gap | fmt_gap_lider }}</dd>
     </dl>
     <div class="tabela-rolavel" role="region" aria-label="Concorrentes por etapa (tabela com rolagem)" tabindex="0">
-      <table>
+      <table class="tabela">
         <caption>Concorrentes privadas com matrícula observada por etapa — {{ competicao.ano | fmt_ano }}</caption>
         <thead>
           <tr>
@@ -89,9 +106,13 @@
     {% endif %}
   </section>
 
-  {# Um único bloco de recorte: a página consome **uma** resposta (indicadores,
-     que já traz a comparação municipal do mesmo ano). #}
-  {{ recorte(meta_indicadores) }}
+  <section class="painel" aria-labelledby="recorte-indicadores">
+    <div class="painel__cabecalho">
+      <h2 id="recorte-indicadores">Recorte dos indicadores</h2>
+      <p class="painel__nota">A origem de cada número desta tela.</p>
+    </div>
+    {{ recorte(meta_indicadores) }}
+  </section>
   {% endif %}
-</article>
+</div>
 {% endblock %}

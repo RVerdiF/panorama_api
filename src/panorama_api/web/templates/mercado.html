@@ -4,7 +4,11 @@
 
 {# **Visão geral** do mercado (cards F5 e NAV-3): tamanho, composição por etapa,
    cobertura e entrada/saída. O ranking de share saiu daqui — vive em
-   `/app/mercados/{mun}/escolas`, que é quem consulta `mart_market_share`. #}
+   `/app/mercados/{mun}/escolas`, que é quem consulta `mart_market_share`.
+
+   Card V1 `t_423aa547`: cabeçalho em `.tela-topo`, recorte em `.painel`, e cada
+   bloco de dado em `.painel` com `.painel__cabecalho` — a hierarquia do
+   protótipo. Os `id`s de seção, o subnav e o formulário de recorte não mudaram. #}
 
 {# O município no `<title>` é o que distingue abas de mercados diferentes
    (achado D3). Sem nome na resposta, o código IBGE ocupa o lugar — nunca um
@@ -12,16 +16,25 @@
 {% block titulo %}Mercado municipal de {{ municipio_nome }} — Panorama Escola{% endblock %}
 
 {% block conteudo %}
-<article class="cartao">
-  {{ cabecalho_mercado(migalhas, municipio, municipio_nome) }}
-  {{ subnav(subnav_itens, "Seções do mercado") }}
-  {# O `action` é a rota atual: o recorte vale para as duas seções, mas o
-     formulário da Visão geral não leva `offset` (não é rota paginada). #}
-  {{ seletor_mercado(href_base, anos_disponiveis, ano_selecionado, etapas_disponiveis, etapa_selecionada,
-                     "A composição abaixo cobre todas as etapas; a etapa escolhida vale para cobertura e entrada/saída.") }}
+<div class="tela">
+  <div class="tela-topo">
+    {{ cabecalho_mercado(migalhas, municipio, municipio_nome) }}
+    {{ subnav(subnav_itens, "Seções do mercado") }}
+  </div>
+
+  <section class="painel painel--inicial" aria-labelledby="recorte-titulo">
+    <div class="painel__cabecalho">
+      <h2 id="recorte-titulo">Recorte do mercado</h2>
+      <p class="painel__nota">Ano e etapa valem para as duas seções do mercado.</p>
+    </div>
+    {# O `action` é a rota atual: o recorte vale para as duas seções, mas o
+       formulário da Visão geral não leva `offset` (não é rota paginada). #}
+    {{ seletor_mercado(href_base, anos_disponiveis, ano_selecionado, etapas_disponiveis, etapa_selecionada,
+                       "A composição abaixo cobre todas as etapas; a etapa escolhida vale para cobertura e entrada/saída.") }}
+  </section>
 
   {% if sem_dados_ano %}
-  <section aria-labelledby="sem-dados-ano" class="cartao--erro">
+  <section aria-labelledby="sem-dados-ano" class="painel painel--erro">
     <h2 id="sem-dados-ano">{{ pagina_erro_titulo }}</h2>
     <p class="aviso aviso--temporario">
       {{ detalhe }} — o recorte escolhido não está publicado. Selecione outro ano
@@ -31,11 +44,15 @@
   </section>
   {% else %}
 
-  <section aria-labelledby="resumo">
-    <h2 id="resumo">Tamanho do mercado em {{ ano_selecionado | fmt_ano }}</h2>
+  <section class="painel" aria-labelledby="resumo">
+    <div class="painel__cabecalho">
+      <h2 id="resumo">Tamanho do mercado em {{ ano_selecionado | fmt_ano }}</h2>
+      <p class="painel__nota">
+        Contagem de escolas privadas ativas no mesmo município e ano.
+      </p>
+    </div>
     <p class="subtitulo">
       <strong>Concorrência:</strong> {{ definicao_concorrencia }}
-      A contagem abaixo é de escolas privadas ativas no mesmo município e ano.
     </p>
     <dl class="lista-definicoes">
       <dt>Escolas privadas ativas no município e ano</dt>
@@ -56,12 +73,16 @@
   </section>
 
   {% if etapas %}
-  <section aria-labelledby="composicao">
-    <h2 id="composicao">Composição por etapa</h2>
+  <section class="painel" aria-labelledby="composicao">
+    <div class="painel__cabecalho">
+      <h2 id="composicao">Composição por etapa</h2>
+      <p class="painel__nota">
+        Uma linha por etapa servida por <code>mart_mercado</code>.
+      </p>
+    </div>
     <p class="subtitulo">
-      Uma linha por etapa servida por <code>mart_mercado</code>. <em>Educação
-      básica (total)</em> é o total oficial do Censo, não a soma das subetapas.
-      Valor ausente aparece como <em>sem dado</em>, nunca como zero.
+      <em>Educação básica (total)</em> é o total oficial do Censo, não a soma das
+      subetapas. Valor ausente aparece como <em>sem dado</em>, nunca como zero.
     </p>
     <p class="aviso">
       A contagem de <strong>escolas ativas</strong> e de <strong>privadas
@@ -100,8 +121,10 @@
   </section>
 
   {% if item_etapa %}
-  <section aria-labelledby="cobertura">
-    <h2 id="cobertura">Cobertura da matrícula — {{ etapa_rotulo }}</h2>
+  <section class="painel" aria-labelledby="cobertura">
+    <div class="painel__cabecalho">
+      <h2 id="cobertura">Cobertura da matrícula — {{ etapa_rotulo }}</h2>
+    </div>
     <div class="tabela-rolavel" role="region" aria-label="Cobertura da matrícula (tabela com rolagem)" tabindex="0">
       <table class="tabela">
         <caption>Cobertura de matrícula na etapa {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
@@ -123,9 +146,11 @@
     </div>
   </section>
 
-  <section aria-labelledby="movimento">
-    <h2 id="movimento">Entrada e saída de escolas — {{ etapa_rotulo }}</h2>
-    <p class="subtitulo">{{ motivo_entrada_saida }}</p>
+  <section class="painel" aria-labelledby="movimento">
+    <div class="painel__cabecalho">
+      <h2 id="movimento">Entrada e saída de escolas — {{ etapa_rotulo }}</h2>
+      <p class="painel__nota">{{ motivo_entrada_saida }}</p>
+    </div>
     <div class="tabela-rolavel" role="region" aria-label="Entrada e saída de escolas (tabela com rolagem)" tabindex="0">
       <table class="tabela">
         <caption>Movimento de escolas na etapa {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
@@ -149,10 +174,13 @@
   {% endif %}
   {% endif %}
 
-  <section aria-labelledby="recorte-mercado">
-    <h2 id="recorte-mercado">Recorte da composição</h2>
+  <section class="painel" aria-labelledby="recorte-mercado">
+    <div class="painel__cabecalho">
+      <h2 id="recorte-mercado">Recorte da composição</h2>
+      <p class="painel__nota">A origem de cada número desta tela.</p>
+    </div>
     {{ recorte_mercado(meta, "Recorte de mart_mercado") }}
   </section>
   {% endif %}
-</article>
+</div>
 {% endblock %}

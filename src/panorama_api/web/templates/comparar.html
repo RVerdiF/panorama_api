@@ -22,37 +22,52 @@
   sólida × barra de contorno tracejado); o equivalente acessível é a tabela.
 #}
 {% block conteudo %}
-<article class="cartao">
-  {{ breadcrumb(migalhas) }}
-  <h1>{{ titulo_secao }}</h1>
+<div class="tela">
+  {# Card V1 `t_423aa547`: a trilha e o título saem para `.tela-topo` e cada
+     bloco de conteúdo vira `.painel` — a gramática das outras telas. #}
+  <div class="tela-topo">
+    {{ breadcrumb(migalhas) }}
+    <h1>{{ titulo_secao }}</h1>
+    {% if duas %}
+    <p class="subtitulo">
+      Matrícula da educação básica das duas escolas, ano a ano, e a oferta por
+      etapa no ano mais recente que as duas têm em comum. Indicadores e
+      comparação municipal continuam nas fichas de cada escola.
+    </p>
+    {% endif %}
+  </div>
 
   {% if duas %}
-  <p class="subtitulo">
-    Matrícula da educação básica das duas escolas, ano a ano, e a oferta por
-    etapa no ano mais recente que as duas têm em comum. Indicadores e
-    comparação municipal continuam nas fichas de cada escola.
-  </p>
-
   {% if aviso_municipios %}
   <p class="aviso">{{ aviso_municipios }}</p>
   {% endif %}
 
-  <dl class="lista-definicoes">
-    {% for escola in escolas %}
-    <dt>{{ escola.rotulo }} — escola <code>{{ escola.co_entidade }}</code></dt>
-    <dd>
-      {{ escola.no_municipio | fmt_nulo }}
-      · <a href="{{ escola.href }}">Ver a ficha</a>
-    </dd>
-    {% endfor %}
-  </dl>
+  <section class="painel painel--inicial" aria-labelledby="escolas-comparadas">
+    <div class="painel__cabecalho">
+      <h2 id="escolas-comparadas">Escolas comparadas</h2>
+      <p class="painel__nota">As duas fichas lado a lado e o caminho de volta.</p>
+    </div>
+    <dl class="lista-definicoes">
+      {% for escola in escolas %}
+      <dt>{{ escola.rotulo }} — escola <code>{{ escola.co_entidade }}</code></dt>
+      <dd>
+        {{ escola.no_municipio | fmt_nulo }}
+        · <a href="{{ escola.href }}">Ver a ficha</a>
+      </dd>
+      {% endfor %}
+    </dl>
+  </section>
 
-  <section aria-labelledby="serie">
-    <h2 id="serie">Série de matrículas</h2>
+  <section class="painel" aria-labelledby="serie">
+    <div class="painel__cabecalho">
+      <h2 id="serie">Série de matrículas</h2>
+      <p class="painel__nota">
+        Ano sem valor aparece como <em>sem dado</em> — nunca como zero.
+      </p>
+    </div>
     <p class="subtitulo">
       Matrícula da educação básica (total oficial do Censo, não a soma das
-      subetapas) por ano censitário. Ano sem valor aparece como
-      <em>sem dado</em> — nunca como zero.
+      subetapas) por ano censitário.
     </p>
     <figure class="serie-figura">
       {% if serie.svg %}
@@ -72,7 +87,7 @@
     </figure>
     {% if serie.pontos %}
     <div class="tabela-rolavel" role="region" aria-label="Série de matrículas por ano, comparada (tabela com rolagem)" tabindex="0">
-      <table>
+      <table class="tabela">
         <caption>Série de matrículas por ano censitário — comparação</caption>
         <thead>
           <tr>
@@ -95,20 +110,23 @@
     {% endif %}
   </section>
 
-  <section aria-labelledby="oferta">
-    <h2 id="oferta">
-      Oferta e matrícula por etapa{% if ano_comum %} ({{ ano_comum | fmt_ano }}){% endif %}
-    </h2>
+  <section class="painel" aria-labelledby="oferta">
+    <div class="painel__cabecalho">
+      <h2 id="oferta">
+        Oferta e matrícula por etapa{% if ano_comum %} ({{ ano_comum | fmt_ano }}){% endif %}
+      </h2>
+      <p class="painel__nota">Ano mais recente comum às duas escolas.</p>
+    </div>
     {% if etapas %}
     <p class="subtitulo">
-      Ano mais recente comum às duas escolas. Oferta é tri-estado: <em>Sim</em>
+      Oferta é tri-estado: <em>Sim</em>
       (matrícula maior que zero), <em>Não</em> (zero declarado) e
       <em>Desconhecido</em> (a base não informou). As linhas estão agrupadas
       pela natureza do número: total oficial, etapas que somam e
       modalidades/subconjuntos que <strong>não</strong> somam ao total.
     </p>
     <div class="tabela-rolavel" role="region" aria-label="Oferta e matrícula por etapa, comparada (tabela com rolagem)" tabindex="0">
-      <table>
+      <table class="tabela">
         <caption>Oferta e matrícula por etapa em {{ ano_comum | fmt_ano }} — comparação</caption>
         <thead>
           <tr>
@@ -146,8 +164,11 @@
     {% endif %}
   </section>
 
-  <section aria-labelledby="recorte-comparacao">
-    <h2 id="recorte-comparacao">Recorte da comparação</h2>
+  <section class="painel" aria-labelledby="recorte-comparacao">
+    <div class="painel__cabecalho">
+      <h2 id="recorte-comparacao">Recorte da comparação</h2>
+      <p class="painel__nota">A origem de cada número da comparação.</p>
+    </div>
     <dl class="lista-definicoes recorte">
       <dt>Universo</dt>
       <dd>
@@ -172,8 +193,11 @@
   </section>
 
   {% else %}
-  <section aria-labelledby="escola-a">
-    <h2 id="escola-a">{{ escolas[0].rotulo }}</h2>
+  <section class="painel painel--inicial" aria-labelledby="escola-a">
+    <div class="painel__cabecalho">
+      <h2 id="escola-a">{{ escolas[0].rotulo }}</h2>
+      <p class="painel__nota">A escola que abre a comparação.</p>
+    </div>
     <p class="subtitulo">
       Escola <code>{{ escolas[0].co_entidade }}</code> ·
       {%- if escolas[0].co_municipio %}
@@ -212,7 +236,7 @@
     </figure>
     {% if escola_unica.serie.pontos %}
     <div class="tabela-rolavel" role="region" aria-label="Série de matrículas por ano (tabela com rolagem)" tabindex="0">
-      <table>
+      <table class="tabela">
         <caption>Série de matrículas por ano censitário</caption>
         <thead>
           <tr>
@@ -233,11 +257,16 @@
     {% endif %}
   </section>
 
-  <section aria-labelledby="escolher">
-    <h2 id="escolher">Escolher a segunda escola</h2>
+  <section class="painel" aria-labelledby="escolher">
+    <div class="painel__cabecalho">
+      <h2 id="escolher">Escolher a segunda escola</h2>
+      <p class="painel__nota">
+        Busque pelo nome; o link "{{ texto_comparar_com_esta }}" abre a
+        comparação das duas.
+      </p>
+    </div>
     <p class="subtitulo">
-      Busque pelo nome da escola que você quer colocar ao lado desta. O link
-      "{{ texto_comparar_com_esta }}" abre a comparação das duas.
+      Busque pelo nome da escola que você quer colocar ao lado desta.
     </p>
     <form class="formulario" method="get" action="{{ caminho_comparar }}" role="search">
       <input type="hidden" name="escolas" value="{{ escolas_param }}">
@@ -308,8 +337,11 @@
     {% endif %}
   </section>
 
-  <section aria-labelledby="recorte-comparacao">
-    <h2 id="recorte-comparacao">Recorte</h2>
+  <section class="painel" aria-labelledby="recorte-comparacao">
+    <div class="painel__cabecalho">
+      <h2 id="recorte-comparacao">Recorte</h2>
+      <p class="painel__nota">A origem de cada número desta tela.</p>
+    </div>
     <dl class="lista-definicoes recorte">
       <dt>Universo</dt>
       <dd>
@@ -333,5 +365,5 @@
     </dl>
   </section>
   {% endif %}
-</article>
+</div>
 {% endblock %}

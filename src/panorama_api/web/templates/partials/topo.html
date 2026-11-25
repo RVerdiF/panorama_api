@@ -1,7 +1,18 @@
-{# Shell de navegação único do front. #}
+{# Shell de navegação único do front (card V1 `t_423aa547`).
+
+   A marca segue o protótipo do dono: sinal `PE`, nome e subtítulo. O `PE` é
+   decorativo (`aria-hidden`) e o subtítulo é texto de apoio — o nome acessível
+   do link continua sendo "Panorama Escola". O selo à direita declara a fonte do
+   dado exibido, sem prometer recorte que a tela não tenha. #}
 <header class="topo">
   <div class="topo__interno">
-    <a class="topo__marca" href="{{ href_inicio }}">Panorama Escola</a>
+    <a class="topo__marca" href="{{ href_inicio }}">
+      <span class="topo__sinal" aria-hidden="true">PE</span>
+      <span class="topo__texto">
+        <span class="topo__nome">Panorama Escola</span>
+        <span class="topo__sub">Inteligência de mercado · MG</span>
+      </span>
+    </a>
     <nav class="topo__nav" aria-label="Navegação principal">
       <a href="{{ href_busca }}"{% if pagina_atual == "escolas" %} aria-current="page"{% elif area_atual == "escolas" %} aria-current="true"{% endif %}>Escolas</a>
       <a href="{{ href_mercados }}"{% if pagina_atual == "municipios" %} aria-current="page"{% elif area_atual == "municipios" %} aria-current="true"{% endif %}>Municípios</a>
@@ -17,5 +28,6 @@
         </ul>
       </details>
     </nav>
+    <span class="selo-dados"><span class="selo-dados__ponto" aria-hidden="true"></span>Censo Escolar · INEP</span>
   </div>
 </header>

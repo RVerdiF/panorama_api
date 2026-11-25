@@ -153,7 +153,7 @@ def test_paginas_do_front_levam_csp_e_nosniff(cliente: TestClient, caminho: str)
 def test_csp_e_a_politica_exata_da_spec(cliente: TestClient) -> None:
     assert cliente.get(BUSCA).headers["content-security-policy"] == (
         "default-src 'none'; script-src 'self'; style-src 'self'; "
-        "img-src 'self'; connect-src 'self'; form-action 'self'; "
+        "img-src 'self'; font-src 'self'; connect-src 'self'; form-action 'self'; "
         "base-uri 'none'; frame-ancestors 'none'; object-src 'none'"
     )
 

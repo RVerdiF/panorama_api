@@ -5,6 +5,9 @@
 
 {% block titulo %}{{ escola.no_entidade or "Escola " ~ escola.co_entidade }} — Panorama Escola{% endblock %}
 
+{# A nota de ausência do rodapé fala de dado exibido: só faz sentido na tela que
+   tem dado. A ficha tem, então herda a nota do `base.html`. #}
+
 {#
   Visão geral da escola (spec §2.2): uma única consulta (`history`) alimenta
   cabeçalho, identificação, oferta do ano recente, série (SVG + tabela) e
@@ -13,67 +16,74 @@
 
   A ordem das seções é contrato: resumo → `#oferta` → `#serie` → `#rendimento`,
   os mesmos `id`s que a linha "Nesta página:" aponta.
+
+  Card V1 `t_423aa547`: o cabeçalho de tela passou a viver em `.tela-topo` (fora
+  dos painéis) e cada bloco de conteúdo virou `.painel` com `.painel__cabecalho`
+  — a hierarquia do protótipo. Os `id`s de âncora e a ordem não mudaram.
 #}
 {% block conteudo %}
-<article class="cartao">
-  {{ cabecalho_escola(cabecalho, migalhas, sem_nome) }}
-  {{ subnav(subnav_itens) }}
+<div class="tela">
+  <div class="tela-topo">
+    {{ cabecalho_escola(cabecalho, migalhas, sem_nome) }}
+    {{ subnav(subnav_itens) }}
+  </div>
 
-  {#- Entrada da comparação lado a lado (card C4): a ficha já tem o id e abre a
-      página com um id, onde se busca a segunda escola sem JS. -#}
-  <p><a href="{{ href_comparar }}">{{ rotulo_comparar }}</a></p>
+  <div class="painel painel--inicial">
+    {#- Entrada da comparação lado a lado (card C4): a ficha já tem o id e abre a
+        página com um id, onde se busca a segunda escola sem JS. -#}
+    <p><a href="{{ href_comparar }}">{{ rotulo_comparar }}</a></p>
 
-  {% if motivo_concorrencia %}
-  {# Escola fora do universo de privadas ativas: a ausência da seção é
-     explicada sem consulta (decisão pelo item mais recente da série). #}
-  <p class="nao-se-aplica">{{ motivo_concorrencia }}</p>
-  {% endif %}
+    {% if motivo_concorrencia %}
+    {# Escola fora do universo de privadas ativas: a ausência da seção é
+       explicada sem consulta (decisão pelo item mais recente da série). #}
+    <p class="nao-se-aplica">{{ motivo_concorrencia }}</p>
+    {% endif %}
 
-  <nav class="nesta-pagina" aria-label="Nesta página">
-    <p>
-      {{ texto_nesta_pagina }}
-      <a href="#oferta">Oferta e matrícula</a> ·
-      <a href="#serie">Série de matrículas</a> ·
-      <a href="#rendimento">Rendimento</a>
-    </p>
-  </nav>
+    <nav class="nesta-pagina" aria-label="Nesta página">
+      <p>
+        {{ texto_nesta_pagina }}
+        <a href="#oferta">Oferta e matrícula</a> ·
+        <a href="#serie">Série de matrículas</a> ·
+        <a href="#rendimento">Rendimento</a>
+      </p>
+    </nav>
 
-  {% if recente %}
-  <dl class="lista-definicoes">
-    <dt>Dependência administrativa (código INEP)</dt>
-    <dd>
-      <code>{{ recente.tp_dependencia | fmt_nulo }}</code> — {{ dependencia_rotulo }}
-    </dd>
-    <dt>Situação de funcionamento (código INEP)</dt>
-    <dd>
-      <code>{{ recente.tp_situacao_funcionamento | fmt_nulo }}</code> — {{ situacao_rotulo }}
-    </dd>
-    <dt>Anos na série</dt>
-    <dd>
-      {{ itens | length }}
-      {%- if ano_inicial is not none and ano_inicial != recente.nu_ano_censo %}
-      (de {{ ano_inicial | fmt_ano }} a {{ recente.nu_ano_censo | fmt_ano }})
-      {%- else %}
-      ({{ recente.nu_ano_censo | fmt_ano }})
-      {%- endif %}
-    </dd>
-  </dl>
-  {% endif %}
-
-  <section aria-labelledby="recorte-serie">
-    <h2 id="recorte-serie">Recorte da série de matrículas</h2>
-    {{ recorte(meta) }}
-  </section>
+    {% if recente %}
+    <dl class="lista-definicoes">
+      <dt>Dependência administrativa (código INEP)</dt>
+      <dd>
+        <code>{{ recente.tp_dependencia | fmt_nulo }}</code> — {{ dependencia_rotulo }}
+      </dd>
+      <dt>Situação de funcionamento (código INEP)</dt>
+      <dd>
+        <code>{{ recente.tp_situacao_funcionamento | fmt_nulo }}</code> — {{ situacao_rotulo }}
+      </dd>
+      <dt>Anos na série</dt>
+      <dd>
+        {{ itens | length }}
+        {%- if ano_inicial is not none and ano_inicial != recente.nu_ano_censo %}
+        (de {{ ano_inicial | fmt_ano }} a {{ recente.nu_ano_censo | fmt_ano }})
+        {%- else %}
+        ({{ recente.nu_ano_censo | fmt_ano }})
+        {%- endif %}
+      </dd>
+    </dl>
+    {% endif %}
+  </div>
 
   {% if etapas %}
-  <section aria-labelledby="oferta">
-    <h2 id="oferta">Oferta e matrícula por etapa ({{ recente.nu_ano_censo | fmt_ano }})</h2>
+  <section class="painel" aria-labelledby="oferta">
+    <div class="painel__cabecalho">
+      <h2 id="oferta">Oferta e matrícula por etapa ({{ recente.nu_ano_censo | fmt_ano }})</h2>
+      <p class="painel__nota">
+        Três grupos distintos: o total oficial, as etapas que somam e as
+        modalidades que <strong>não</strong> somam.
+      </p>
+    </div>
     <p class="subtitulo">
       Oferta é tri-estado: <em>Sim</em> (matrícula maior que zero),
       <em>Não</em> (zero declarado) e <em>Desconhecido</em> (a base não
-      informou). <em>Desconhecido</em> não é "não oferta". As linhas estão
-      agrupadas pela natureza do número: total oficial, etapas que somam e
-      modalidades/subconjuntos que <strong>não</strong> somam ao total.
+      informou). <em>Desconhecido</em> não é "não oferta".
     </p>
     {% if recente.is_oferta_desconhecida %}
     <p class="aviso">{{ texto_oferta_desconhecida }}</p>
@@ -83,7 +93,7 @@
          `data-tipo` — Oferta é tri-estado e não ordena. Cada `<tbody>` é um
          grupo semântico, então a ordenação acontece **dentro** do grupo: o
          cabeçalho dele e a linha de total (`data-fixa`) não se movem. #}
-      <table data-ordenavel>
+      <table class="tabela" data-ordenavel>
         <caption>Oferta por etapa e matrícula observada em {{ recente.nu_ano_censo | fmt_ano }}</caption>
         <thead>
           <tr>
@@ -113,12 +123,16 @@
   </section>
   {% endif %}
 
-  <section aria-labelledby="serie">
-    <h2 id="serie">Série de matrículas</h2>
+  <section class="painel" aria-labelledby="serie">
+    <div class="painel__cabecalho">
+      <h2 id="serie">Série de matrículas</h2>
+      <p class="painel__nota">
+        Ano sem valor aparece como <em>sem dado</em> — nunca como zero.
+      </p>
+    </div>
     <p class="subtitulo">
       Matrícula da educação básica (total oficial do Censo, não a soma das
-      subetapas) por ano censitário. Ano sem valor aparece como
-      <em>sem dado</em> — nunca como zero.
+      subetapas) por ano censitário.
     </p>
     <figure class="serie-figura">
       {% if serie.svg %}
@@ -134,7 +148,7 @@
       {% endif %}
     </figure>
     <div class="tabela-rolavel" role="region" aria-label="Série de matrículas por ano (tabela com rolagem)" tabindex="0">
-      <table>
+      <table class="tabela">
         <caption>Série de matrículas por ano censitário</caption>
         <thead>
           <tr>
@@ -155,17 +169,19 @@
   </section>
 
   {% if rendimento %}
-  <section aria-labelledby="rendimento">
-    <h2 id="rendimento">Rendimento por ano</h2>
-    <p class="subtitulo">
-      Taxas do Censo Escolar, em porcentagem. Ausência aparece como
-      <em>sem dado</em> com a flag de origem (<code>is_*_missing</code>).
-    </p>
+  <section class="painel" aria-labelledby="rendimento">
+    <div class="painel__cabecalho">
+      <h2 id="rendimento">Rendimento por ano</h2>
+      <p class="painel__nota">
+        Taxas do Censo, em porcentagem; ausência com a flag de origem
+        (<code>is_*_missing</code>).
+      </p>
+    </div>
     <div class="tabela-rolavel" role="region" aria-label="Rendimento por ano (tabela com rolagem)" tabindex="0">
       {# Ordenável no cliente (card `t_ee9b1eec`): Ano e cada taxa. A ordem
          inicial é cronológica, então o `aria-sort` do servidor é verdade
          também sem JS. #}
-      <table data-ordenavel>
+      <table class="tabela" data-ordenavel>
         <caption>Rendimento escolar por ano censitário</caption>
         <thead>
           <tr>
@@ -189,5 +205,13 @@
     </div>
   </section>
   {% endif %}
-</article>
+
+  <section class="painel" aria-labelledby="recorte-serie">
+    <div class="painel__cabecalho">
+      <h2 id="recorte-serie">Recorte da série de matrículas</h2>
+      <p class="painel__nota">A origem de cada número desta tela.</p>
+    </div>
+    {{ recorte(meta) }}
+  </section>
+</div>
 {% endblock %}
