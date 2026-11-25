@@ -38,10 +38,13 @@
   {% if sem_dados_ano %}
   <section class="painel painel--erro" aria-labelledby="sem-dados-ano">
     <h2 id="sem-dados-ano">{{ pagina_erro_titulo }}</h2>
-    <p class="aviso aviso--temporario">
-      {{ detalhe }} — o recorte escolhido não está publicado. Selecione outro ano
-      ou etapa acima; nada foi exibido parcialmente.
-    </p>
+    <div class="aviso aviso--temporario">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <p>
+        {{ detalhe }} — o recorte escolhido não está publicado. Selecione outro ano
+        ou etapa acima; nada foi exibido parcialmente.
+      </p>
+    </div>
     <p class="nota">Código de erro <code>{{ codigo }}</code>.</p>
   </section>
   {% else %}
@@ -78,13 +81,16 @@
       <dt>Matrícula total observada — {{ etapa_rotulo }}</dt>
       <dd>{{ denominadores.qt_mat_total | fmt_contagem }}</dd>
     </dl>
-    <p class="aviso">
-      A contagem de <strong>escolas ativas</strong> e de <strong>privadas
-      ativas</strong> do município não varia por etapa (na mart, a escola ativa
-      aparece em todas): os dois totais aparecem uma única vez em
-      <em>Tamanho e composição por etapa</em>, acima — repeti-los em cada linha
-      daria a impressão de nove números diferentes.
-    </p>
+    <div class="aviso">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <p>
+        A contagem de <strong>escolas ativas</strong> e de <strong>privadas
+        ativas</strong> do município não varia por etapa (na mart, a escola ativa
+        aparece em todas): os dois totais aparecem uma única vez em
+        <em>Tamanho e composição por etapa</em>, acima — repeti-los em cada linha
+        daria a impressão de nove números diferentes.
+      </p>
+    </div>
     {% if etapas %}
     <div class="tabela-rolagem" role="region" aria-label="Composição do mercado por etapa (tabela com rolagem)" tabindex="0">
       {# Ordenável no cliente: as três colunas de matrícula. A coluna de etapa
@@ -112,7 +118,7 @@
       </table>
     </div>
     {% else %}
-    <p class="sem-dado">sem dado de composição para o recorte</p>
+    <div class="nota-metodo"><p><strong>sem dado</strong> de composição para o recorte.</p></div>
     {% endif %}
   </section>
 
@@ -145,7 +151,7 @@
         </table>
       </div>
       {% else %}
-      <p class="sem-dado">sem dado de movimento para a etapa</p>
+      <div class="nota-metodo"><p><strong>sem dado</strong> de movimento para a etapa.</p></div>
       {% endif %}
     </section>
 
@@ -229,7 +235,7 @@
       </div>
     </nav>
     {% else %}
-    <p class="sem-dado">sem dado de share para o recorte</p>
+    <div class="nota-metodo"><p><strong>sem dado</strong> de share para o recorte.</p></div>
     {% endif %}
   </section>
 

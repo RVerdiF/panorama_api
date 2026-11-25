@@ -170,10 +170,13 @@
       {% endif %}
     </nav>
     {% if paginacao.refinar %}
-    <p class="aviso">
-      Limite de paginação atingido. Refine a busca — nome mais específico ou um
-      município — para ver outras escolas.
-    </p>
+    <div class="aviso">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <p>
+        Limite de paginação atingido. Refine a busca — nome mais específico ou um
+        município — para ver outras escolas.
+      </p>
+    </div>
     {% endif %}
 
     {# Origem de cada número da tabela (autor e consulta). Só existe depois de
@@ -220,10 +223,12 @@
     {% endif %}
 
     {% elif resposta %}
-    <p class="sem-dado">Nenhuma escola encontrada para esta busca.</p>
-    {#- Estado vazio com próximo passo: o critério pode estar escondendo o
-        resultado, e a página não pode ser um beco sem saída. -#}
+    {#- Estado vazio de busca do protótipo (lupa + título + resumo): as sugestões
+        de próximo passo continuam dentro dele, como lista de ações. -#}
     <div class="estado-vazio">
+      <svg class="estado-vazio__icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <h3>Nenhuma escola encontrada para esta busca.</h3>
+      <p>Ajuste o nome, o município ou os filtros — as sugestões abaixo abrem uma busca válida.</p>
       <ul class="lista-regras">
         {% for sugestao in sugestoes_vazio %}
         <li>
@@ -233,9 +238,11 @@
       </ul>
     </div>
     {% else %}
-    <p class="sem-dado">
-      Nenhuma escola listada ainda: informe o nome da escola ou escolha um município.
-    </p>
+    <div class="estado-vazio">
+      <svg class="estado-vazio__icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <h3>Nenhuma escola listada ainda</h3>
+      <p>Informe o nome da escola ou escolha um município para começar a busca.</p>
+    </div>
     {% endif %}
   </section>
 

@@ -103,7 +103,10 @@
         </p>
       </div>
       {% if recente and recente.is_oferta_desconhecida %}
-      <p class="aviso">{{ texto_oferta_desconhecida }}</p>
+      <div class="aviso">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+        <p>{{ texto_oferta_desconhecida }}</p>
+      </div>
       {% endif %}
       {% if etapas %}
       {# Componente do protótipo: total oficial, etapas que somam e
@@ -130,7 +133,7 @@
         {% endfor %}
       </div>
       {% else %}
-      <p class="sem-dado">sem dado de oferta para o ano de referência</p>
+      <div class="nota-metodo"><p><strong>sem dado</strong> de oferta para o ano de referência.</p></div>
       {% endif %}
       <div class="nota-metodo">
         <strong>Como ler:</strong> <em>Desconhecido</em> significa que o Censo não
@@ -193,10 +196,13 @@
         <p class="nao-se-aplica"><strong>{{ nao_se_aplica_titulo }}.</strong> {{ motivo_concorrencia }}</p>
         {% else %}
         {% if aviso_abaixo_porte %}
-        <p class="aviso">{{ texto_abaixo_porte }}</p>
+        <div class="aviso">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+          <p>{{ texto_abaixo_porte }}</p>
+        </div>
         {% endif %}
         {% if motivo_sem_comparacao %}
-        <p class="sem-dado">sem dado — {{ motivo_sem_comparacao }}</p>
+        <div class="nota-metodo"><p><strong>sem dado</strong> — {{ motivo_sem_comparacao }}</p></div>
         {% endif %}
         <div id="posicao-crescimento">
           <dl class="lista-posicao">
@@ -251,7 +257,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    <p class="sem-dado">sem dado de ranking para o ano de referência</p>
+    <div class="nota-metodo"><p><strong>sem dado</strong> de ranking para o ano de referência.</p></div>
     {% endif %}
     <nav class="paginacao" aria-label="Mais escolas do mercado">
       <p class="paginacao__estado">
