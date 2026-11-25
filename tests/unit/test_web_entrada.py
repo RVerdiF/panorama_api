@@ -288,7 +288,10 @@ def test_logo_do_topo_e_link_para_a_entrada(cliente: TestClient):
     for caminho in (INICIO, BUSCA, METODOLOGIA):
         html = _get(cliente, caminho).text
 
-        assert re.search(r'<a class="topo__marca" href="/">Panorama Escola</a>', html)
+        # Card V1: a marca virou sinal `PE` + nome + subtítulo; o link continua
+        # sendo o `<a class="topo__marca">` apontando para a entrada.
+        assert '<a class="topo__marca" href="/">' in html
+        assert '<span class="topo__nome">Panorama Escola</span>' in html
 
 
 def test_aria_current_marca_a_tela_ativa(cliente: TestClient):

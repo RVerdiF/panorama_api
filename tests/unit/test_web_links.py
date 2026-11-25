@@ -113,7 +113,9 @@ def test_busca_mantem_o_codigo_inep_em_code_sem_link(client_links):
     html = _html(client_links.get(BUSCA, params={"q": "modelo"}))
 
     # O código INEP continua texto (não é o link): o nome é que é clicável.
-    assert '<td><code>31000001</code></td>' in html
+    # Card V1: a célula ganhou `class="num"` para alinhar á direita com
+    # `tabular-nums`, como o protótipo — o conteúdo é o mesmo.
+    assert '<td class="num"><code>31000001</code></td>' in html
     assert f'<a href="{ESCOLA}"><code>' not in html
 
 

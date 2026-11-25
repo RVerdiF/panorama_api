@@ -162,7 +162,11 @@ def test_navbar_unica_na_ordem_certa_em_todas_as_telas(cliente: TestClient):
             ">Metodologia<"
         ), caminho
         # O logo é a volta para a entrada do sistema, em qualquer tela (A5).
-        assert '<a class="topo__marca" href="/">Panorama Escola</a>' in html, caminho
+        # Card V1 `t_423aa547`: a marca ganhou o sinal `PE` e o subtítulo do
+        # protótipo; o nome acessível do link continua sendo "Panorama Escola".
+        assert '<a class="topo__marca" href="/">' in html, caminho
+        assert '<span class="topo__nome">Panorama Escola</span>' in html, caminho
+        assert '<span class="topo__sub">Inteligência de mercado · MG</span>' in html, caminho
 
 
 def test_navbar_nao_usa_role_menu_nem_js(cliente: TestClient):

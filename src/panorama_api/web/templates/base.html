@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block titulo %}Panorama Escola{% endblock %}</title>
   <meta name="description" content="Panorama Escola — matrículas, oferta e mercado da educação básica em Minas Gerais (Censo Escolar/INEP).">
+  {# Inter 400 é a fonte do corpo de texto: sem o preload ela só começa a baixar
+     depois que o CSS é parseado (card V1 `t_423aa547`). `crossorigin` é
+     obrigatório para o preload de fonte bater com a requisição do `@font-face`,
+     mesmo na própria origem. A URL tem hash, como todo asset do front. #}
+  <link rel="preload" href="{{ fonte_corpo_url }}" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="{{ css_url }}">
   {# Base única de JS (card t_71b25279): asset com hash servido pelo
      AssetRegistry, `defer` para não bloquear o parser, CSP estrita do /app.

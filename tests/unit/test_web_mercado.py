@@ -342,13 +342,14 @@ def test_recorte_obrigatorio_ano_etapa_universo_fonte_e_avisos(mercado_repo):
 
     assert "Ano de referência" in html
     assert "2025" in html
-    assert "Universo (meta.universo)" in html
+    # Rótulo do dado, não o caminho no contrato (`meta.universo`): card V1.
+    assert "<dt>Universo</dt>" in html
     assert "escolas_ativas_mg" in html
-    assert "Fonte (meta.fonte)" in html
+    assert "<dt>Fonte</dt>" in html
     assert "mart_mercado" in html
     # O recorte do share só existe na rota do ranking.
     assert "mart_market_share" not in html
-    assert "Avisos (meta.avisos)" in html
+    assert "<dt>Avisos</dt>" in html
 
 
 # -- seletor de ano e etapa -------------------------------------------------

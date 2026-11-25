@@ -189,6 +189,10 @@ def contexto_base(
         "app_prefix": PREFIXO_WEB,
         "app_version": __version__,
         "css_url": assets().url("app.css"),
+        # Inter 400 é a fonte do corpo: o `<head>` faz `preload` dela para o
+        # texto não esperar o parse do CSS (card V1 `t_423aa547`). A URL sai do
+        # mesmo registro — com hash, servida pelo app.
+        "fonte_corpo_url": assets().url("inter-400.woff2"),
         # Base única de JS do front (card `t_71b25279`): mesmo registro de
         # assets, mesma URL com hash, carregada com `defer` no `<head>`.
         "js_url": assets().url("app.js"),

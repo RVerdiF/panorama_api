@@ -6,21 +6,33 @@
    que antes abria junto com a composição. Esta rota consulta **só**
    `dados.share_mercado` — a composição por etapa não é recomputada a cada
    página. A paginação, o aviso de teto (offset 1000) e o estado vazio do N3
-   mantêm a regra; os links para a ficha da escola continuam como estão. #}
+   mantêm a regra; os links para a ficha da escola continuam como estão.
+
+   Card V1 `t_423aa547`: cabeçalho em `.tela-topo`, recorte e ranking em
+   `.painel` com `.painel__cabecalho`. #}
 
 {% block titulo %}Escolas do mercado de {{ municipio_nome }} — Panorama Escola{% endblock %}
 
 {% block conteudo %}
-<article class="cartao">
-  {{ cabecalho_mercado(migalhas, municipio, municipio_nome) }}
-  {{ subnav(subnav_itens, "Seções do mercado") }}
-  {# O `action` é a rota atual e o formulário não carrega `offset`: trocar o
-     recorte recomeça na primeira página do ranking. #}
-  {{ seletor_mercado(href_base, anos_disponiveis, ano_selecionado, etapas_disponiveis, etapa_selecionada,
-                     "O share é sempre de uma etapa.") }}
+<div class="tela">
+  <div class="tela-topo">
+    {{ cabecalho_mercado(migalhas, municipio, municipio_nome) }}
+    {{ subnav(subnav_itens, "Seções do mercado") }}
+  </div>
+
+  <section class="painel painel--inicial" aria-labelledby="recorte-titulo">
+    <div class="painel__cabecalho">
+      <h2 id="recorte-titulo">Recorte do ranking</h2>
+      <p class="painel__nota">Trocar o recorte recomeça na primeira página.</p>
+    </div>
+    {# O `action` é a rota atual e o formulário não carrega `offset`: trocar o
+       recorte recomeça na primeira página do ranking. #}
+    {{ seletor_mercado(href_base, anos_disponiveis, ano_selecionado, etapas_disponiveis, etapa_selecionada,
+                       "O share é sempre de uma etapa.") }}
+  </section>
 
   {% if sem_dados_ano %}
-  <section aria-labelledby="sem-dados-ano" class="cartao--erro">
+  <section aria-labelledby="sem-dados-ano" class="painel painel--erro">
     <h2 id="sem-dados-ano">{{ pagina_erro_titulo }}</h2>
     <p class="aviso aviso--temporario">
       {{ detalhe }} — o recorte escolhido não está publicado. Selecione outro ano
@@ -30,12 +42,14 @@
   </section>
   {% else %}
 
-  <section aria-labelledby="share">
-    <h2 id="share">Share de matrícula — {{ etapa_rotulo }}</h2>
-    <p class="subtitulo">
-      Participação de cada <strong>escola</strong> na matrícula da etapa
-      (<code>entidade_tipo=escola</code>), em {{ ano_selecionado | fmt_ano }}.
-    </p>
+  <section class="painel" aria-labelledby="share">
+    <div class="painel__cabecalho">
+      <h2 id="share">Share de matrícula — {{ etapa_rotulo }}</h2>
+      <p class="painel__nota">
+        Participação de cada <strong>escola</strong> na matrícula da etapa
+        (<code>entidade_tipo=escola</code>), em {{ ano_selecionado | fmt_ano }}.
+      </p>
+    </div>
 
     <p class="aviso">
       Escola ausente desta tabela <strong>não</strong> tem 0% de share: a
@@ -109,10 +123,13 @@
     {% endif %}
   </section>
 
-  <section aria-labelledby="recorte-share">
-    <h2 id="recorte-share">Recorte do share</h2>
+  <section class="painel" aria-labelledby="recorte-share">
+    <div class="painel__cabecalho">
+      <h2 id="recorte-share">Recorte do share</h2>
+      <p class="painel__nota">A origem de cada número do ranking.</p>
+    </div>
     {{ recorte_mercado(meta_share, "Recorte de mart_market_share") }}
   </section>
   {% endif %}
-</article>
+</div>
 {% endblock %}
