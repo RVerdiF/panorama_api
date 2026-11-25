@@ -158,12 +158,18 @@ def _item_da_etapa(items: Sequence[MarketItem], etapa: str) -> MarketItem | None
 def barra_share(pct: float | None) -> Markup | None:
     """Barra decorativa do share em matrícula privada (CSS do protótipo).
 
-    Devolve o trilho com o preenchimento em ``style="width:X%"`` — o
+    Devolve o trilho com o preenchimento em ``data-largura="X%"`` — o
     percentual real, saturado em 0..100 com uma casa (par do protótipo) — ou
     ``None`` quando **não há share** (``None``, ``NaN``, ``inf``): a ausência
     nunca vira zero (AGENTS.md §6) — a célula fica só com o número
-    "sem dado". O ``style=`` aqui é a única exceção do front: o
-    `test_web_seguranca` permite ``width:`` só em `.barra-share__preenche`.
+    "sem dado".
+
+    Sem ``style=`` de propósito: a CSP é `style-src 'self'` (sem
+    `'unsafe-inline'`) e o navegador descarta o atributo — a barra nunca
+    ganhava largura em produção (rodada 1 da revisão, item 1). A largura é
+    aplicada pelo `app.js` (`data-largura` → CSSOM, que a CSP permite); sem
+    JS, o número ao lado continua legível e a barra fica vazia — nunca
+    errada.
 
     O trilho não carrega texto: a leitura acessível é o número ao lado
     (`.barra-share__valor` no ranking, o `<td>` na tabela do mercado).
@@ -175,7 +181,7 @@ def barra_share(pct: float | None) -> Markup | None:
     largura = f"{min(max(float(pct), 0.0), 100.0):.1f}"
     return Markup(
         '<span class="barra-share__trilho">'
-        f'<span class="barra-share__preenche" style="width:{largura}%"></span>'
+        f'<span class="barra-share__preenche" data-largura="{largura}%"></span>'
         "</span>"
     )
 

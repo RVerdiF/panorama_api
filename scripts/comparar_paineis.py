@@ -26,7 +26,7 @@ import os
 import sys
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 from urllib.request import urlopen
 
 if TYPE_CHECKING:
@@ -221,7 +221,7 @@ def _buscar_base(base: str) -> dict[str, str]:
     return paginas
 
 
-def main() -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--base",
@@ -229,7 +229,9 @@ def main() -> int:
         help="base de um servidor local (ex.: http://127.0.0.1:8081); "
         "sem ela, sobe o app hermético em memória",
     )
-    args = parser.parse_args()
+    # `argv=None` lê `sys.argv` (uso como script); o gate hermético chama
+    # `main([])` — sem isso, os argumentos do pytest vazariam para cá.
+    args = parser.parse_args(argv)
     paginas = _buscar_base(args.base) if args.base else _buscar_hermetico()
 
     falhas = 0

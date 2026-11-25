@@ -10,7 +10,7 @@ partir daí valem três invariantes que este arquivo protege:
   com o mesmo app **sem** o middleware de segurança;
 * o asset JS é servido como `text/javascript; charset=utf-8` com cache imutável,
   e as páginas carregam exatamente uma tag `<script src=… defer>` — sem inline,
-  sem `<style>`, sem `style=` fora da barra de share e sem atributo `on*=`.
+  sem `<style>`, sem `style=` e sem atributo `on*=`.
 """
 
 from __future__ import annotations
@@ -323,19 +323,19 @@ def test_pagina_sem_inline_de_estilo_ou_script(
     html = cliente.get(caminho, follow_redirects=False).text
 
     assert "<style" not in html, caminho
-    _sem_style_fora_da_barra(html, caminho)
+    _sem_style(html, caminho)
     assert not re.search(r"\son[a-z]+\s*=", html), caminho
 
 
-#: Exceção única ao `style=`: a largura da barra de share (percentual real do
-#: SSR, card V2 `t_cbd54a92`), só em `.barra-share__preenche`.
-_STYLE_SHARE = re.compile(r'<span class="barra-share__preenche" style="width:[0-9.]+%">')
+def _sem_style(html: str, caminho: str = "") -> None:
+    """Nenhum `style=` em página ou template (rodada 1 da revisão, item 1).
 
-
-def _sem_style_fora_da_barra(html: str, caminho: str = "") -> None:
-    """Nenhum `style=` fora da largura da barra de share."""
-    sem_barra = _STYLE_SHARE.sub("", html)
-    assert not re.search(r"\sstyle\s*=", sem_barra), caminho
+    A CSP é `style-src 'self'` e o navegador descarta o atributo — a antiga
+    exceção da barra de share (`style="width:…"` no SSR) nunca funcionou em
+    produção. A largura agora viaja em `data-largura` e o `app.js`
+    (`aplicarBarras`) aplica via CSSOM.
+    """
+    assert not re.search(r"\sstyle\s*=", html), caminho
 
 
 def test_nenhum_template_tem_inline_ou_script_sem_src() -> None:
@@ -345,7 +345,7 @@ def test_nenhum_template_tem_inline_ou_script_sem_src() -> None:
         for tag in _tags_script(texto):
             assert 'src="' in tag, f"{caminho.name}: script sem src: {tag}"
         assert "<style" not in texto, caminho.name
-        _sem_style_fora_da_barra(texto, caminho.name)
+        _sem_style(texto, caminho.name)
         assert not re.search(r"\son[a-z]+\s*=", texto), caminho.name
 
 

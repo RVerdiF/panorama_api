@@ -142,8 +142,13 @@ def test_ficha_mostra_crescimento_definicao_e_rank(client, repository):
     assert '"anos": [2025]' in html
 
 
-def test_ficha_com_share_mostra_barra_com_width(client, repository):
-    """Ranking em CSS do protótipo: trilho + preenche com o share real."""
+def test_ficha_com_share_mostra_barra_com_data_largura(client, repository):
+    """Ranking em CSS do protótipo: trilho + preenche com o share real.
+
+    Sem `style=`: a CSP `style-src 'self'` descartava o atributo e a barra
+    nunca ganhava largura (rodada 1 da revisão, item 1). O SSR emite
+    `data-largura` e o `app.js` (`aplicarBarras`) aplica via CSSOM.
+    """
     repository.history = [
         history_row(nu_ano_censo=2025, tp_dependencia="4", tp_situacao_funcionamento="1")
     ]
@@ -152,7 +157,8 @@ def test_ficha_com_share_mostra_barra_com_width(client, repository):
 
     html = _html(client.get(VISAO_GERAL_URL))
 
-    assert '<span class="barra-share__preenche" style="width:12.5%">' in html
+    assert '<span class="barra-share__preenche" data-largura="12.5%">' in html
+    assert "style=" not in html
 
 
 def test_posicao_por_crescimento_nao_e_rotulada_de_creche(client, repository):

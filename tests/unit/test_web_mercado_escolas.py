@@ -545,7 +545,7 @@ def test_share_nulo_nao_ganha_barra_e_share_presente_ganha(mercado_repo):
 
     assert "barra-share__preenche" not in _linha_da_escola(html, "31000001")
     assert "sem dado" in _linha_da_escola(html, "31000001")
-    assert 'style="width:37.5%"' in _linha_da_escola(html, "31000002")
+    assert 'data-largura="37.5%"' in _linha_da_escola(html, "31000002")
 
 
 def test_barra_limita_share_fora_de_0_100(mercado_repo):
@@ -568,10 +568,10 @@ def test_barra_limita_share_fora_de_0_100(mercado_repo):
     html = _html(_client(mercado_repo).get(f"{ESCOLAS}?etapa=bas"))
 
     linha_acima = _linha_da_escola(html, "31000003")
-    assert 'style="width:100.0%"' in linha_acima
+    assert 'data-largura="100.0%"' in linha_acima
 
     linha_abaixo = _linha_da_escola(html, "31000004")
-    assert 'style="width:0.0%"' in linha_abaixo
+    assert 'data-largura="0.0%"' in linha_abaixo
 
 
 def test_barra_e_decorativa_e_nao_duplica_a_leitura(mercado_repo):
@@ -611,7 +611,7 @@ def test_barra_share_formata_e_limita_o_valor():
         (137.5, "100.0"),
         (-3.2, "0.0"),
     ):
-        assert f'<span class="barra-share__preenche" style="width:{largura}%">' in str(
+        assert f'<span class="barra-share__preenche" data-largura="{largura}%">' in str(
             barra_share(pct)
         ), pct
 

@@ -93,6 +93,22 @@
     }
   });
 
+  /* Barras de share (card V2 `t_cbd54a92`, rodada 1 item 1): o SSR emite
+     `data-largura="X%"` no `.barra-share__preenche` e este iniciador aplica
+     via CSSOM (`el.style.width`), que a CSP `style-src 'self'` permite — o
+     atributo `style="width:…"` era descartado pelo navegador e nenhuma barra
+     ganhava largura em produção. Sem este JS, a barra fica vazia e o número
+     ao lado continua legível: ausência de largura, nunca largura errada. */
+  registrar(function aplicarBarras(raiz) {
+    var barras = raiz.querySelectorAll
+      ? raiz.querySelectorAll(".barra-share__preenche[data-largura]")
+      : [];
+    for (var i = 0; i < barras.length; i += 1) {
+      var largura = barras[i].getAttribute("data-largura") || "";
+      if (/^[0-9]+(\.[0-9]+)?%$/.test(largura)) barras[i].style.width = largura;
+    }
+  });
+
   /* Gráfico da série de matrículas (card V2 `t_cbd54a92`): linha com área,
      portado do protótipo (`panorama-design/assets/js/app.js`: `px`/`py`,
      `medir`/`desenhar`, `posicionarTip`/`ativar`/`maisProximo`, ponteiro,
