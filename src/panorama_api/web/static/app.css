@@ -979,17 +979,15 @@ table.tabela.tabela--compacta { min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
 }
-
-/* ============================================================
-   /* app-only */ — CSS exclusivo do app (fora do bloco herdado).
+/* app-only — CSS exclusivo do app (fora do bloco herdado).
    Tudo acima desta seção é cópia verbatim de
    `panorama-design/assets/css/panorama.css` (diff vazio fora daqui).
    Abaixo vivem SÓ os seletores que não existem no protótipo,
    traduzidos para os tokens do protótipo (`--accent`, `--space-*`),
    mais os ajustes de SSR:
-   - `@font-face` com URLs `{{asset:…}}` resolvidas para hash no boot
-     (`web/assets.py`) e `--fonte-mono` no stack do sistema (o subset
-     self-hosted não inclui IBM Plex Mono);
+   - `@font-face` com URLs publicadas resolvidas para hash no boot
+     (`web/assets.py`); valem os tokens do protótipo (`--font-mono` inclui
+     o IBM Plex Mono servido aqui);
    - série SVG legada renderizada no servidor (`.serie-*`, usada por
      `escola.py:svg_serie`/`svg_serie_comparada`);
    - ordenação atual por `th[data-tipo]` (botão criado no `app.js`);
@@ -1005,14 +1003,14 @@ table.tabela.tabela--compacta { min-width: 0; }
    redeclarados aqui: valem as do bloco herdado.
    ============================================================ */
 
-/* --- SSR: fontes com hash + mono do sistema --- */
+/* --- app-only: fontes com hash (sobrescrevem as relativas do protótipo) --- */
 /* --- fontes --- */
 @font-face {
   font-family: "Source Serif 4";
   font-style: normal;
   font-weight: 600;
   font-display: swap;
-  src: url("{{asset:source-serif-700.woff2}}") format("woff2");
+  src: url("{{asset:source-serif-600.woff2}}") format("woff2");
 }
 
 @font-face {
@@ -1039,9 +1037,20 @@ table.tabela.tabela--compacta { min-width: 0; }
   src: url("{{asset:inter-600.woff2}}") format("woff2");
 }
 
-:root {
-  /* Stack do sistema no lugar do IBM Plex Mono (subset sem o arquivo). */
-  --fonte-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("{{asset:plex-mono-400.woff2}}") format("woff2");
+}
+
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("{{asset:plex-mono-500.woff2}}") format("woff2");
 }
 
 /* --- SSR: alvos de teclado e atalho de acessibilidade --- */
@@ -1114,7 +1123,7 @@ table.tabela.tabela--compacta { min-width: 0; }
 
 .topo__sub {
   margin-top: 2px;
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -1226,7 +1235,7 @@ table.tabela.tabela--compacta { min-width: 0; }
   background: var(--surface-sunken);
   border: 1px solid var(--border-soft);
   color: var(--fg-2);
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.02em;
   box-shadow: var(--inset-well);
@@ -1314,7 +1323,7 @@ table.tabela.tabela--compacta { min-width: 0; }
 }
 .codigo-erro {
   margin: 0 0 0.35rem;
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1338,7 +1347,7 @@ table.tabela.tabela--compacta { min-width: 0; }
 }
 .campo label,
 .hero__campo label {
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -1510,7 +1519,7 @@ th[data-tipo] button {
   border: 0;
   background: transparent;
   cursor: pointer;
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.07em;
@@ -1543,7 +1552,7 @@ th[data-tipo][aria-sort="descending"] button::after {
 
 /* --- app-only: grupo semântico, barra legada e linha alvo --- */
 tr.grupo-etapas th {
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.05em;
@@ -1552,7 +1561,7 @@ tr.grupo-etapas th {
   background: var(--surface-raise);
 }
 .tabela tbody tr:target {
-  background: var(#d9e4df);
+  background: var(--surface-warm);
   scroll-margin-top: 5rem;
 }
 
@@ -1588,7 +1597,7 @@ table .barra-share rect {
 }
 
 .lista-definicoes dt {
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: 12px;
   letter-spacing: 0.02em;
   color: var(--muted-strong);
@@ -1688,7 +1697,7 @@ table .barra-share rect {
 .hero .recorte {
   margin-top: 0;
   padding: var(--space-6);
-  background: var(#e2eae6);
+  background: var(--surface-warm);
   border-radius: 16px;
 }
 
@@ -1715,7 +1724,7 @@ table .barra-share rect {
 .recorte__rotulo {
   color: var(--muted-strong);
   max-width: none;
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1733,7 +1742,7 @@ table .barra-share rect {
 
 .recorte__fonte {
   margin: 1.25rem 0 0;
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.02em;
   color: var(--muted-strong);
@@ -1833,7 +1842,7 @@ table .barra-share rect {
 .paginacao__contagem {
   margin: 0;
   padding-top: var(--space-3);
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
   font-size: var(--text-xs);
   color: var(--muted-strong);
   max-width: none;
@@ -1878,7 +1887,7 @@ table .barra-share rect {
 .serie__valor {
   fill: var(--muted-strong);
   font-size: 11px;
-  font-family: var(--fonte-mono);
+  font-family: var(--font-mono);
 }
 
 .serie__valor {
