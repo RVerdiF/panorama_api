@@ -100,10 +100,11 @@
      Os dados vêm do SSR, nunca de mock: primeiro de uma ilha JSON
      (`<script type="application/json">` com `{"anos": [...], "valores": [...]}`,
      nulos onde não há dado) dentro da mesma `section#serie`; sem ilha, da
-     tabela SSR da seção (`tbody tr` com `th[data-valor]` do ano e o primeiro
-     `td.num[data-valor]` com o bruto). Sem dados, não faz nada: o SVG do
+     tabela SSR da seção (ano no `th` e matrícula no primeiro `td.num`,
+     ambos lidos como texto). Sem dados, não faz nada: o SVG do
      servidor (ou o "sem dado") continua valendo. Todo o SVG nasce de
-     `createElementNS` e `textContent` — nenhum `innerHTML` (CSP estrita) — e
+     `createElementNS` e `textContent` — nenhuma escrita de marcação por
+     string (CSP estrita) — e
      a caixa de leitura tem `aria-live="polite"`. */
   var SVG_NS = "http://www.w3.org/2000/svg";
   function numeroBR(casas) {
@@ -122,11 +123,10 @@
     if (atual === null || anterior === null || !anterior) return null;
     return ((atual - anterior) / anterior) * 100;
   }
-  function numeroDeBruto(texto) {
-    if (texto === null || texto === undefined) return null;
+  function numeroPtBR(texto) {
     var limpo = String(texto).trim();
-    if (limpo === "") return null;
-    var n = Number(limpo);
+    if (limpo === "" || /sem dado/i.test(limpo)) return null;
+    var n = Number(limpo.replace(/\./g, "").replace(",", "."));
     return isFinite(n) ? n : null;
   }
   function serieDaIlha(secao) {
@@ -150,11 +150,13 @@
     var anos = [];
     var valores = [];
     for (var i = 0; i < linhas.length; i += 1) {
-      var anoCel = linhas[i].querySelector("th[data-valor]");
-      var valorCel = linhas[i].querySelector("td.num[data-valor], td[data-valor]");
+      var anoCel = linhas[i].querySelector("th");
+      var valorCel = linhas[i].querySelector("td.num");
       if (!anoCel || !valorCel) return null;
-      anos.push(Number(anoCel.getAttribute("data-valor")));
-      valores.push(numeroDeBruto(valorCel.getAttribute("data-valor")));
+      var m = (anoCel.textContent || "").match(/(\d{4})/);
+      if (!m) return null;
+      anos.push(Number(m[1]));
+      valores.push(numeroPtBR(valorCel.textContent || ""));
     }
     return { anos: anos, valores: valores };
   }
