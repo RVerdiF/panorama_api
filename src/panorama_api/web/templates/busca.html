@@ -11,9 +11,9 @@
 {#
   Busca de escolas (card V2 `t_cbd54a92`) na linguagem do protótipo: cabeçalho
   de tela, painel de filtros, painel de resultados com a tabela de 7 colunas e o
-  rodapé final. Sem barra lateral. A orientação de produto ("O que é o Panorama
-  Escola") e o painel "Recorte da busca" saíram: o recorte da consulta virou a
-  lista `rodape-meta` abaixo da tabela, que só existe depois de uma consulta.
+  rodapé final. A orientação de produto e o bloco de recorte da consulta saíram;
+  a origem de cada número agora é a lista `rodape-meta` abaixo da tabela, que só
+  existe depois de uma consulta.
 
   Matrícula, share municipal e variação anual **não** vêm no schema de busca
   (`School`): as células saem como `sem dado` com a mesma estrutura e classes das
@@ -174,10 +174,10 @@
     </p>
     {% endif %}
 
-    {# Recorte da consulta (o antigo painel "Recorte da busca"): a origem de cada
-       número da tabela. Só existe depois de uma consulta. #}
+    {# Origem de cada número da tabela (autor e consulta). Só existe depois de
+       uma consulta: sem consulta não há números a contextualizar. #}
     {% if houve_consulta %}
-    <dl class="rodape-meta" aria-label="Recorte da busca">
+    <dl class="rodape-meta" aria-label="Origem dos números da consulta">
       <div>
         <dt>Ano de referência</dt>
         <dd>{{ meta.ano_referencia | fmt_ano }}</dd>

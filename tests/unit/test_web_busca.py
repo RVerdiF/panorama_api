@@ -389,11 +389,11 @@ def test_valor_ausente_sai_como_sem_dado_e_oferta_desconhecida(
     html = _get(client, params={"co_municipio": "3106200"}).text
 
     assert "sem dado" in html
-    # `oferta.bas = null` é "Desconhecido", nunca "Não" nem 0.
-    assert "Desconhecido" in html
+    # A tabela de busca não tem mais coluna de oferta (card V2); quando a base
+    # não informa a oferta, o marcador em português acompanha o nome da escola.
+    assert "Oferta desconhecida" in html
     # E6: a flag interna não é exibida como texto; o leitor vê o português.
     assert "is_oferta_desconhecida" not in html
-    assert "Oferta desconhecida" in html
 
 
 def test_busca_nao_usa_termos_geograficos_proibidos(client, repository):
