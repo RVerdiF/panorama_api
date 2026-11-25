@@ -216,8 +216,8 @@
               {% if linha.is_abaixo_porte %}<span class="nota">{{ texto_abaixo_porte }}</span>{% endif %}
             </td>
             <td class="num">{{ linha.mat_entidade | fmt_contagem }}</td>
-            <td class="num">{# O número é a leitura acessível; a barra é decorativa
-                  e só existe quando há share — `sem dado` não ganha barra. #}{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}{% if linha.barra_share %}{{ linha.barra_share }}{% endif %}</td>
+            <td class="num metrica">{# O protótipo usa 4 colunas só de texto
+                  nesta tabela — sem barra (a barra vive no ranking da ficha). #}{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}</td>
           </tr>
           {% endfor %}
         </tbody>

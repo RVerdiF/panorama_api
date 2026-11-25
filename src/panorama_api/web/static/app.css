@@ -2002,3 +2002,32 @@ td .barra-share__trilho {
     padding-inline: 0;
   }
 }
+
+/* --- app-only: conter tabelas largas na grade (rodada 3 da revisão) ---
+   `table.tabela` tem `min-width: 720px` no bloco herdado e o item de grade
+   tem `min-width: auto` por padrão: sem isto, uma tabela larga (Rendimento
+   da ficha, Cobertura do mercado) estica a `.duas-col` e a página ganha
+   rolagem horizontal. Com `min-width: 0` no filho da grade, o painel fica
+   na coluna e a rolagem acontece dentro de `.tabela-rolagem` (que já tem
+   `overflow-x: auto` no bloco herdado). */
+.duas-col > *,
+.duas-col--iguais > * {
+  min-width: 0;
+}
+
+.painel {
+  min-width: 0;
+}
+
+.tabela-rolagem {
+  max-width: 100%;
+}
+
+/* --- app-only: barra do ranking renderiza (rodada 3 da revisão) ---
+   `.barra-share__preenche` é um `<span>` e o bloco herdado não declara
+   `display`: como inline, `width` (aplicado pelo `app.js` via CSSOM, pois
+   a CSP barra `style=`) não renderiza. `display: block` dentro do trilho
+   de 92px faz a largura aparecer; o número ao lado continua a leitura. */
+.barra-share__preenche {
+  display: block;
+}
