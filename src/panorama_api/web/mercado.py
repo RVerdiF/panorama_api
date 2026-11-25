@@ -155,38 +155,28 @@ def _item_da_etapa(items: Sequence[MarketItem], etapa: str) -> MarketItem | None
     return next((item for item in items if item.etapa == etapa), None)
 
 
-def _formatar_largura(valor: float) -> str:
-    """Largura do `<rect>`: determinística, sem zeros à direita e sem expoente.
-
-    ``37.5`` → ``37.5``, ``100.0`` → ``100``, ``0.0834`` → ``0.0834``. Quatro
-    casas bastam para o share (o menor passo do contrato é 0,0001 p.p.) e
-    evitam a notação científica que ``str(float)`` produziria para valores
-    ínfimos — o atributo só aceita número decimal.
-    """
-    return f"{valor:.4f}".rstrip("0").rstrip(".")
-
-
 def barra_share(pct: float | None) -> Markup | None:
-    """Barra decorativa do share em matrícula privada (SVG inline, sem JS).
+    """Barra decorativa do share em matrícula privada (CSS do protótipo).
 
-    Devolve ``None`` quando **não há share** (``None``, ``NaN``, ``inf``): a
-    ausência nunca vira zero (AGENTS.md §6) — a célula fica só com o número
-    "sem dado". Valor fora de 0..100 é limitado à faixa, porque a barra é uma
-    leitura visual e não pode estourar o `viewBox`.
+    Devolve o trilho com o preenchimento em ``style="width:X%"`` — o
+    percentual real, saturado em 0..100 com uma casa (par do protótipo) — ou
+    ``None`` quando **não há share** (``None``, ``NaN``, ``inf``): a ausência
+    nunca vira zero (AGENTS.md §6) — a célula fica só com o número
+    "sem dado". O ``style=`` aqui é a única exceção do front: o
+    `test_web_seguranca` permite ``width:`` só em `.barra-share__preenche`.
 
-    O SVG é ``aria-hidden``/``focusable="false"``: o número em texto na célula
-    continua sendo a leitura acessível, a barra não duplica a informação.
+    O trilho não carrega texto: a leitura acessível é o número ao lado
+    (`.barra-share__valor` no ranking, o `<td>` na tabela do mercado).
     Nada externo é interpolado além do número já limitado — por isso o
-    ``Markup`` pode ser usado sem abrir escape no template. Sem ``xmlns``: o SVG
-    é inline no HTML, onde o namespace já é o do documento (e o atributo
-    custaria ~38 B em cada linha do ranking).
+    ``Markup`` pode ser usado sem abrir escape no template.
     """
     if pct is None or not math.isfinite(pct):
         return None
-    largura = _formatar_largura(min(max(float(pct), 0.0), 100.0))
+    largura = f"{min(max(float(pct), 0.0), 100.0):.1f}"
     return Markup(
-        '<svg class="barra-share" viewBox="0 0 100 8" aria-hidden="true" '
-        f'focusable="false"><rect width="{largura}" height="8"/></svg>'
+        '<span class="barra-share__trilho">'
+        f'<span class="barra-share__preenche" style="width:{largura}%"></span>'
+        "</span>"
     )
 
 

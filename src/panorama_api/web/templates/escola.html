@@ -266,7 +266,7 @@
             {% if linha.matricula is not none %}{{ linha.matricula | fmt_contagem }} matrículas{% else %}sem dado{% endif %}
           </p>
         </div>
-        <span class="barra-share">{{ linha.barra }}<span class="barra-share__valor">{% if linha.share_privado_pct is not none %}{{ linha.share_privado_pct | fmt_nulo }}%{% else %}sem dado{% endif %}</span></span>
+        <span class="barra-share">{% if linha.barra %}{{ linha.barra }}{% endif %}<span class="barra-share__valor">{% if linha.share_privado_pct is not none %}{{ linha.share_privado_pct | fmt_nulo }}%{% else %}sem dado{% endif %}</span></span>
       </li>
       {% endfor %}
     </ul>

@@ -994,9 +994,8 @@ table.tabela.tabela--compacta { min-width: 0; }
      as setas vivem sob `th[data-tipo][aria-sort]` para não colidir
      com o `th.ordenavel > span` do protótipo;
    - estados de ausência do SSR (`.nao-se-aplica`, `.aviso--temporario`);
-   - `.barra-share` antigo escopado a `table` (o protótipo usa
-     `.barra-share` flex para o ranking em CSS — sem o escopo, esta
-     regra quebraria as barras novas);
+   - trilho do share em linha na tabela do mercado (`td
+     .barra-share__trilho`; no ranking vale o flex do protótipo);
    - `.subnav [aria-current]` escopado a `.subnav ul` (o protótipo usa
      âncoras diretas com `[aria-current="page"]` e cor própria).
    Regras de base (a, table, h1…) e componentes do protótipo NÃO são
@@ -1550,7 +1549,7 @@ th[data-tipo][aria-sort="descending"] button::after {
   content: " ▾";
 }
 
-/* --- app-only: grupo semântico, barra legada e linha alvo --- */
+/* --- app-only: grupo semântico, trilho do share e linha alvo --- */
 tr.grupo-etapas th {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1569,22 +1568,12 @@ tr.grupo-etapas th {
   box-shadow: inset 4px 0 0 var(--accent);
 }
 
-/* Barra legada do share (SVG inline do servidor): só dentro de tabela.
-   O .barra-share do protótipo é flex para o ranking em CSS. */
-table .barra-share {
+/* Trilho do share dentro da tabela do mercado: o protótipo só usa a barra no
+   ranking (flex); na célula ela acompanha o número em linha. */
+td .barra-share__trilho {
   display: inline-block;
-  width: 5rem;
-  height: 8px;
   margin-left: 0.4rem;
   vertical-align: middle;
-  background: var(--surface-sunken);
-  border-radius: 2px;
-  overflow: hidden;
-  box-shadow: var(--inset-well);
-}
-
-table .barra-share rect {
-  fill: var(--accent);
 }
 
 /* --- app-only: listas, ausência e estados do SSR --- */
