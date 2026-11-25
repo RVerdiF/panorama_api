@@ -7,15 +7,16 @@ devolve o contexto do template. Nenhum acesso a dado — quem consulta é
 Duas rotas, uma consulta cara cada (spec §5.3):
 
 * `/app/mercados/{co_municipio}` — **Visão geral**: tamanho, composição,
-  cobertura e entrada/saída. Consulta só `dados.mercado` (3 consultas,
-  ~63,7 MB).
+  cobertura e entrada/saída. Consulta `dados.mercado` mais o top-10 do share
+  (`dados.share_mercado` com `limit=10`, na etapa do recorte) para a tabela do
+  painel "Escolas do mercado por share" (card V2 `t_cbd54a92`, rodada 1,
+  item 2); a lista completa e paginada continua na rota abaixo.
 * `/app/mercados/{co_municipio}/escolas` — **Escolas do mercado**: o ranking de
   share paginado. Consulta só `dados.share_mercado` (3 consultas, ~203,5 MB).
 
-O ranking saiu da abertura porque era a consulta mais cara do produto
-(`mart_market_share` ≈ 181 MB): antes, toda abertura, troca de etapa ou página
-do ranking custava 6 consultas / ~267 MB. Agora a abertura custa 3 / 63,7 MB e
-cada página do ranking 3 / 203,5 MB, sem recomputar a composição.
+O ranking saiu da abertura no card NAV-3 (a consulta `mart_market_share` é
+cara: ~181 MB) e voltou como top-10 no card V2, por exigência da especificação
+do protótipo; a paginação completa continua fora da abertura.
 
 Decisões que moram neste módulo:
 
@@ -368,6 +369,22 @@ def contexto_escolas_mercado(
     }
 
 
+def contexto_share_visao_geral(
+    *, share: ShareResponse
+) -> dict[str, Any]:
+    """As 10 primeiras linhas do share para a **Visão geral** (card V2).
+
+    A mesma leitura de `_linhas_share` do ranking (posição, nome com link da
+    ficha, matrícula e share privado com barra), limitada à consulta da rota
+    (`limit=10`, primeira página). A lista completa e paginada continua em
+    `/app/mercados/{co}/escolas`.
+    """
+    return {
+        "linhas_share": _linhas_share(share),
+        "texto_abaixo_porte": TEXTO_ABAIXO_PORTE,
+    }
+
+
 __all__ = [
     "COBERTURA",
     "ESCOLAS",
@@ -376,6 +393,7 @@ __all__ = [
     "VISAO_GERAL",
     "barra_share",
     "contexto_escolas_mercado",
+    "contexto_share_visao_geral",
     "contexto_visao_geral",
     "itens_subnav",
     "kpis_mercado",

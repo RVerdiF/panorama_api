@@ -6,9 +6,8 @@
 {# **Mercado municipal** (card V2 `t_cbd54a92`) na linguagem do protótipo:
    cabeçalho de tela, painel de recorte (seletor sem `h2`), quatro KPIs e quatro
    painéis — tamanho e composição por etapa (painel único), movimento de escolas,
-   cobertura e limites, e a chamada para o ranking de share. O ranking nominal
-   vive em `/app/mercados/{co}/escolas` (consulta `mart_market_share`, cara):
-   aqui fica o link, para a abertura seguir custando só `mart_mercado`. #}
+   cobertura e limites, e o top-10 do ranking de share (a lista completa e
+   paginada continua em `/app/mercados/{co}/escolas`). #}
 
 {# O município no `<title>` é o que distingue abas de mercados diferentes. Sem
    nome na resposta, o código IBGE ocupa o lugar. #}
@@ -196,14 +195,42 @@
         Escolas privadas ativas ordenadas por participação na matrícula privada.
       </p>
     </div>
-    <p class="subtitulo">
-      O ranking nominal do share é a leitura mais cara do produto: ele vive em
-      <em>Escolas do mercado</em>, para a abertura continuar custando só a
-      composição do mercado.
-    </p>
-    <p>
-      <a class="botao botao--secundario" href="{{ href_base }}/escolas">Ver o ranking de share do município</a>
-    </p>
+    {% if linhas_share %}
+    <p class="paginacao__contagem">Mostrando as {{ linhas_share | length }} primeiras.</p>
+    <div class="tabela-rolagem" role="region" aria-label="Escolas do mercado por share (tabela com rolagem)" tabindex="0">
+      <table class="tabela">
+        <caption>Ranking de participação privada — {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
+        <thead>
+          <tr><th class="num" scope="col">#</th><th scope="col">Escola</th><th class="num" scope="col">Matrícula</th><th class="num" scope="col">Share privado</th></tr>
+        </thead>
+        <tbody>
+          {% for linha in linhas_share %}
+          <tr{% if linha.id_entidade %} id="escola-{{ linha.id_entidade }}"{% endif %}>
+            <th class="num" scope="row">{{ linha.posicao }}.</th>
+            <td>
+              {% if linha.id_entidade %}
+              <a href="{{ app_prefix }}/escolas/{{ linha.id_entidade }}">{{ linha.no_entidade | fmt_nulo }}</a>
+              {% else %}
+              {{ linha.no_entidade | fmt_nulo }}
+              {% endif %}
+              {% if linha.is_abaixo_porte %}<span class="nota">{{ texto_abaixo_porte }}</span>{% endif %}
+            </td>
+            <td class="num">{{ linha.mat_entidade | fmt_contagem }}</td>
+            <td class="num">{# O número é a leitura acessível; a barra é decorativa
+                  e só existe quando há share — `sem dado` não ganha barra. #}{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}{% if linha.barra_share %}{{ linha.barra_share }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <nav class="paginacao" aria-label="Ranking completo do share">
+      <div class="paginacao__botoes">
+        <a class="botao botao--secundario" href="{{ href_base }}/escolas">Ver o ranking de share do município</a>
+      </div>
+    </nav>
+    {% else %}
+    <p class="sem-dado">sem dado de share para o recorte</p>
+    {% endif %}
   </section>
 
   <dl class="rodape-meta" aria-label="Origem dos números da composição">

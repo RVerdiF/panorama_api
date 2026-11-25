@@ -57,6 +57,8 @@ from panorama_api.web.escola import (
     contexto_visao_geral,
     item_mais_recente,
     kpis_da_escola,
+    rotulo_dependencia,
+    rotulo_situacao,
     texto_variacao,
 )
 from panorama_api.web.filters import (
@@ -73,6 +75,7 @@ from panorama_api.web.mercado import (
     ROTULO_ESCOLAS_MERCADO,
     VISAO_GERAL,
     contexto_escolas_mercado,
+    contexto_share_visao_geral,
     contexto_visao_geral as contexto_mercado_visao_geral,
     itens_subnav,
     kpis_mercado,
@@ -473,6 +476,10 @@ def busca(
             filtros_pagina=filtros_pagina,
         ),
         "texto_oferta_desconhecida": TEXTO_OFERTA_DESCONHECIDA,
+        # Rótulos dos códigos INEP por linha (rodada 1 da revisão, item 4): a
+        # busca mostra o código com a leitura ("4 — Privada"), igual à ficha.
+        "rotulo_dependencia": rotulo_dependencia,
+        "rotulo_situacao": rotulo_situacao,
     }
 
     if not termo and not municipio:
@@ -876,9 +883,11 @@ def mercado(
       substituível pelo usuário, não é erro de sistema;
     * a composição é consultada **sem** recorte de etapa (a tela cobre todas);
       a etapa selecionada vale para cobertura, entrada/saída e denominadores;
-    * o ranking de share **não** é consultado aqui: ele vive em
-      `/app/mercados/{co_municipio}/escolas` (card NAV-3), e a abertura cai de
-      6 consultas / ~267 MB para 3 / 63,7 MB;
+    * o top-10 do share é consultado aqui (a mesma etapa do recorte,
+      `limit=10`): a tabela do painel "Escolas do mercado por share" sai de
+      `dados.share_mercado` e a lista completa e paginada continua em
+      `/app/mercados/{co_municipio}/escolas` (card V2 `t_cbd54a92`, rodada 1,
+      item 2);
     * ``offset`` não é recorte desta tela: presente, responde ``422``
       `PARAMETRO_INVALIDO` em vez de silêncio — a paginação é do ranking.
     """
@@ -938,6 +947,19 @@ def mercado(
         )
 
     contexto.update(contexto_mercado_visao_geral(mercado=resposta_mercado, etapa=etapa_ref))
+    # Top-10 do share na própria Visão geral (card V2 `t_cbd54a92`, rodada 1,
+    # item 2): a mesma etapa do recorte, primeira página. A lista completa e
+    # paginada continua em `/app/mercados/{co}/escolas`.
+    resposta_share = dados.share_mercado(
+        request,
+        co_municipio=co_municipio,
+        ano=ano_ref,
+        etapa=etapa_ref,
+        entidade_tipo="escola",
+        limit=10,
+        offset=0,
+    )
+    contexto.update(contexto_share_visao_geral(share=resposta_share))
     contexto["kpis"] = kpis_mercado(
         denominadores=contexto["denominadores"], ano=contexto["ano_selecionado"]
     )

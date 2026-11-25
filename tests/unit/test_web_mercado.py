@@ -119,13 +119,22 @@ def _consultas(repository: FakeRepository, metodo: str) -> list[dict]:
 # -- orçamento de consultas e de HTML (NAV-3) -------------------------------
 
 
-def test_visao_geral_consulta_so_a_composicao_e_nunca_o_share(mercado_repo):
-    """Abertura: 3 chamadas de `dados.mercado`, nenhuma de `share_mercado`."""
+def test_visao_geral_consulta_a_composicao_e_o_top10_do_share(mercado_repo):
+    """Abertura: `dados.mercado` + `dados.share_mercado` (top-10, etapa do recorte).
+
+    Card V2 `t_cbd54a92`, rodada 1, item 2: a tabela do painel "Escolas do
+    mercado por share" sai da consulta de share (`limit=10`, primeira página);
+    a lista completa e paginada continua na rota `/escolas`.
+    """
     _html(_client(mercado_repo).get(MERCADO))
 
     chamadas = [nome for nome, _ in mercado_repo.calls]
-    assert set(chamadas) == {"get_municipio", "get_market", "get_concentracao"}
-    assert "get_market_share" not in chamadas
+    assert set(chamadas) == {"get_municipio", "get_market", "get_concentracao", "get_market_share"}
+    (consulta,) = _consultas(mercado_repo, "get_market_share")
+    assert consulta["etapa"] == "bas"
+    assert consulta["entidade_tipo"] == "escola"
+    assert consulta["limit"] == 10
+    assert consulta["offset"] == 0
 
 
 def test_visao_geral_cabe_no_teto_de_html(mercado_repo):
@@ -134,15 +143,23 @@ def test_visao_geral_cabe_no_teto_de_html(mercado_repo):
     assert len(resposta.content) <= TETO_HTML_BYTES
 
 
-def test_visao_geral_nao_renderiza_o_ranking_de_share(mercado_repo):
+def test_visao_geral_renderiza_o_top10_do_share_em_tabela(mercado_repo):
+    """O painel "Escolas do mercado por share" é `table.tabela` (V2, item 2).
+
+    Colunas # · Escola · Matrícula · Share privado, 10 primeiras da etapa do
+    recorte, com link para a ficha e para o ranking completo em `/escolas`.
+    """
     html = desescapar(_html(_client(mercado_repo).get(MERCADO)))
 
-    # O ranking é a outra seção: só o link do subnav aparece aqui.
-    assert "Share de matrícula —" not in html
-    assert "Recorte do share" not in html
+    for coluna in ("#", "Escola", "Matrícula", "Share privado"):
+        assert f"<th" in html and coluna in html, coluna
+    assert html.count('id="escola-310000bas') == 10
+    assert "<th class=\"num\" scope=\"row\">1.</th>" in html
+    assert "<th class=\"num\" scope=\"row\">10.</th>" in html
+    assert "<th class=\"num\" scope=\"row\">11.</th>" not in html
+    # Links top-10 → ficha, e o botão para o ranking completo.
+    assert "/app/escolas/310000bas00" in html
     assert f'href="{ESCOLAS}' in html
-    # Links mercado → escola são do ranking, não da abertura.
-    assert "/app/escolas/310000" not in html
 
 
 def test_offset_na_visao_geral_responde_422_sem_consultar(mercado_repo):
@@ -257,14 +274,17 @@ def test_maior_ano_do_seletor_e_o_padrao_mesmo_com_lista_nao_ordenada():
 # -- composição: contrato de chamada ---------------------------------------
 
 
-def test_composicao_e_a_unica_consulta_de_mercado_e_sem_recorte_de_etapa(
+def test_composicao_continua_sem_recorte_de_etapa(
     mercado_repo,
 ):
+    """A composição (`get_market`) cobre todas as etapas; o share tem recorte.
+    `dados.mercado` é consultado sem etapa; `dados.share_mercado` leva a etapa
+    do recorte (V2, item 2) — e reconfere a existência do mercado (`get_market`
+    com a etapa), como na rota `/escolas`."""
     _client(mercado_repo).get(MERCADO)
 
     consultas = _consultas(mercado_repo, "get_market")
-    assert len(consultas) == 1
-    assert consultas[0]["etapa"] is None
+    assert {consulta["etapa"] for consulta in consultas} == {None, "bas"}
 
 
 def test_etapa_informada_vale_para_cobertura_e_movimento(mercado_repo):
@@ -276,13 +296,16 @@ def test_etapa_informada_vale_para_cobertura_e_movimento(mercado_repo):
     assert "Tamanho do mercado por etapa" in html
 
 
-def test_denominadores_vem_da_linha_da_etapa_sem_consultar_share(mercado_repo):
+def test_denominadores_vem_da_linha_da_etapa_e_share_usa_a_etapa(mercado_repo):
     html = _html(_client(mercado_repo).get(f"{MERCADO}?etapa=med"))
 
     assert "Escolas privadas ativas no município e ano" in html
     assert ">30<" in html
     assert ">100<" in html
-    assert not _consultas(mercado_repo, "get_market_share")
+    # Os denominadores saem da linha da etapa em `mart_mercado`; o share do
+    # top-10 leva a mesma etapa do recorte (V2, item 2).
+    (consulta,) = _consultas(mercado_repo, "get_market_share")
+    assert consulta["etapa"] == "med"
 
 
 # -- ausência no primeiro ano da série --------------------------------------
