@@ -55,9 +55,10 @@ LEGENDA_T3 = "Rendimento escolar por ano censitário"
 LEGENDA_T2 = "Oferta por etapa e matrícula observada"
 
 #: Tabelas fora da lista do card (rejeitadas na spec §2): não ordenam.
+#: A tabela de concorrentes por etapa saiu no card V2 `t_cbd54a92` (a ficha
+#: passou a mostrar KPIs, posição e ranking em vez da lista por etapa).
 LEGENDAS_SEM_ORDENACAO = (
     "Série de matrículas por ano censitário",  # T1
-    "Concorrentes privadas com matrícula observada por etapa",  # T4
     "Cobertura de matrícula na etapa",  # T6
     "Movimento de escolas na etapa",  # T7
 )
@@ -345,7 +346,9 @@ def test_tabelas_fora_da_lista_nao_tem_data_ordenavel(paginas: dict[str, str]) -
 def test_so_as_tres_tabelas_do_card_ordenam(paginas: dict[str, str]) -> None:
     assert paginas["mercado"].count("data-ordenavel") == 1
     assert paginas["ficha"].count("data-ordenavel") == 2
-    assert paginas["concorrencia"].count("data-ordenavel") == 0
+    # `/concorrencia` é `301` para a ficha (card V2): o corpo é o mesmo, com as
+    # mesmas duas tabelas ordenáveis.
+    assert paginas["concorrencia"].count("data-ordenavel") == 2
     assert paginas["ranking"].count("data-ordenavel") == 0
     assert paginas["busca"].count("data-ordenavel") == 0
 

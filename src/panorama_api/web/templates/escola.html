@@ -93,8 +93,8 @@
         <tbody>
           {% for ponto in serie.pontos %}
           <tr>
-            <th scope="row" data-valor="{{ ponto.ano | fmt_bruto }}">{{ ponto.ano | fmt_ano }}</th>
-            <td class="num" data-valor="{{ ponto.valor | fmt_bruto }}">{{ ponto.valor | fmt_contagem(ponto.motivo) }}</td>
+            <th scope="row">{{ ponto.ano | fmt_ano }}</th>
+            <td class="num">{{ ponto.valor | fmt_contagem(ponto.motivo) }}</td>
             <td class="num{% if ponto.variacao is not none %} {{ 'var-pos' if ponto.variacao >= 0 else 'var-neg' }}{% endif %}">{{ ponto.variacao | variacao_texto }}</td>
           </tr>
           {% endfor %}
@@ -284,7 +284,7 @@
   </section>
   {% endif %}
 
-  <dl class="rodape-meta" aria-label="Recorte da série de matrículas">
+  <dl class="rodape-meta" aria-label="Origem dos números da série de matrículas">
     <div>
       <dt>Ano de referência</dt>
       <dd>{{ meta.ano_referencia | fmt_ano }}</dd>

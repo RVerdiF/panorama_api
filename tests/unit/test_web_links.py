@@ -113,9 +113,9 @@ def test_busca_mantem_o_codigo_inep_em_code_sem_link(client_links):
     html = _html(client_links.get(BUSCA, params={"q": "modelo"}))
 
     # O código INEP continua texto (não é o link): o nome é que é clicável.
-    # Card V1: a célula ganhou `class="num"` para alinhar á direita com
-    # `tabular-nums`, como o protótipo — o conteúdo é o mesmo.
-    assert '<td class="num"><code>31000001</code></td>' in html
+    # Card V2: a tabela de 7 colunas não tem mais coluna própria de código — ele
+    # acompanha o nome na célula da escola, ainda em `<code>`.
+    assert "<code>31000001</code>" in html
     assert f'<a href="{ESCOLA}"><code>' not in html
 
 
@@ -203,14 +203,17 @@ def test_escola_sem_municipio_nao_gera_link_quebrado(client_links, repo_links):
 
 
 def test_lider_da_comparacao_municipal_continua_texto(client_links):
-    """Sem `co_entidade` do líder no payload, linkar seria adivinhar por nome."""
-    # A comparação municipal vive na rota própria desde o NAV-2.
+    """Sem `co_entidade` do líder no payload, linkar seria adivinhar por nome.
+
+    Card V2: o líder do município aparece citado no KPI "Gap para o líder" —
+    como texto, nunca como link (o `co_entidade` do líder não é publicado).
+    """
     html = _html(client_links.get(f"{ESCOLA}/concorrencia"))
 
     achado = re.search(
-        r"<dt>Líder do município[^<]*</dt>\s*<dd>(.*?)</dd>", html, flags=re.S
+        r'<p class="kpi__nota">(matrículas atrás de [^<]*)</p>', html, flags=re.S
     )
-    assert achado is not None
+    assert achado is not None, "KPI de gap sem o líder citado"
     assert "ESCOLA LIDER" in achado.group(1)
     assert "href=" not in achado.group(1)
 

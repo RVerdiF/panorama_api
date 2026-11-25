@@ -30,20 +30,19 @@ import pytest
 from panorama_api.contract import OFERTA_ETAPAS
 from panorama_api.core.errors import UpstreamUnavailable
 from panorama_api.web.filters import fmt_ano
-from tests.unit.conftest import history_row, school_row
+from tests.unit.conftest import history_row, indicator_row, school_row
 
 ESCOLA = "/app/escolas/31000001"
 #: Termos proibidos como vocabulário de comparação geográfica (escopo-adiado-v1).
 TERMOS_PROIBIDOS = ("raio", "próximos", "proximos", "na região", "na regiao")
 #: Chamadas ao repositório que só existem na rota de indicadores.
 METODOS_PRIVADAS = ("get_school_indicators", "get_school_competidores", "get_school")
-#: Rótulo do item ativo do subnav na Visão geral.
-SUBNAV_VISAO_GERAL = '<a href="/app/escolas/31000001" aria-current="page">Visão geral</a>'
+#: Rótulo do item ativo do subnav na Visão geral (âncora interna, card V2).
+SUBNAV_VISAO_GERAL = '<a href="#resumo" aria-current="page">Visão geral</a>'
 
-#: Teto de peso pedido pelo card (25 KB) e o baseline da ficha na `main` antes
-#: desta entrega (medido com a fixture 31005371, `Accept-Encoding: identity`).
-TETO_HTML_BYTES = 25 * 1024
-BASELINE_FICHA_BYTES = 13_732
+#: Teto de peso da ficha fundida (KPIs + série + oferta/rendimento + posição +
+#: ranking): card V2 `t_cbd54a92`. A ficha deixou de ser "só o history".
+TETO_HTML_BYTES = 40 * 1024
 
 #: Escola real do card F11 (COL COTEMIG BARROCA, BH): `qt_mat_creche = 0`.
 COTEMIG = "31005371"
@@ -119,16 +118,21 @@ def _cotemig(client, repository) -> str:
 # -- 1 consulta: a ficha não paga indicadores ao abrir ------------------------
 
 
-def test_escola_privada_ativa_faz_uma_unica_consulta(client, repository):
+def test_escola_privada_ativa_faz_historico_e_indicadores(client, repository):
     repository.history = _serie(2024, 2025)
+    repository.indicators = [indicator_row()]
 
     html = _html(client.get(ESCOLA))
 
-    assert _leituras(repository) == ["get_school_history"]
-    for metodo in METODOS_PRIVADAS:
-        assert metodo not in _leituras(repository), metodo
-    # A seção existe para esta escola: o subnav aponta para ela.
-    assert '<a href="/app/escolas/31000001/concorrencia">Indicadores e concorrência</a>' in html
+    # Card V2: a ficha fundiu a Visão geral e os indicadores/concorrência —
+    # `history` alimenta série/oferta/rendimento; `indicators` alimenta KPIs,
+    # posição e ranking. Nenhuma leitura de identidade (`get_school`).
+    leituras = _leituras(repository)
+    assert leituras[0] == "get_school_history"
+    assert "get_school_indicators" in leituras
+    assert "get_school" not in leituras
+    # A seção existe para esta escola: o subnav aponta para a âncora.
+    assert '<a href="#concorrencia">Indicadores e concorrência</a>' in html
     assert "Série de matrículas" in html
 
 
@@ -195,24 +199,21 @@ def test_escola_sem_dependencia_declarada_nao_linka_nem_classifica(client, repos
 # -- peso: 25 KB e menor que o baseline --------------------------------------
 
 
-def test_html_da_visao_geral_cabe_no_orcamento_e_encolhe_contra_o_baseline(
-    client, repository
-):
-    """Tirar indicadores e comparação da abertura encolhe a página de verdade."""
+def test_html_da_visao_geral_cabe_no_orcamento(client, repository):
+    """A ficha fundida (KPIs + série + oferta/rendimento + posição + ranking)
+    cabe no orçamento de peso do front."""
     repository.schools = [
         school_row(co_entidade=COTEMIG, no_entidade="COL COTEMIG BARROCA")
     ]
     repository.history = _serie_cotemig()
+    repository.indicators = [indicator_row(co_entidade=COTEMIG)]
 
     resposta = client.get(COTEMIG_URL, headers={"Accept-Encoding": "identity"})
     tamanho = len(resposta.content)
-    print(f"Visão geral da {COTEMIG}: {tamanho} B (baseline {BASELINE_FICHA_BYTES} B)")
+    print(f"Ficha da {COTEMIG}: {tamanho} B")
 
     assert resposta.status_code == 200
     assert tamanho <= TETO_HTML_BYTES, f"{tamanho} B > {TETO_HTML_BYTES} B"
-    assert tamanho < BASELINE_FICHA_BYTES, (
-        f"{tamanho} B não encolheu contra o baseline de {BASELINE_FICHA_BYTES} B"
-    )
 
 
 # -- subnav e âncoras de seção -----------------------------------------------
@@ -227,17 +228,21 @@ def test_subnav_marca_a_visao_geral_como_pagina_atual(client, repository):
     assert SUBNAV_VISAO_GERAL in html
     # O item ativo é "page" no subnav; `role="tablist"` não existe (sem JS/abas).
     assert 'role="tablist"' not in html
+    assert '<a href="#concorrencia">Indicadores e concorrência</a>' in html
     assert '<a href="/app/mercados/3106200">Mercado de BELO HORIZONTE →</a>' in html
 
 
 def test_visao_geral_tem_os_ids_de_contrato_na_ordem_e_ancoras(client, repository):
     html = _cotemig(client, repository)
 
-    for ancora in ("#oferta", "#serie", "#rendimento"):
+    # Card V2: o subnav aponta para as âncoras internas, não para rotas.
+    for ancora in ("#resumo", "#concorrencia"):
         assert f'href="{ancora}"' in html, ancora
-    assert "Nesta página:" in html
-    # A ordem é contrato: resumo → oferta → série → rendimento.
-    posicoes = [html.index(f'id="{secao}"') for secao in ("oferta", "serie", "rendimento")]
+    # A ordem é contrato: resumo → série → oferta → rendimento → concorrência.
+    posicoes = [
+        html.index(f'id="{secao}"')
+        for secao in ("resumo", "serie", "oferta", "rendimento", "concorrencia")
+    ]
     assert posicoes == sorted(posicoes), posicoes
 
 
@@ -322,9 +327,11 @@ def test_serie_tem_svg_inline_e_tabela_equivalente(client, repository):
 
     tabela = _tabela(html, "Série de matrículas por ano")
     assert "<caption>Série de matrículas por ano censitário</caption>" in tabela
-    for ano, valor in ((2023, "90"), (2024, "110"), (2025, "120")):
+    # Card V2: a tabela da série ganhou a coluna "Variação anual". No primeiro
+    # ano observado não há ano anterior → "sem dado".
+    for ano, valor, variacao in ((2023, "90", "sem dado"), (2024, "110", "+22,2%"), (2025, "120", "+9,1%")):
         assert f'<th scope="row">{ano}</th>' in tabela
-        assert _celulas_da_linha(tabela, str(ano)) == [valor]
+        assert _celulas_da_linha(tabela, str(ano)) == [valor, variacao]
 
 
 def test_svg_marca_ano_sem_dado_como_lacuna(client, repository):
