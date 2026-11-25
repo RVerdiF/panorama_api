@@ -17,7 +17,9 @@
 
   Matrícula, share municipal e variação anual **não** vêm no schema de busca
   (`School`): as células saem como `sem dado` com a mesma estrutura e classes das
-  colunas que têm valor — nunca 0 nem um número inventado.
+  colunas que têm valor — nunca 0 nem um número inventado. Sem dado para
+  ordenar, o `th` de Matrícula não anuncia ordenação (sem `aria-sort`/seta):
+  anunciar `descending` sobre "sem dado" seria falso (revisão, item 4).
 #}
 {% block conteudo %}
 <div class="tela">
@@ -103,8 +105,7 @@
     <div class="painel__cabecalho">
       <h2 id="titulo-resultados">Resultados</h2>
       <p class="painel__nota">
-        Ordenável por matrícula. Nenhum total é exibido: a paginação usa apenas
-        "tem mais".
+        Nenhum total é exibido: a paginação usa apenas "tem mais".
       </p>
     </div>
 
@@ -118,7 +119,7 @@
             <th scope="col" class="nome-escola">Escola</th>
             <th scope="col">Município</th>
             <th scope="col">Dependência</th>
-            <th scope="col" class="num ordenavel" aria-sort="descending">Matrícula <span aria-hidden="true">▼</span></th>
+            <th scope="col" class="num">Matrícula</th>
             <th scope="col" class="num">Share municipal</th>
             <th scope="col" class="num">Variação anual</th>
             <th scope="col">Situação</th>
@@ -146,13 +147,14 @@
               {{ escola.no_municipio | fmt_nulo }}
               {% endif %}
             </td>
-            <td class="num">{{ escola.tp_dependencia | fmt_nulo }}</td>
+            {# Código INEP com a leitura ao lado ("4 — Privada"), igual à ficha. #}
+            <td class="num">{{ escola.tp_dependencia | fmt_nulo }} — {{ rotulo_dependencia(escola.tp_dependencia) }}</td>
             {#- School não traz matrícula, share nem variação: `sem dado` na
                 mesma célula/estrutura, nunca 0 (AGENTS.md §6). -#}
             <td class="num"><span class="sem-dado">sem dado</span></td>
             <td class="num"><span class="sem-dado">sem dado</span></td>
             <td class="num"><span class="sem-dado">sem dado</span></td>
-            <td>{{ escola.tp_situacao_funcionamento | fmt_nulo }}</td>
+            <td>{{ escola.tp_situacao_funcionamento | fmt_nulo }} — {{ rotulo_situacao(escola.tp_situacao_funcionamento) }}</td>
           </tr>
           {% endfor %}
         </tbody>

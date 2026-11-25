@@ -338,6 +338,25 @@ def test_busca_por_municipio_renderiza_a_escola_e_o_recorte_obrigatorio(
     assert not TEXTO_DE_TOTAL.search(html)
 
 
+def test_busca_por_municipio_mostra_codigo_inep_com_rotulo(
+    client, repository
+):
+    """Dependência e situação com a leitura do código ("4 — Privada").
+
+    Rodada 1 da revisão, item 4: os códigos crus `4`/`1` ganham o rótulo da
+    ficha; sem matrícula no schema, a coluna não anuncia ordenação.
+    """
+    repository.schools = [school_row()]
+
+    resposta = _get(client, params={"co_municipio": "3106200"})
+    html = resposta.text
+
+    assert resposta.status_code == 200
+    assert "4 — Privada" in html
+    assert "1 — Em atividade" in html
+    assert "aria-sort" not in html
+
+
 def test_busca_envia_limit_20_e_os_filtros_ao_repositorio(client, repository):
     repository.schools = [school_row()]
 
