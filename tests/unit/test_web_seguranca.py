@@ -299,7 +299,8 @@ def _tags_script(html: str) -> list[str]:
 def test_pagina_carrega_exatamente_o_app_js_com_defer(
     cliente: TestClient, caminho: str, status: int
 ) -> None:
-    resposta = cliente.get(caminho)
+    # Sem seguir redirect: o 301 da concorrência antiga não tem HTML.
+    resposta = cliente.get(caminho, follow_redirects=False)
 
     assert resposta.status_code == status, caminho
     if status == 301:
@@ -318,7 +319,8 @@ def test_pagina_carrega_exatamente_o_app_js_com_defer(
 def test_pagina_sem_inline_de_estilo_ou_script(
     cliente: TestClient, caminho: str, status: int
 ) -> None:
-    html = cliente.get(caminho).text
+    # Sem seguir redirect: o corpo do 301 é vazio por definição.
+    html = cliente.get(caminho, follow_redirects=False).text
 
     assert "<style" not in html, caminho
     _sem_style_fora_da_barra(html, caminho)
