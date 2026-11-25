@@ -312,15 +312,19 @@ def test_script_unico_e_o_app_js_com_defer():
     """Card `t_71b25279`: o front tem **uma** base de JS, o `app.js` com hash.
 
     Substitui a guarda de "zero JavaScript" do NAV-1: o shell continua completo
-    sem JS, mas a única tag permitida é a do asset servido pelo `AssetRegistry`,
-    herdada de `base.html` — nada de `<script>` inline e nada de segundo `.js`.
+    sem JS, mas a única tag **executável** permitida é a do asset servido pelo
+    `AssetRegistry`, herdada de `base.html` — nada de `<script>` inline e nada
+    de segundo `.js`. Ilhas de dados (`type="application/json"`, card V2
+    `t_cbd54a92`) não executam e passam: o `app.js` as lê por `textContent`.
     """
     for caminho in sorted(TEMPLATES.rglob("*.html")):
         texto = caminho.read_text(encoding="utf-8")
         for tag in re.findall(r"<script\b[^>]*>", texto):
+            if 'type="application/json"' in tag:
+                continue
             assert 'src="{{ js_url }}"' in tag, f"{caminho.name}: script sem src: {tag}"
             assert "defer" in tag, f"{caminho.name}: script sem defer: {tag}"
-        assert texto.count("<script") <= 1, caminho.name
+        assert texto.count("<script") <= 2, caminho.name
 
     assert sorted(p.name for p in STATIC.glob("*.js")) == ["app.js"]
 
