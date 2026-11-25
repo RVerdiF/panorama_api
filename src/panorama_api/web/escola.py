@@ -21,6 +21,7 @@ Duas decisões moram neste módulo:
 
 from __future__ import annotations
 
+import json
 from typing import Any, Mapping, NamedTuple, Protocol, Sequence, TypeVar
 
 from markupsafe import Markup
@@ -286,7 +287,25 @@ def serie_matriculas(items: Sequence[HistoryItem]) -> dict[str, Any]:
     template mostra "sem dado" em vez de um gráfico de zeros.
     """
     pontos = _pontos_da_serie(items)
-    return {"pontos": pontos, "svg": svg_serie(pontos)}
+    return {"pontos": pontos, "svg": svg_serie(pontos), "ilha": _ilha_serie(pontos)}
+
+
+def _ilha_serie(pontos: Sequence[dict[str, Any]]) -> Markup:
+    """Ilha JSON da série para hidratação no cliente (`static/app.js`).
+
+    ``{"anos": [...], "valores": [...]}`` com os números do SSR — ``null``
+    onde falta dado, nunca ``0``. O `app.js` lê a ilha por
+    ``JSON.parse(textContent)`` dentro da `section#serie` e desenha linha/área
+    com dica `aria-live`; sem ilha válida, ele usa a tabela SSR da seção.
+    O JSON nasce só de inteiros/`None` (`json.dumps`), então o ``Markup`` é
+    seguro sem escape adicional.
+    """
+    anos = [int(ponto["ano"]) for ponto in pontos]
+    valores = [
+        int(ponto["valor"]) if ponto["valor"] is not None else None
+        for ponto in pontos
+    ]
+    return Markup(json.dumps({"anos": anos, "valores": valores}))
 
 
 def _pontos_da_serie(items: Sequence[HistoryItem]) -> list[dict[str, Any]]:
