@@ -979,3 +979,1043 @@ table.tabela.tabela--compacta { min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
 }
+
+/* ============================================================
+   /* app-only */ — CSS exclusivo do app (fora do bloco herdado).
+   Tudo acima desta seção é cópia verbatim de
+   `panorama-design/assets/css/panorama.css` (diff vazio fora daqui).
+   Abaixo vivem SÓ os seletores que não existem no protótipo,
+   traduzidos para os tokens do protótipo (`--accent`, `--space-*`),
+   mais os ajustes de SSR:
+   - `@font-face` com URLs `{{asset:…}}` resolvidas para hash no boot
+     (`web/assets.py`) e `--fonte-mono` no stack do sistema (o subset
+     self-hosted não inclui IBM Plex Mono);
+   - série SVG legada renderizada no servidor (`.serie-*`, usada por
+     `escola.py:svg_serie`/`svg_serie_comparada`);
+   - ordenação atual por `th[data-tipo]` (botão criado no `app.js`);
+     as setas vivem sob `th[data-tipo][aria-sort]` para não colidir
+     com o `th.ordenavel > span` do protótipo;
+   - estados de ausência do SSR (`.nao-se-aplica`, `.aviso--temporario`);
+   - `.barra-share` antigo escopado a `table` (o protótipo usa
+     `.barra-share` flex para o ranking em CSS — sem o escopo, esta
+     regra quebraria as barras novas);
+   - `.subnav [aria-current]` escopado a `.subnav ul` (o protótipo usa
+     âncoras diretas com `[aria-current="page"]` e cor própria).
+   Regras de base (a, table, h1…) e componentes do protótipo NÃO são
+   redeclarados aqui: valem as do bloco herdado.
+   ============================================================ */
+
+/* --- SSR: fontes com hash + mono do sistema --- */
+/* --- fontes --- */
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("{{asset:source-serif-700.woff2}}") format("woff2");
+}
+
+@font-face {
+  font-family: "Source Serif 4";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("{{asset:source-serif-700.woff2}}") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("{{asset:inter-400.woff2}}") format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("{{asset:inter-600.woff2}}") format("woff2");
+}
+
+:root {
+  /* Stack do sistema no lugar do IBM Plex Mono (subset sem o arquivo). */
+  --fonte-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* --- SSR: alvos de teclado e atalho de acessibilidade --- */
+[tabindex]:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+.visualmente-oculto {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- app-only: navbar legada do SSR (o protótipo usa .marca/.menu) --- */
+.topo__interno,
+.rodape__interno,
+.conteudo {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--container-gutter-desktop);
+}
+.topo__interno {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-6);
+  padding: 0;
+}
+.topo__marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.topo__sinal {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  border: 1px solid var(--accent-active);
+  color: var(--accent-on);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: var(--bevel-btn);
+}
+.topo__texto {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.topo__nome {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 17px;
+  letter-spacing: -0.008em;
+}
+
+.topo__sub {
+  margin-top: 2px;
+  font-family: var(--fonte-mono);
+  font-size: 10px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted-strong);
+}
+
+.topo__nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+.topo__nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--fg-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard);
+}
+
+.topo__nav a:hover {
+  background: var(--surface-sunken);
+  color: var(--fg);
+  border-color: var(--border-soft);
+  text-decoration: none;
+}
+
+.topo__nav a[aria-current] {
+  background: var(--surface-raise);
+  color: var(--accent);
+  border-color: var(--border);
+  box-shadow: var(--bevel-top);
+}
+.topo__submenu > summary {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--fg-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.topo__submenu > summary::-webkit-details-marker {
+  display: none;
+}
+.topo__submenu > summary::after {
+  content: "▾" / "";
+  margin-left: 0.35rem;
+  color: var(--muted-strong);
+}
+.topo__submenu[open] > summary::after {
+  content: "▴" / "";
+}
+.topo__submenu > summary:hover {
+  background: var(--surface-sunken);
+  color: var(--fg);
+  border-color: var(--border-soft);
+}
+
+.topo__submenu > summary[aria-current] {
+  background: var(--surface-raise);
+  color: var(--accent);
+  border-color: var(--border);
+  box-shadow: var(--bevel-top);
+}
+.topo__painel {
+  margin: 0.35rem 0 0;
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  list-style: none;
+  display: grid;
+  gap: 0.1rem;
+  border-left: 1px solid var(--border);
+}
+.topo__painel a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+  border-radius: 5px;
+  color: var(--fg-2);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+.topo__painel a:hover {
+  background: var(--surface-sunken);
+  color: var(--accent);
+}
+.selo-dados {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-soft);
+  color: var(--fg-2);
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  box-shadow: var(--inset-well);
+}
+
+.selo-dados__ponto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+/* --- app-only: pilha da tela e migalhas do SSR --- */
+.conteudo {
+  padding-block: var(--space-8) var(--space-12);
+}
+.tela > * + * {
+  margin-top: var(--space-6);
+}
+
+.tela > .tela-topo + * {
+  margin-top: var(--space-8);
+}
+.breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  color: var(--muted-strong);
+}
+
+.breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--muted-strong);
+  text-decoration: none;
+}
+.nesta-pagina a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.breadcrumb a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.breadcrumb li + li::before {
+  content: "›";
+  margin-right: 0.5rem;
+  opacity: 0.55;
+}
+.breadcrumb [aria-current="page"] {
+  color: var(--fg);
+}
+
+.subtitulo {
+  margin: 0;
+  color: var(--fg-2);
+  font-size: var(--text-lg);
+  max-width: 74ch;
+}
+
+/* --- app-only: painel de erro, nota, código de erro, seção --- */
+.painel--erro {
+  border-left: 4px solid var(--danger);
+}
+.painel__cabecalho h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  letter-spacing: -0.01em;
+}
+.nota {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted-strong);
+  max-width: 62ch;
+  line-height: 1.55;
+}
+.codigo-erro {
+  margin: 0 0 0.35rem;
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-strong);
+}
+.secao + .secao {
+  margin-top: var(--space-8);
+}
+
+/* --- app-only: formulários do SSR --- */
+.formulario {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-5);
+  align-items: start;
+  margin: 0;
+  padding: var(--space-5);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-raise);
+}
+.campo label,
+.hero__campo label {
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+}
+.campo input[type="search"],
+.campo select {
+  height: 46px;
+  width: 100%;
+  min-width: 0;
+  padding: 0 13px;
+  font: inherit;
+  font-size: var(--text-base);
+  color: var(--fg);
+  background: var(--surface-raise);
+  border: 1px solid #6f7d76;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--inset-well);
+  transition:
+    border-color var(--motion-fast) var(--ease-standard),
+    box-shadow var(--motion-fast) var(--ease-standard);
+}
+
+.campo input:hover,
+.campo select:hover {
+  border-color: var(--muted-strong);
+}
+
+.campo input:focus-visible,
+.campo select:focus-visible {
+  border-color: var(--accent);
+  box-shadow: var(--inset-well), var(--focus-ring);
+}
+.campo--booleano {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding-top: 18px;
+}
+
+.campo--booleano input {
+  width: 19px;
+  height: 19px;
+  accent-color: var(--accent);
+}
+
+.campo--booleano label {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--fg-2);
+}
+
+/* Ação do formulário: mantém a coluna de `.campo`, então o botão estica na
+   largura da célula — estado do mercado e da busca sem filtro. */
+.campo--acao {
+  justify-content: flex-end;
+}
+
+/* Só com o link "Limpar filtros" (busca com filtro) a ação vira linha; `:has`
+   evita classe extra e deixa o mercado com o layout de coluna intacto. */
+.campo--acao:has(.limpar-filtros) {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+.limpar-filtros {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 0.25rem;
+  font-size: var(--text-sm);
+}
+.formulario button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: var(--bevel-btn), 0 1px 2px rgba(22, 33, 29, 0.22);
+}
+
+/* --- app-only: dica de campo (o .campo__dica é do bloco herdado) --- */
+.dica {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--muted-strong);
+  max-width: none;
+  line-height: 1.45;
+}
+
+/* --- app-only: chips com link (o protótipo usa button) --- */
+.chip strong {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.chip a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+  border-radius: 5px;
+  color: var(--accent);
+  text-decoration: none;
+  line-height: 1;
+}
+
+.chip a:hover {
+  background: var(--border-soft);
+  color: var(--fg);
+}
+
+/* --- app-only: rolagem horizontal das tabelas do SSR --- */
+.tabela-rolavel {
+  overflow-x: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+}
+
+/* --- app-only: colunas e grupos das tabelas do SSR --- */
+.tabela th.nome-escola {
+  width: 22rem;
+}
+
+.tabela td.nome-escola {
+  white-space: normal;
+}
+.tabela td[data-valor],
+.tabela tbody th[data-valor] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tabela th[data-tipo="numero"] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.gap-lider {
+  font-weight: 700;
+}
+
+/* --- app-only: ordenação atual (botão criado no app.js) --- */
+th[data-tipo] {
+  padding: 0;
+}
+
+th[data-tipo] button {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 11px 12px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fg-2);
+  text-align: left;
+}
+
+th[data-tipo="numero"] button {
+  justify-content: flex-end;
+}
+
+th[data-tipo] button:hover {
+  background: var(--surface-warm);
+  color: var(--fg);
+}
+
+th[data-tipo][aria-sort] button {
+  color: var(--accent);
+}
+
+th[data-tipo][aria-sort] button::after {
+  content: " ▴";
+  font-size: 10px;
+}
+
+th[data-tipo][aria-sort="descending"] button::after {
+  content: " ▾";
+}
+
+/* --- app-only: grupo semântico, barra legada e linha alvo --- */
+tr.grupo-etapas th {
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted-strong);
+  background: var(--surface-raise);
+}
+.tabela tbody tr:target {
+  background: var(#d9e4df);
+  scroll-margin-top: 5rem;
+}
+
+.tabela tbody tr:target > *:first-child {
+  box-shadow: inset 4px 0 0 var(--accent);
+}
+
+/* Barra legada do share (SVG inline do servidor): só dentro de tabela.
+   O .barra-share do protótipo é flex para o ranking em CSS. */
+table .barra-share {
+  display: inline-block;
+  width: 5rem;
+  height: 8px;
+  margin-left: 0.4rem;
+  vertical-align: middle;
+  background: var(--surface-sunken);
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: var(--inset-well);
+}
+
+table .barra-share rect {
+  fill: var(--accent);
+}
+
+/* --- app-only: listas, ausência e estados do SSR --- */
+.lista-definicoes {
+  display: grid;
+  grid-template-columns: minmax(10rem, 22rem) 1fr;
+  gap: 0.6rem 1.25rem;
+  margin: 0;
+  padding: 0;
+}
+
+.lista-definicoes dt {
+  font-family: var(--fonte-mono);
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--muted-strong);
+}
+
+.lista-definicoes dd {
+  margin: 0;
+  color: var(--fg);
+  overflow-wrap: anywhere;
+}
+
+.lista-regras {
+  margin: 0;
+  padding-left: 1.15rem;
+  display: grid;
+  gap: 0.65rem;
+}
+.aviso--temporario {
+  border-left-color: var(--danger);
+}
+
+.nao-se-aplica {
+  margin: var(--space-4) 0;
+  padding: 13px 15px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raise);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--muted-strong);
+  font-size: var(--text-sm);
+  color: var(--fg-2);
+}
+.estado-vazio .lista-regras {
+  display: inline-grid;
+  text-align: left;
+  max-width: 52ch;
+}
+
+/* --- app-only: landing/hero, recorte e cartões (telas sem contraparte) --- */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+/* O `h1` da landing usa o mesmo topo de escala (`--text-3xl`): 76 px é outdoor
+   numa página de leitura, então `--text-4xl` fica no token, não no título. */
+.hero h1 {
+  margin: 0 0 var(--space-4);
+  font-size: clamp(2.25rem, 4.6vw, var(--text-3xl));
+  line-height: var(--leading-tight);
+  letter-spacing: var(--tracking-display);
+  max-width: 24ch;
+}
+
+.hero__busca {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  margin: 1.5rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.hero__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.hero__campo input[type="search"],
+.hero__campo select {
+  font: inherit;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  height: 46px;
+  padding: 0 13px;
+  border: 1px solid #6f7d76;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raise);
+  color: var(--fg);
+  box-shadow: var(--inset-well);
+}
+
+.hero__acoes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.5rem;
+}
+
+/* Painel do recorte: tint do acento e raio grande; contraste medido no teste. */
+.hero .recorte {
+  margin-top: 0;
+  padding: var(--space-6);
+  background: var(#e2eae6);
+  border-radius: 16px;
+}
+
+.hero .recorte h2 {
+  margin-top: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  letter-spacing: -0.005em;
+}
+
+.recorte__lista {
+  display: grid;
+  gap: 1.25rem;
+  margin: 0;
+}
+
+/* Número em cima do rótulo sem inverter a ordem do `dl`: o número segue `dd`. */
+.recorte__item {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 0.15rem;
+}
+
+.recorte__rotulo {
+  color: var(--muted-strong);
+  max-width: none;
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.recorte__valor {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.recorte__fonte {
+  margin: 1.25rem 0 0;
+  font-family: var(--fonte-mono);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  color: var(--muted-strong);
+  max-width: none;
+}
+
+/* "O que você encontra": 3 colunas a partir de 48rem. */
+.encontra {
+  display: grid;
+  gap: 1.25rem;
+}
+
+/* Cada card é uma coluna flex com o link ancorado no pé: os três CTAs ficam na
+   mesma linha de base mesmo com parágrafos de alturas diferentes. */
+.encontra > div {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  background: var(--surface-raise);
+  box-shadow: var(--bevel-top), var(--raise-sm);
+}
+
+.encontra h3 {
+  margin: 0 0 var(--space-2);
+}
+
+.encontra p {
+  margin: 0 0 var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--fg-2);
+}
+
+.encontra a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: auto;
+  font-weight: 600;
+}
+
+/* --- app-only: subnav em lista e índice da página --- */
+.subnav ul {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--border);
+}
+.subnav__saida {
+  margin-left: auto;
+}
+
+.nesta-pagina p {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--muted-strong);
+  max-width: none;
+}
+
+/* Item ativo restrito à subnav em lista (o protótipo usa âncoras diretas). */
+.subnav ul [aria-current="page"] {
+  background: var(--surface);
+  color: var(--accent);
+  border-color: var(--border);
+  border-bottom-color: var(--surface);
+  text-decoration: none;
+}
+
+/* --- app-only: paginação do SSR --- */
+.paginacao__link {
+  /* Alvo de toque ≥44px (WCAG 2.5.5). */
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--accent);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: var(--bevel-top), 0 1px 2px rgba(22, 33, 29, 0.07);
+}
+
+.paginacao__link:hover {
+  background: #f2f5f1;
+  border-color: var(--accent);
+  color: #1c5346;
+  text-decoration: none;
+}
+
+.paginacao__contagem {
+  margin: 0;
+  padding-top: var(--space-3);
+  font-family: var(--fonte-mono);
+  font-size: var(--text-xs);
+  color: var(--muted-strong);
+  max-width: none;
+}
+
+/* --- app-only: série SVG legada do servidor --- */
+.serie-figura {
+  margin: 0 0 var(--space-4);
+}
+
+.serie {
+  display: block;
+  width: 100%;
+  max-width: 40rem;
+  height: auto;
+}
+
+.serie__barra {
+  fill: var(--accent);
+}
+
+/* Segunda escola da comparação: contorno tracejado (distingue sem cor). */
+.serie__barra--b {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 2;
+}
+
+.serie__eixo {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.serie__ausente {
+  stroke: var(--muted-strong);
+  stroke-width: 2;
+  stroke-dasharray: 3 3;
+}
+
+.serie__ano,
+.serie__valor {
+  fill: var(--muted-strong);
+  font-size: 11px;
+  font-family: var(--fonte-mono);
+}
+
+.serie__valor {
+  fill: var(--fg);
+}
+
+.serie-figura figcaption {
+  margin-top: 0.5rem;
+  color: var(--muted-strong);
+  font-size: var(--text-xs);
+  max-width: 62ch;
+}
+
+/* --- app-only: rodapé do SSR --- */
+.rodape {
+  margin-top: var(--space-12);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  font-size: var(--text-xs);
+  color: var(--muted-strong);
+}
+
+.rodape__interno {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  justify-content: space-between;
+  padding-block: var(--space-5);
+}
+
+.rodape__interno p {
+  margin: 0;
+  max-width: 62ch;
+}
+
+.rodape code {
+  font-size: 11px;
+  color: var(--fg-2);
+}
+
+.rodape-erro {
+  margin-top: var(--space-5);
+  font-size: var(--text-xs);
+  color: var(--muted-strong);
+}
+
+/* --- app-only: responsivo (só seletores desta seção) --- */
+@media (min-width: 48rem) {
+  .hero {
+    grid-template-columns: 1.1fr 0.9fr;
+    gap: 1.5rem 2.5rem;
+    align-items: center;
+  }
+
+  /* Pílula em dois blocos: campos, depois botões. */
+  .hero__busca {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem 0.9rem;
+    padding: 0.9rem 2.5rem;
+    border-radius: 999px;
+  }
+
+  .hero__acoes {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .hero__busca .dica {
+    display: none;
+  }
+
+  .encontra {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 60rem) {
+  .topo__nav {
+    width: 100%;
+    margin-left: 0;
+    gap: 2px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border-soft);
+  }
+
+  .topo__nav a {
+    flex: 1;
+    justify-content: center;
+    padding: 0 6px;
+  }
+
+  .topo__submenu {
+    flex: 1;
+  }
+
+  .topo__submenu > summary {
+    width: 100%;
+    justify-content: center;
+    padding: 0 6px;
+  }
+
+  .selo-dados {
+    display: none;
+  }
+
+  .conteudo,
+  .topo__interno,
+  .rodape__interno {
+    padding-inline: var(--space-4);
+  }
+}
+
+@media (max-width: 40rem) {
+  .lista-definicoes {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+
+  .lista-definicoes dd {
+    margin-bottom: 0.6rem;
+  }
+  .formulario {
+    grid-template-columns: 1fr;
+    padding: var(--space-4);
+  }
+
+  .topo__sub {
+    display: none;
+  }
+  .subtitulo {
+    font-size: var(--text-base);
+  }
+
+  .tabela-rolavel {
+    margin-inline: 0;
+    padding-inline: 0;
+  }
+}
