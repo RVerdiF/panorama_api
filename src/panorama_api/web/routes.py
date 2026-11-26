@@ -1178,33 +1178,6 @@ def _ano_do_seletor(ano: int | None, anos: tuple[int, ...]) -> int:
 
 
 @router.get(
-    "/fonts/{nome}",
-    name="web_fonte_prototipo",
-    summary="Fontes no caminho relativo do CSS vendorizado",
-)
-def fonte_prototipo(nome: str, request: Request) -> Response:
-    """Serve `static/fonts/<nome>` no caminho que o CSS vendorizado declara.
-
-    O `panorama.css` vendorizado referencia `../fonts/*.woff2`, que resolve
-    para `/app/fonts/*` a partir da URL do stylesheet — e o arquivo
-    vendorizado NÃO pode ser editado (D1-a, contrato byte a byte). O caminho
-    é servido aqui, do mesmo diretório que o `AssetRegistry` publica com
-    hash; fora da lista de arquivos, é 404 de endereço.
-    """
-    base = (STATIC_DIR / "fonts").resolve()
-    caminho = (STATIC_DIR / "fonts" / nome).resolve()
-    if caminho.parent != base or not caminho.is_file():
-        return pagina_inexistente(
-            request, ProblemError(ErrorCode.NAO_ENCONTRADO, "fonte não encontrada")
-        )
-    return Response(
-        content=caminho.read_bytes(),
-        media_type="font/woff2",
-        headers={"Cache-Control": CACHE_CONTROL_ASSET},
-    )
-
-
-@router.get(
     "/static/{caminho}",
     name="web_static",
     summary="Assets do front (nome com hash de conteúdo)",

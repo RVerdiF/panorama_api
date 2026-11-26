@@ -8,14 +8,22 @@ navegador nunca precisa revalidar e um deploy de código gera URL nova.
 O hash também é verificado no handler: uma URL com hash errado dá 404 em vez de
 servir bytes que não correspondem ao nome público.
 
-Referência entre assets (`{{asset:<nome>}}`)
---------------------------------------------
-
+Referência entre assets (`{{asset:<nome>}}` e `../fonts/<nome>`)
+-------------------------------------------------------------
 O `@font-face` do `app.css` precisa apontar para a URL **com hash** da fonte, e
 essa URL só existe depois que o conteúdo da fonte é lido. Em vez de duplicar a
 lógica de hash no CSS, o CSS declara a referência lógica::
 
     src: url("{{asset:inter-400.woff2}}") format("woff2");
+
+O CSS vendorizado do protótipo (`static/prototipo/`) NÃO pode ser editado
+(contrato byte a byte, D1-a): as referências relativas que ele já declara::
+
+    src: url("../fonts/inter-400.woff2") format("woff2");
+
+são resolvidas pelo registro da mesma forma, virando a URL pública com hash
+da fonte. O arquivo no disco segue intacto (`cmp` limpo); só os bytes
+servidos carregam a URL final — o mesmo padrão do `{{asset:}}`.
 
 O registro varre `static/` (inclusive subdiretórios, como `static/fonts/`),
 publica tudo num espaço de nomes plano — o nome público é o nome do arquivo — e
@@ -53,6 +61,11 @@ _TEXTUAL_SUFFIXES = frozenset({".css", ".js", ".svg"})
 
 #: `{{asset:<nome>}}` — nome publicado, nunca caminho no disco.
 _REFERENCIA = re.compile(r"\{\{asset:([A-Za-z0-9._-]+)\}\}")
+
+#: `../fonts/<nome>` — referência relativa do CSS vendorizado do protótipo
+#: (`static/prototipo/`), que NÃO pode ser editado (D1-a). Resolve para a
+#: mesma URL pública com hash; o arquivo no disco segue intacto.
+_REFERENCIA_RELATIVA_FONTE = re.compile(r"\.\./fonts/([A-Za-z0-9._-]+)")
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,6 +140,10 @@ class AssetRegistry:
                 return achado.group(0)
 
         resolvido = _REFERENCIA.sub(troca, texto)
+        # O CSS vendorizado declara `../fonts/<nome>` (relativo à posição do
+        # stylesheet no disco); servido sob `/app/static/`, esse relativo
+        # quebraria — resolve para a URL com hash, sem tocar no arquivo.
+        resolvido = _REFERENCIA_RELATIVA_FONTE.sub(troca, resolvido)
         if faltando:
             raise KeyError(f"{dono} referencia asset inexistente: {sorted(set(faltando))!r}")
         return resolvido.encode("utf-8")

@@ -13,7 +13,8 @@ O que este teste protege:
 * cada `@font-face` **efetivo** (o último por família/peso, na seção
   `app-only` do `app.css`, que vem depois na cascata) aponta para a URL com
   hash da fonte e declara `font-display: swap` — os arquivos vendorizados
-  do protótipo usam URLs relativas `../fonts/`, servidas em `/app/fonts/`;
+  do protótipo usam URLs relativas `../fonts/`, resolvidas pelo registro
+  para a URL com hash no boot (o arquivo vendorizado segue intacto);
 * o `<head>` faz `preload` do Inter 400 (a fonte do corpo), com `crossorigin`,
   e o HTML não referencia nenhuma origem externa.
 """
@@ -116,7 +117,7 @@ def test_font_face_aponta_para_a_url_com_hash_e_usa_swap(css_servido: str):
         assert "font-display: swap" in bloco, bloco
 
     # O `app.css` app-only só usa URLs com hash (as relativas `../fonts/`
-    # vivem nos arquivos vendorizados do protótipo, servidas em `/app/fonts/`).
+    # vivem nos arquivos vendorizados e o registro as resolve no boot).
     # As efetivas por família/peso usam hash do próprio app.
     relativas = set(re.findall(r'url\("\.\./fonts/([a-z0-9-]+\.woff2)"\)', css_servido))
     assert relativas <= ARQUIVOS_ESPERADOS, relativas
@@ -141,25 +142,39 @@ def test_font_face_aponta_para_a_url_com_hash_e_usa_swap(css_servido: str):
         assert f'font-family: "{familia}"' in css_servido, familia
 
 
-def test_fontes_no_caminho_relativo_do_prototipo_sem_404():
+def test_referencias_relativas_do_prototipo_resolvem_para_hash_sem_404():
     """O `panorama.css` vendorizado declara `../fonts/*.woff2` (NÃO editável).
 
-    A partir da URL do stylesheet isso resolve para `/app/fonts/*`: o
-    servidor atende os 6 arquivos ali, imutáveis, e dá 404 de endereço fora
-    da lista — sem esse caminho, o CSS vendorizado renderiza sem fonte.
+    Servido sob `/app/static/`, esse relativo quebraria — o registro resolve
+    cada um para a URL pública com hash no boot. O arquivo no disco segue
+    intacto; os bytes servidos apontam para fontes que o handler de fato
+    serve (200, imutáveis).
     """
+    from panorama_api.web.routes import STATIC_DIR
+
+    registro = assets()
+    servido = registro.get(registro.url("panorama.css").rsplit("/", 1)[-1])
+    assert servido is not None
+    css = servido.corpo.decode("utf-8")
+
+    assert "../fonts/" not in css, "referência relativa sem resolver no CSS servido"
+    assert "{{asset:" not in css
+
+    em_disco = (STATIC_DIR / "prototipo" / "panorama.css").read_bytes()
+    assert b"../fonts/" in em_disco, "o arquivo vendorizado deve seguir intacto"
+
     app = create_app(settings=_settings(), repository=FakeRepository())
     with TestClient(app) as cliente:
-        for nome in sorted(ARQUIVOS_ESPERADOS):
-            resposta = cliente.get(f"/app/fonts/{nome}")
-            assert resposta.status_code == 200, nome
+        for fonte in sorted(
+            set(re.findall(r'url\\("(/app/static/[0-9a-f]{12}-[a-z0-9-]+\\.woff2)"\\)', css))
+        ):
+            resposta = cliente.get(fonte)
+            assert resposta.status_code == 200, fonte
             assert resposta.headers["cache-control"] == (
                 "public, max-age=31536000, immutable"
             )
-            assert resposta.headers["content-type"] == "font/woff2"
-            assert resposta.content == (FONTES / nome).read_bytes(), nome
-
-        assert cliente.get("/app/fonts/nao-existe.woff2").status_code == 404
+        # As 6 do protótipo estão todas lá.
+        assert len(re.findall(r"@font-face", css)) == 6, css.count("@font-face")
 
 
 def test_head_faz_preload_do_inter_400_com_crossorigin():
