@@ -1,4 +1,5 @@
-"""Invariantes de acessibilidade dos controles em `web/static/app.css`.
+"""Invariantes de acessibilidade dos controles do front (D1-a em diante: união
+dos três stylesheets — `static/prototipo/*.css` + `static/app.css` app-only).
 
 Card `t_e9a9df42` (achados C1, C6 e D2 do relatório de UI). O CSS não tem
 renderização testável aqui, mas os três invariantes que o card cobra são
@@ -29,6 +30,34 @@ CSS = (
     / "app.css"
 )
 
+#: CSS vendorizado do protótipo (D1-a): fonte dos tokens e das regras de base.
+#: Os invariantes visuais valem para a página renderizada, que é a união dos
+#: três stylesheets linkados no `base.html` — por isso as leituras abaixo usam
+#: o CSS total, não só o app-only.
+PROTOTIPO = CSS.parent / "prototipo" / "panorama.css"
+PROTOTIPO_TELAS = CSS.parent / "prototipo" / "panorama-telas.css"
+
+
+def _css_total() -> str:
+    """Os três stylesheets na ordem da cascata: protótipo, telas, app-only."""
+    return (
+        PROTOTIPO.read_text(encoding="utf-8")
+        + "\n"
+        + PROTOTIPO_TELAS.read_text(encoding="utf-8")
+        + "\n"
+        + CSS.read_text(encoding="utf-8")
+    )
+
+
+def _tokens() -> dict[str, str]:
+    """Valor `#rrggbb` de cada token do `:root` vendorizado."""
+    saida: dict[str, str] = {}
+    for bloco in re.findall(r":root\s*\{(.*?)\}", PROTOTIPO.read_text(encoding="utf-8"), re.S):
+        for nome, valor in re.findall(r"--([A-Za-z0-9-]+):\s*(#[0-9a-fA-F]{6})", bloco):
+            saida[nome] = valor
+    assert saida, "nenhum token no :root vendorizado?"
+    return saida
+
 #: Mínimo de WCAG 1.4.11 (contraste de elemento não textual).
 CONTRASTE_MINIMO = 3.0
 
@@ -37,11 +66,16 @@ ALVO_MINIMO_PX = 44
 
 
 def _regra(seletor: str) -> str:
-    """Declarações da regra cujo seletor é exatamente `seletor`."""
-    css = CSS.read_text(encoding="utf-8")
-    achado = re.search(rf"(?m)^{re.escape(seletor)}\s*\{{([^}}]*)\}}", css)
-    assert achado is not None, f"regra ausente em app.css: {seletor}"
-    return achado.group(1)
+    """Declarações da regra cujo seletor é exatamente `seletor`.
+
+    Procura no CSS total (protótipo vendorizado + app-only, na ordem da
+    cascata): o invariante vale para a página renderizada.
+    """
+    css = _css_total()
+    achados = re.findall(rf"(?m)^{re.escape(seletor)}\s*\{{([^}}]*)\}}", css)
+    assert achados, f"regra ausente no CSS total: {seletor}"
+    # Última na cascata vence: é a efetiva no navegador.
+    return achados[-1]
 
 
 def _canal_linear(valor: int) -> float:
@@ -62,17 +96,18 @@ def _contraste(cor_a: str, cor_b: str) -> float:
 
 
 def test_borda_de_controle_tem_contraste_de_3_para_1_sobre_branco():
-    # O protótipo usa hex literal na borda do controle (`#6f7d76`, distinto do
-    # `--border` decorativo do cartão): mede o que está na regra.
+    # A borda do controle é o token `--muted` (D1-a: zero literal no app-only),
+    # distinto do `--border` decorativo do cartão: resolve a var e mede.
     regra = _regra(".campo select")
-    achado = re.search(r"border:\s*1px solid\s*(#[0-9a-fA-F]{6})", regra)
-    assert achado is not None, "borda do controle sem hex explícito"
+    achado = re.search(r"border:\s*1px solid\s*var\(--([A-Za-z0-9-]+)\)", regra)
+    assert achado is not None, "borda do controle sem token var(--…)"
+    cor = _tokens()[achado.group(1)]
 
-    assert _contraste(achado.group(1), "#ffffff") >= CONTRASTE_MINIMO
+    assert _contraste(cor, "#ffffff") >= CONTRASTE_MINIMO
 
 
 def test_hover_em_link_botao_e_paginacao():
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
     linhas_com_hover = [linha for linha in css.splitlines() if ":hover" in linha]
 
     assert len(linhas_com_hover) >= 2
@@ -119,15 +154,14 @@ CONTRASTE_TEXTO_MINIMO = 4.5
 
 
 def _cor_do_token(nome: str) -> str:
-    """Valor `#rrggbb` de um token `--<nome>` declarado em `app.css`."""
-    css = CSS.read_text(encoding="utf-8")
-    achado = re.search(rf"--{re.escape(nome)}:\s*(#[0-9a-fA-F]{{6}})", css)
-    assert achado is not None, f"token --{nome} ausente em app.css"
-    return achado.group(1)
+    """Valor `#rrggbb` de um token `--<nome>` do `:root` vendorizado."""
+    tokens = _tokens()
+    assert nome in tokens, f"token --{nome} ausente no :root vendorizado"
+    return tokens[nome]
 
 
 def test_texto_do_painel_do_recorte_tem_contraste_de_4_5_para_1():
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
     texto = re.search(r"--fg:\s*(#[0-9a-fA-F]{6})", css)
     assert texto is not None
     fundo = _cor_do_token(FUNDO_PAINEL.lstrip("-"))
@@ -136,7 +170,7 @@ def test_texto_do_painel_do_recorte_tem_contraste_de_4_5_para_1():
 
 
 def test_painel_do_recorte_usa_o_fundo_e_o_raio_da_spec():
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
     painel = _regra(".hero .recorte")
 
     # Fundo pelo token, não por hex solto: um só lugar decide a cor do painel.
@@ -157,7 +191,7 @@ def test_hero_empilha_antes_de_48rem_e_vira_duas_colunas_depois():
     assert "display: flex" not in base
     assert "1.1fr" not in base
 
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
     bloco = re.search(r"@media \(min-width: 48rem\)\s*\{(.*?)\n\}", css, re.S)
     assert bloco is not None, "breakpoint do hero ausente"
     assert ".hero" in bloco.group(1)
@@ -172,7 +206,7 @@ def test_nenhum_outline_none_sem_indicador_visivel():
     captura (`.grafico__captura`). Remover o contorno sem substituto quebra o
     foco visível — este teste impede a regressão.
     """
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
     blocos = re.findall(r"([^{}]*)\{([^{}]*)\}", css)
     assert blocos, "nenhum bloco de regra no CSS?"
 
@@ -196,10 +230,9 @@ CAMPOS_DO_HERO = '.hero__campo input[type="search"],\n.hero__campo select'
 
 
 def _cor_da_variavel(nome: str) -> str:
-    css = CSS.read_text(encoding="utf-8")
-    achado = re.search(rf"--{re.escape(nome)}:\s*(#[0-9a-fA-F]{{6}})", css)
-    assert achado is not None, f"variável --{nome} ausente"
-    return achado.group(1)
+    tokens = _tokens()
+    assert nome in tokens, f"variável --{nome} ausente no :root vendorizado"
+    return tokens[nome]
 
 
 def test_botao_primario_do_hero_tem_branco_sobre_a_cor_de_destaque():
@@ -252,7 +285,7 @@ def test_campos_e_botoes_da_busca_do_hero_tem_alvo_de_44px():
 
 
 def test_barra_do_hero_empilha_com_raio_16px_e_vira_pilula_em_48rem():
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
     base = _regra(".hero__busca")
 
     # Empilhada abaixo de 48rem: uma coluna, raio de 16 px e sombra da peça.
@@ -268,7 +301,7 @@ def test_barra_do_hero_empilha_com_raio_16px_e_vira_pilula_em_48rem():
 
 def test_foco_visivel_continua_valendo_para_os_botoes():
     """`button:focus-visible` com o contorno do acento, inclusive no hero."""
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
 
     assert "button:focus-visible" in css
     assert "outline: 2px solid var(--accent)" in css
@@ -282,7 +315,7 @@ def test_h1_usa_a_escala_do_prototipo():
     O teto é o token da escala (card V1 manda medir o CSS, não o olho). O
     mínimo mantém o título legível a 390 px.
     """
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
     base = _regra("h1")
     hero = _regra(".hero h1")
 
@@ -299,7 +332,7 @@ def test_h1_usa_a_escala_do_prototipo():
 
 def test_titulos_e_numeros_usam_as_familias_do_prototipo():
     """Serifada nos títulos, Inter no corpo, `tabular-nums` nos números."""
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
     titulos = _regra("h1")
 
     assert "var(--font-display)" in titulos
@@ -319,7 +352,7 @@ def test_titulos_e_numeros_usam_as_familias_do_prototipo():
 
 def test_paleta_de_acao_e_a_do_prototipo():
     """Verde institucional único: `#1e5a4c` em ação **e** link."""
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
 
     assert re.search(r"--accent:\s*#1e5a4c", css)
     assert re.search(r"--bg:\s*#e6eae6", css)
@@ -331,7 +364,7 @@ def test_paleta_de_acao_e_a_do_prototipo():
 
 
 def test_raios_e_sombra_do_prototipo_estao_nos_tokens():
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
 
     assert re.search(r"--radius-sm:\s*7px", css)
     assert re.search(r"--radius-md:\s*10px", css)
@@ -343,7 +376,7 @@ def test_raios_e_sombra_do_prototipo_estao_nos_tokens():
 
 
 def test_movimento_respeita_prefers_reduced_motion():
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
 
     assert "@media (prefers-reduced-motion: reduce)" in css
     bloco = css[css.index("@media (prefers-reduced-motion: reduce)") :]
@@ -351,7 +384,7 @@ def test_movimento_respeita_prefers_reduced_motion():
 
 
 def test_foco_visivel_usa_o_anel_do_prototipo():
-    css = CSS.read_text(encoding="utf-8")
+    css = _css_total()
 
     assert re.search(r"--focus-ring:\s*0 0 0 3px rgba\(30, 90, 76, 0\.30\)", css)
 
