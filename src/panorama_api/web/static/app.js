@@ -431,6 +431,217 @@
     }
   }
 
+  /* Busca `/app/` (card V3 `t_9f384f60`): combobox progressiva de município
+     + validação no cliente, portadas do protótipo (`assets/js/app.js`:
+     `iniciarCombobox` e `avisar`). O SSR emite o `select#municipio`
+     funcionando sem JS; aqui ele é escondido (sem `name`, para não duplicar
+     o parâmetro) e vira `div.combo` — `input` visível sem `name`, `hidden`
+     com o código e a lista — alimentada pela ilha JSON `dados-municipios`
+     (`[nome, codigo]`). `q` com 1–2 caracteres e "Ver mercado do município"
+     sem município escolhido mostram a mensagem em `p.retorno` e não
+     submetem; o servidor continua validando (422 inalterado). */
+  function normalizarBusca(texto) {
+    return String(texto).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  }
+  function lerIlhaMunicipios() {
+    var ilha = documento.getElementById("dados-municipios");
+    if (!ilha) return [];
+    try {
+      var dado = JSON.parse(ilha.textContent);
+      if (dado && Object.prototype.toString.call(dado) === "[object Array]") return dado;
+    } catch (erro) { /* sem ilha a combobox abre vazia */ }
+    return [];
+  }
+  function avisarBusca(retorno, msg) {
+    if (!retorno) return;
+    retorno.textContent = msg;
+    retorno.hidden = false;
+  }
+  function ligarCombobox(campo, lista, seta, pares, oculto) {
+    var filtrados = [];
+    var ativo = -1;
+    var suprimirAbertura = false;
+    function abrir(filtro) {
+      var alvo = normalizarBusca(filtro || "");
+      filtrados = [];
+      for (var i = 0; i < pares.length && filtrados.length < 60; i += 1) {
+        if (alvo === "" || normalizarBusca(pares[i][0]).indexOf(alvo) > -1) {
+          filtrados.push(pares[i]);
+        }
+      }
+      while (lista.firstChild) lista.removeChild(lista.firstChild);
+      if (!filtrados.length) {
+        var vazio = documento.createElement("li");
+        vazio.className = "vazio";
+        vazio.textContent = "Nenhum município com esse trecho.";
+        lista.appendChild(vazio);
+      } else {
+        filtrados.forEach(function (par, i) {
+          var li = documento.createElement("li");
+          li.setAttribute("role", "option");
+          li.dataset.idx = String(i);
+          var nome = documento.createElement("span");
+          nome.textContent = par[0];
+          var cod = documento.createElement("span");
+          cod.textContent = par[1];
+          li.appendChild(nome);
+          li.appendChild(cod);
+          li.addEventListener("mousedown", function (ev) {
+            ev.preventDefault();
+            escolher(i);
+          });
+          lista.appendChild(li);
+        });
+      }
+      ativo = -1;
+      lista.dataset.aberta = "true";
+      campo.setAttribute("aria-expanded", "true");
+    }
+    function fechar() {
+      lista.dataset.aberta = "false";
+      campo.setAttribute("aria-expanded", "false");
+      ativo = -1;
+    }
+    function escolher(i) {
+      var par = filtrados[i];
+      if (!par) return;
+      oculto.value = par[1];
+      campo.value = par[0];
+      fechar();
+      suprimirAbertura = true;
+      campo.focus();
+      setTimeout(function () { suprimirAbertura = false; }, 0);
+    }
+    function destacar() {
+      var itens = lista.querySelectorAll("li[data-idx]");
+      for (var k = 0; k < itens.length; k += 1) {
+        var ligado = Number(itens[k].dataset.idx) === ativo;
+        itens[k].setAttribute("aria-selected", ligado ? "true" : "false");
+        if (ligado) {
+          var topo = itens[k].offsetTop;
+          if (topo < lista.scrollTop) lista.scrollTop = topo;
+          else if (topo + itens[k].offsetHeight > lista.scrollTop + lista.clientHeight) {
+            lista.scrollTop = topo + itens[k].offsetHeight - lista.clientHeight;
+          }
+        }
+      }
+    }
+    campo.addEventListener("focus", function () { if (!suprimirAbertura) abrir(""); });
+    campo.addEventListener("input", function () { oculto.value = ""; abrir(campo.value); });
+    if (seta) {
+      seta.addEventListener("click", function () {
+        if (lista.dataset.aberta === "true") fechar();
+        else { campo.focus(); abrir(campo.value); }
+      });
+    }
+    campo.addEventListener("keydown", function (ev) {
+      if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+        ev.preventDefault();
+        if (lista.dataset.aberta !== "true") { abrir(campo.value); return; }
+        ativo = ev.key === "ArrowDown"
+          ? Math.min(ativo + 1, filtrados.length - 1)
+          : Math.max(ativo - 1, 0);
+        destacar();
+      } else if (ev.key === "Enter" && lista.dataset.aberta === "true" && ativo > -1) {
+        ev.preventDefault();
+        escolher(ativo);
+      } else if (ev.key === "Escape") {
+        fechar();
+      }
+    });
+    documento.addEventListener("mousedown", function (ev) {
+      if (!ev.target.closest(".combo")) fechar();
+    });
+  }
+  function montarComboBusca(form) {
+    var select = form.querySelector("select#municipio");
+    if (!select) return null;
+    var pares = lerIlhaMunicipios();
+    var codigoInicial = select.value;
+    var textoInicial = "";
+    if (codigoInicial && select.selectedIndex > -1) {
+      textoInicial = select.options[select.selectedIndex].text;
+    }
+    select.removeAttribute("name");
+    select.hidden = true;
+    var rotulo = form.querySelector('label[for="municipio"]');
+    var combo = documento.createElement("div");
+    combo.setAttribute("class", "combo");
+    var campo = documento.createElement("input");
+    campo.type = "text";
+    campo.id = "co_municipio";
+    campo.setAttribute("placeholder", "Todos os municípios");
+    campo.setAttribute("autocomplete", "off");
+    campo.setAttribute("role", "combobox");
+    campo.setAttribute("aria-expanded", "false");
+    campo.setAttribute("aria-controls", "lista-municipios");
+    campo.setAttribute("aria-autocomplete", "list");
+    if (textoInicial) campo.value = textoInicial;
+    var seta = documento.createElement("button");
+    seta.type = "button";
+    seta.setAttribute("class", "combo__seta");
+    seta.id = "botao-municipio";
+    seta.setAttribute("aria-label", "Abrir lista de municípios");
+    var svg = documento.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("width", "15");
+    svg.setAttribute("height", "15");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "2");
+    svg.setAttribute("aria-hidden", "true");
+    var traco = documento.createElementNS(SVG_NS, "path");
+    traco.setAttribute("d", "m6 9 6 6 6-6");
+    svg.appendChild(traco);
+    seta.appendChild(svg);
+    var lista = documento.createElement("ul");
+    lista.setAttribute("class", "combo__lista");
+    lista.id = "lista-municipios";
+    lista.setAttribute("role", "listbox");
+    lista.setAttribute("aria-label", "Municípios de Minas Gerais");
+    lista.dataset.aberta = "false";
+    var oculto = documento.createElement("input");
+    oculto.type = "hidden";
+    oculto.name = "co_municipio";
+    oculto.value = codigoInicial;
+    combo.appendChild(campo);
+    combo.appendChild(seta);
+    combo.appendChild(lista);
+    select.parentNode.insertBefore(combo, select);
+    select.parentNode.insertBefore(oculto, select);
+    if (rotulo) rotulo.htmlFor = "co_municipio";
+    ligarCombobox(campo, lista, seta, pares, oculto);
+    return oculto;
+  }
+  function prepararBusca(form) {
+    if (!form || form.getAttribute("data-busca-pronta") === "true") return;
+    form.setAttribute("data-busca-pronta", "true");
+    var retorno = form.querySelector("p#retorno");
+    var campoQ = form.querySelector("input#q");
+    var botaoMercado = form.querySelector("button#ir-mercado");
+    var oculto = montarComboBusca(form);
+    form.addEventListener("submit", function (ev) {
+      var nome = campoQ ? campoQ.value.trim() : "";
+      if (nome.length > 0 && nome.length < 3) {
+        ev.preventDefault();
+        avisarBusca(retorno, "O nome precisa ter ao menos 3 caracteres.");
+        if (campoQ) campoQ.focus();
+        return;
+      }
+      var vaiAoMercado = !!botaoMercado && ev.submitter === botaoMercado;
+      if (vaiAoMercado && (!oculto || !oculto.value)) {
+        ev.preventDefault();
+        avisarBusca(retorno, "Escolha um município na lista para abrir o mercado dele.");
+      }
+    });
+  }
+  registrar(function buscaProgressiva(raiz) {
+    var formularios = raiz.querySelectorAll ? raiz.querySelectorAll("form#form-busca") : [];
+    for (var f = 0; f < formularios.length; f += 1) {
+      prepararBusca(formularios[f]);
+    }
+  });
+
   global.Panorama = global.Panorama || {};
   global.Panorama.iniciar = iniciar;
   global.Panorama.registrar = registrar;

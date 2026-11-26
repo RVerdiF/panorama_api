@@ -11,6 +11,7 @@ módulo.
 
 from __future__ import annotations
 
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping
@@ -42,7 +43,6 @@ from panorama_api.web.conteudo import (
     MOTIVO_SECAO_INDICADORES,
     ROTULO_COMPARAR_COM_ESTA,
     ROTULO_RETENCAO,
-    TEXTO_OFERTA_DESCONHECIDA,
     UNIVERSOS,
     anos_publicados,
     rotulo_etapa,
@@ -348,68 +348,6 @@ def inicio(request: Request) -> Response:
     return templates().TemplateResponse(request, "inicio.html", contexto)
 
 
-def _sugestoes_busca_vazia(
-    *,
-    termo: str,
-    municipio: str,
-    apenas_ativas: bool,
-    filtros_pagina: Mapping[str, str],
-) -> list[dict[str, str]]:
-    """Próximos passos do resultado vazio da busca (achado C4).
-
-    Cada item é ``{"lead", "href", "motivo"}``; ``href`` vazio significa dica
-    de texto (sem link). Todo link é a **mesma** busca com um filtro a menos —
-    nunca uma URL que devolveria outra página vazia ou um ``422``:
-
-    * "menos letras" é texto quando há `q`; sem `q` a dica é informar o nome,
-      porque reduzir letras de um termo inexistente não muda nada;
-    * sem município: só quando há `q`; removê-lo sem `q` cairia na busca sem
-      critério, que o próprio `/v1` recusa;
-    * sem o filtro de ativas: sempre que ele está ligado, porque `q` e/ou
-      `co_municipio` continuam na URL.
-    """
-    caminho = f"{PREFIXO_WEB}/"
-    sugestoes: list[dict[str, str]] = []
-    if termo:
-        sugestoes.append(
-            {
-                "lead": "Use menos letras",
-                "href": "",
-                "motivo": "um trecho do começo do nome costuma bastar.",
-            }
-        )
-    else:
-        sugestoes.append(
-            {
-                "lead": "Informe o nome da escola",
-                "href": "",
-                "motivo": (
-                    "trecho de 3 a 100 caracteres, combinado ou não com o município."
-                ),
-            }
-        )
-    if municipio and termo:
-        sugestoes.append(
-            {
-                "lead": "Buscar sem o filtro de município",
-                "href": url_lista(caminho, {**filtros_pagina, "co_municipio": ""}),
-                "motivo": "restrita a um município, a busca não vê escolas de outro.",
-            }
-        )
-    if apenas_ativas:
-        sugestoes.append(
-            {
-                "lead": "Incluir escolas inativas",
-                "href": url_lista(caminho, {**filtros_pagina, "apenas_ativas": ""}),
-                "motivo": (
-                    "o filtro de situação esconde escolas que já encerraram as "
-                    "atividades."
-                ),
-            }
-        )
-    return sugestoes
-
-
 @router.get(
     "/",
     response_class=HTMLResponse,
@@ -449,6 +387,9 @@ def busca(
         "apenas_ativas": "true" if apenas_ativas else "",
     }
 
+    # Lista IBGE versionada: alimenta o `select` do SSR e a ilha JSON
+    # `dados-municipios` ([nome, codigo]) que a combobox do `app.js` filtra.
+    municipios = municipios_mg()
     contexto: dict[str, Any] = {
         **contexto_base(request, pagina="escolas"),
         "filtros": {
@@ -456,7 +397,18 @@ def busca(
             "co_municipio": municipio,
             "apenas_ativas": apenas_ativas,
         },
-        "municipios": municipios_mg(),
+        "municipios": municipios,
+        "ilha_municipios": json.dumps(
+            [[m.no_municipio, m.co_municipio] for m in municipios],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ),
+        # Nome do município escolhido, para o chip e para a combobox
+        # reabrir com o texto visível (o `hidden` leva o código).
+        "nome_municipio": next(
+            (m.no_municipio for m in municipios if m.co_municipio == municipio),
+            "",
+        ),
         "resposta": None,
         "escolas": [],
         "paginacao": None,
@@ -471,19 +423,8 @@ def busca(
         # especial `ano_referencia`, que sairia como "sem dado" e passaria a
         # impressão de base faltando (achado A3).
         "houve_consulta": bool(termo or municipio),
-        # Sugestões do estado vazio (achado C4): cada uma é um próximo passo
-        # concreto. O link "sem o município" só existe quando sobra outro
-        # critério (`q`) — removê-lo sem `q` cairia na busca vazia, que é outro
-        # beco sem saída.
-        "sugestoes_vazio": _sugestoes_busca_vazia(
-            termo=termo,
-            municipio=municipio,
-            apenas_ativas=apenas_ativas,
-            filtros_pagina=filtros_pagina,
-        ),
-        "texto_oferta_desconhecida": TEXTO_OFERTA_DESCONHECIDA,
-        # Rótulos dos códigos INEP por linha (rodada 1 da revisão, item 4): a
-        # busca mostra o código com a leitura ("4 — Privada"), igual à ficha.
+        # Rótulos dos códigos INEP por linha: a busca mostra só a leitura
+        # ("Privada"), sem o código cru (D5).
         "rotulo_dependencia": rotulo_dependencia,
         "rotulo_situacao": rotulo_situacao,
     }

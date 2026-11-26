@@ -412,6 +412,12 @@
   padding-inline: 0.25rem;
   font-size: var(--text-sm);
 }
+
+/* Busca V3 (card `t_9f384f60`): o `style="margin-top:16px"` do segundo
+   `.filtros` do protótipo vira regra app-only com o mesmo seletor e valor. */
+#form-busca .filtros + .filtros {
+  margin-top: 16px;
+}
 .formulario button {
   display: inline-flex;
   align-items: center;
