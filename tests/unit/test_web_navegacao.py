@@ -1,14 +1,15 @@
-"""Shell de navegação do front — card NAV-1 `t_d31ce632` (spec §1, §2.1, §2.3, §7).
+"""Shell de navegação do front — card NAV-1 `t_d31ce632` (spec §1, §2.1, §2.3, §7),
+no DOM do protótipo (card V3-S0).
 
 Cobre, sobre o HTML renderizado de verdade (``TestClient`` + repositório fake,
 nenhuma rede/BigQuery):
 
-* a navbar de nível 1 (Escolas · Municípios · Metodologia ▾) existe **uma vez**
-  em todas as telas — inclusive nas páginas de erro — e na ordem da spec, com o
-  logo levando para a landing `/`;
-* o submenu é disclosure nativo (``<details>``/``<summary>``, sem `role="menu"`
-  e sem JS) e cada um dos 6 links do painel aponta para uma âncora que existe em
-  `/app/metodologia`;
+* a navbar de nível 1 (Escolas · Municípios · Redes inerte · Metodologia)
+  existe **uma vez** em todas as telas — inclusive nas páginas de erro — e na
+  ordem da spec, com o logo levando para a landing `/`;
+* Metodologia é link simples (sem ``<details>``/``<summary>``, sem
+  ``role="menu"`` e sem JS) com ``aria-current="page"`` quando ativo, e a
+  página `/app/metodologia` mantém as âncoras de conteúdo;
 * `aria-current`: ``"page"`` no item cuja tela é a própria, ``"true"`` na área
   dona de uma tela-filha (ficha → Escolas, mercado → Municípios);
 * o índice novo ``GET /app/mercados/`` (com barra) responde 200 com o select de
@@ -120,11 +121,11 @@ def _get(cliente: TestClient, caminho: str, **kwargs):
 def _navbar(html: str) -> str:
     """Bloco do `<nav aria-label="Navegação principal">` — nada além dele.
 
-    Os atributos são contados **no bloco**, não no documento: o breadcrumb da
-    ficha e do mercado também usa ``aria-current="page"`` para o último item.
+    Os atributos são contados **no bloco**, não no documento: a trilha da
+    ficha e do mercado também usa link + `span` para o último item.
     """
     achado = re.search(
-        r'<nav class="topo__nav" aria-label="Navegação principal">.*?</nav>', html, re.S
+        r'<nav class="menu" aria-label="Navegação principal">.*?</nav>', html, re.S
     )
     assert achado is not None, "navbar de nível 1 ausente no HTML"
     return achado.group(0)
@@ -157,44 +158,54 @@ def test_navbar_unica_na_ordem_certa_em_todas_as_telas(cliente: TestClient):
         html = resposta.text
         assert html.count('aria-label="Navegação principal"') == 1, caminho
         navbar = _navbar(html)
-        # Ordem de nível 1: Escolas · Municípios · Metodologia (spec §2.1).
+        # Ordem de nível 1: Escolas · Municípios · Redes · Metodologia (spec §2.1,
+        # DOM do protótipo: Redes é item inerte, não link).
         assert navbar.index(">Escolas<") < navbar.index(">Municípios<") < navbar.index(
-            ">Metodologia<"
-        ), caminho
+            ">Redes<"
+        ) < navbar.index(">Metodologia<"), caminho
+        # Redes é inerte: `span` sem `href`, nunca link nem item ativo (V3-S0).
+        assert '<span aria-disabled="true">Redes</span>' in navbar, caminho
+        trecho_redes = re.search(r"<span[^>]*>Redes</span>", navbar)
+        assert trecho_redes is not None, caminho
+        assert "href" not in trecho_redes.group(0), caminho
         # O logo é a volta para a entrada do sistema, em qualquer tela (A5).
-        # Card V1 `t_423aa547`: a marca ganhou o sinal `PE` e o subtítulo do
-        # protótipo; o nome acessível do link continua sendo "Panorama Escola".
-        assert '<a class="topo__marca" href="/">' in html, caminho
-        assert '<span class="topo__nome">Panorama Escola</span>' in html, caminho
-        assert '<span class="topo__sub">Inteligência de mercado · MG</span>' in html, caminho
+        # Card V1 `t_423aa547` + protótipo V3-S0: a marca é o sinal `PE`
+        # (decorativo) + nome + subtítulo; o nome acessível do link continua
+        # sendo "Panorama Escola".
+        assert '<a class="marca" href="/">' in html, caminho
+        assert '<span class="marca__sinal" aria-hidden="true">PE</span>' in html, caminho
+        assert '<span class="marca__nome">Panorama Escola</span>' in html, caminho
+        assert '<span class="marca__sub">Inteligência de mercado · MG</span>' in html, caminho
+        # O selo à direita declara a fonte do dado exibido (V3-S0).
+        assert '<span class="selo-data">' in html, caminho
 
 
 def test_navbar_nao_usa_role_menu_nem_js(cliente: TestClient):
     html = _get(cliente, BUSCA).text
+    navbar = _navbar(html)
 
     assert 'role="menu"' not in html
     assert 'role="menuitem"' not in html
-    # O disclosure é nativo: o estado aberto/fechado é do `<details>`.
-    assert "<details" in html and "<summary" in html
+    # Metodologia virou link simples: sem disclosure, sem painel, sem JS.
+    assert "<details" not in navbar and "<summary" not in navbar
+    assert "<button" not in navbar
 
 
-# -- 2. submenu nativo de Metodologia ----------------------------------------
+# -- 2. Metodologia como link simples ----------------------------------------
 
 
-def test_submenu_de_metodologia_tem_o_painel_com_seis_ancoras(cliente: TestClient):
+def test_metodologia_e_link_simples_e_a_pagina_mantem_as_ancoras(cliente: TestClient):
     navbar = _navbar(_get(cliente, BUSCA).text)
     metodologia = _get(cliente, METODOLOGIA).text
 
-    assert '<details class="topo__submenu">' in navbar
-    assert "<summary>Metodologia</summary>" in navbar
-    painel = re.search(r'<ul class="topo__painel">(.*?)</ul>', navbar, re.S)
-    assert painel is not None, "painel do submenu ausente"
-    assert painel.group(1).count("<li><a ") == 6
-    # O destino da área continua a um clique, no 1.º item do painel.
-    assert f'<li><a href="{METODOLOGIA}">Visão geral da metodologia</a></li>' in painel.group(1)
-    # Cada fragmento do painel tem a âncora correspondente na metodologia.
+    # O destino da área continua a um clique, direto no item da navbar.
+    assert f'<a href="{METODOLOGIA}">Metodologia</a>' in navbar
+    # Sem disclosure nem painel na navbar do protótipo.
+    assert "<details" not in navbar
+    assert "topo__submenu" not in navbar
+    assert "topo__painel" not in navbar
+    # As âncoras de conteúdo da metodologia continuam existindo na página.
     for fragmento in FRAGMENTOS:
-        assert f'href="{METODOLOGIA}#{fragmento}"' in navbar, fragmento
         assert f'id="{fragmento}"' in metodologia, fragmento
 
 
@@ -217,10 +228,10 @@ def test_aria_current_do_indice_marca_so_o_link_de_municipios(cliente: TestClien
     assert 'aria-current="true"' not in navbar
 
 
-def test_aria_current_da_metodologia_marca_so_o_summary(cliente: TestClient):
+def test_aria_current_da_metodologia_marca_so_o_link(cliente: TestClient):
     navbar = _navbar(_get(cliente, METODOLOGIA).text)
 
-    assert '<summary aria-current="page">Metodologia</summary>' in navbar
+    assert f'<a href="{METODOLOGIA}" aria-current="page">Metodologia</a>' in navbar
     assert navbar.count('aria-current="page"') == 1
     assert 'aria-current="true"' not in navbar
 
@@ -240,6 +251,38 @@ def test_aria_current_do_mercado_marca_a_area_municipios_como_true(cliente: Test
     assert '<a href="/app/mercados/" aria-current="true">Municípios</a>' in navbar
     assert navbar.count('aria-current="true"') == 1
     assert 'aria-current="page"' not in navbar
+
+
+def test_redes_segue_inerte_em_todas_as_telas(cliente: TestClient):
+    for caminho, _status in PAGINAS:
+        navbar = _navbar(_get(cliente, caminho).text)
+
+        assert '<span aria-disabled="true">Redes</span>' in navbar, caminho
+        assert "Redes</a>" not in navbar, caminho
+        assert re.search(r'<[^>]*aria-current[^>]*>Redes<', navbar) is None, caminho
+
+
+# -- 3b. rodapé final único de cada página ------------------------------------
+
+
+def test_rodape_final_traz_fonte_e_versoes(cliente: TestClient):
+    html = _get(cliente, MERCADO).text
+
+    assert '<footer class="rodape-final">' in html
+    assert "Fonte: Censo Escolar (INEP)" in html
+    assert "<code>dados dev · contrato mvp-1</code>" in html
+    assert '<footer class="rodape">' not in html
+
+
+def test_rodape_final_omite_a_nota_onde_nao_ha_valor(cliente: TestClient):
+    sem_nota = (BUSCA, INDICE)
+    com_nota = (ESCOLA, MERCADO)
+    nota = "Esta página nunca troca dado ausente por zero"
+
+    for caminho in sem_nota:
+        assert nota not in _get(cliente, caminho).text, caminho
+    for caminho in com_nota:
+        assert nota in _get(cliente, caminho).text, caminho
 
 
 # -- 4. índice `/app/mercados/`: 200, 303 e 422 sem consulta ------------------

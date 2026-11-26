@@ -13,8 +13,8 @@ nenhuma rede/BigQuery):
   `APP_ANOS_DISPONIVEIS`, fonte INEP) e **não** mostra "sem dado" do bloco
   "Recorte da busca", que só aparece depois de uma consulta;
 * A5 — o logo do topo é link para a entrada `/`;
-* B7 — `aria-current="page"` na tela ativa e breadcrumb com links em escola e
-  mercado;
+* B7 — `aria-current="page"` na tela ativa e trilha com último item sem link em
+  escola e mercado;
 * D3 — `<title>` do mercado traz o nome do município.
 """
 
@@ -154,8 +154,9 @@ def test_raiz_usa_o_shell_com_um_unico_h1_e_landmarks(cliente: TestClient):
 
     assert html.count("<h1") == 1
     assert '<header class="topo">' in html
+    assert '<div class="envoltorio">' in html
     assert '<main id="conteudo"' in html
-    assert '<footer class="rodape">' in html
+    assert '<footer class="rodape-final">' in html
     # A landing não exibe valor nenhum: a nota de ausência do rodapé sairia como
     # ruído (mesma regra da 1ª visita da busca, achado A3). A copy da seção de
     # fonte (card `t_2c2e564b`) fala de "sem dado" — a asserção é sobre a nota
@@ -289,10 +290,12 @@ def test_logo_do_topo_e_link_para_a_entrada(cliente: TestClient):
     for caminho in (INICIO, BUSCA, METODOLOGIA):
         html = _get(cliente, caminho).text
 
-        # Card V1: a marca virou sinal `PE` + nome + subtítulo; o link continua
-        # sendo o `<a class="topo__marca">` apontando para a entrada.
-        assert '<a class="topo__marca" href="/">' in html
-        assert '<span class="topo__nome">Panorama Escola</span>' in html
+        # Card V1 + protótipo V3-S0: a marca é sinal `PE` (decorativo) + nome
+        # + subtítulo; o link continua apontando para a entrada.
+        assert '<a class="marca" href="/">' in html
+        assert '<span class="marca__sinal" aria-hidden="true">PE</span>' in html
+        assert '<span class="marca__nome">Panorama Escola</span>' in html
+        assert '<span class="marca__sub">Inteligência de mercado · MG</span>' in html
 
 
 def test_aria_current_marca_a_tela_ativa(cliente: TestClient):
@@ -303,34 +306,52 @@ def test_aria_current_marca_a_tela_ativa(cliente: TestClient):
     # A busca é a tela de nível 1 "Escolas": `page` no link da área.
     assert '<a href="/app/" aria-current="page">Escolas</a>' in busca
     assert busca.count('aria-current="page"') == 1
-    # Metodologia é disclosure: o item ativo é o `<summary>` do submenu.
-    assert '<summary aria-current="page">Metodologia</summary>' in metodologia
+    # Metodologia é link simples: o item ativo é o `<a>` da navbar.
+    assert f'<a href="{METODOLOGIA}" aria-current="page">Metodologia</a>' in metodologia
     assert metodologia.count('aria-current="page"') == 1
     # Os itens não ativos não marcam nada (nem `page`, nem `true`).
     assert '<a href="/app/mercados/" aria-current' not in busca
-    assert '<summary aria-current' not in busca
-    assert '<a href="/app/" aria-current' not in metodologia
     assert '<a href="/app/mercados/" aria-current' not in metodologia
+    assert '<a href="/app/" aria-current' not in metodologia
     assert 'aria-current="true"' not in busca
     assert 'aria-current="true"' not in metodologia
+    # Redes é inerte e nunca recebe `aria-current`.
+    assert re.search(r'<[^>]*aria-current[^>]*>Redes<', busca) is None
+    assert re.search(r'<[^>]*aria-current[^>]*>Redes<', metodologia) is None
 
 
-# -- B7: breadcrumb com links ------------------------------------------------
+# -- B7: trilha com último item sem link --------------------------------------
 
 
-def test_escola_tem_breadcrumb_com_link_para_o_mercado(cliente: TestClient):
+def _trilha(html: str) -> str:
+    achado = re.search(r'<p class="trilha">.*?</p>', html, re.S)
+    assert achado is not None, "trilha da página ausente"
+    return achado.group(0)
+
+
+def test_escola_tem_trilha_com_links_e_ultimo_item_sem_link(cliente: TestClient):
     html = _get(cliente, ESCOLA).text
 
-    assert 'aria-label="breadcrumb"' in html
-    assert f'href="{MERCADO}"' in html
-    assert f'href="{BUSCA}"' in html
+    # Protótipo V3-S0: `p.trilha`, sem `nav`/`ol` e sem `aria-label`.
+    assert 'aria-label="breadcrumb"' not in html
+    assert '<nav class="breadcrumb"' not in html
+    assert '<ol class="breadcrumb"' not in html
+    trilha = _trilha(html)
+    assert f'href="{MERCADO}"' in trilha
+    assert f'href="{BUSCA}"' in trilha
+    # O último item é a tela atual: `span`, nunca link.
+    assert re.search(r"<span>[^<]+</span>\s*</p>", trilha) is not None
+    assert re.search(r"</a>\s*</p>", trilha) is None
 
 
-def test_mercado_tem_breadcrumb_para_a_busca(cliente: TestClient):
+def test_mercado_tem_trilha_para_a_busca_com_ultimo_item_sem_link(cliente: TestClient):
     html = _get(cliente, MERCADO).text
 
-    assert 'aria-label="breadcrumb"' in html
-    assert f'href="{BUSCA}"' in html
+    assert 'aria-label="breadcrumb"' not in html
+    trilha = _trilha(html)
+    assert f'href="{BUSCA}"' in trilha
+    assert re.search(r"<span>[^<]+</span>\s*</p>", trilha) is not None
+    assert re.search(r"</a>\s*</p>", trilha) is None
 
 
 # -- D3: título do mercado ---------------------------------------------------
