@@ -56,41 +56,9 @@ PENDENTES: dict[str, frozenset[str]] = {
     # Zera no card da busca (ordem 2).
     "busca.html": frozenset(),
     # Zera no card do mercado (ordem 3).
-    "mercado.html": frozenset(
-        {
-            "aviso--temporario",
-            "lista-definicoes",
-            "lista-regras",
-            "nota",
-            "paginacao__contagem",
-            "painel--erro",
-            "subtitulo",
-        }
-    ),
+    "mercado.html": frozenset(),
     # Zera no card do mercado (ordem 3).
-    "partials/mercado.html": frozenset(
-        {
-            "campo--acao",
-            "dica",
-            "formulario",
-            "lista-definicoes",
-            "lista-regras",
-            "nota",
-            "recorte",
-            "subtitulo",
-        }
-    ),
-    # Sai no card do mercado (ordem 3): o arquivo vira 301 para `#escolas`.
-    "mercado_escolas.html": frozenset(
-        {
-            "aviso--temporario",
-            "nota",
-            "paginacao__contagem",
-            "paginacao__link",
-            "painel--erro",
-            "tabela-rolavel",
-        }
-    ),
+    "partials/mercado.html": frozenset(),
     # Zera no card do indice de municipios (ordem 4).
     "mercados_indice.html": frozenset(
         {"campo--acao", "dica", "formulario", "subtitulo"}
