@@ -1059,3 +1059,16 @@ td .barra-share__trilho {
 #mercado section[aria-labelledby="titulo-cobertura"] > .definicao {
   margin-top: 12px;
 }
+
+/* --- app-only: pilha da metodologia (card D1-E6) ---
+   A tela não tem contraparte no protótipo: ela herda os componentes, e os
+   que aparecem repetidos num mesmo painel (`div.definicao` das regras e das
+   definições, `div.aviso` dos avisos) não têm margem própria no CSS
+   vendorizado — no protótipo o vão vinha de `style=` inline, proibido aqui.
+   Mesmo valor do inline de cobertura do mercado (12px → `--space-3`).
+   `.nota-metodo` dos universos já traz `margin-top` do vendorizado. */
+#regras > .definicao + .definicao,
+#definicoes > .definicao + .definicao,
+#avisos > .aviso + .aviso {
+  margin-top: var(--space-3);
+}

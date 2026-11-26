@@ -3,10 +3,16 @@
 
 {% block titulo %}Metodologia — Panorama Escola{% endblock %}
 
-{# Card V1 `t_423aa547`: cabeçalho em `.tela-topo` e cada seção em `.painel`
-   com `.painel__cabecalho` — a mesma hierarquia da ficha e do mercado. Os `id`s
-   de âncora do submenu da navbar (`#versao`, `#regras`, `#definicoes`,
-   `#avisos`, `#universo`) não mudaram. #}
+{# Card D1-E6 (`t_002faeca`): a metodologia não tem contraparte no protótipo,
+   então herda o sistema dele (D13) — `tela-topo` com `p.trilha`/`h1`/
+   `p.tela-sub`, cada seção é um `section.painel#<âncora>` com
+   `div.painel__cabecalho > h2` + `p.painel__nota`, e o corpo usa só
+   componentes do protótipo: `dl.rodape-meta`, `div.definicao`,
+   `div.nota-metodo` e `div.aviso`. As seções ficam como filhas diretas de
+   `main`, que já é a pilha prevista no CSS vendorizado para telas sem
+   invólucro com id. Os `id`s de âncora (`#versao`, `#regras`, `#definicoes`,
+   `#avisos`, `#universo`) são linkados de outras telas e o texto não muda
+   nesta migração. #}
 {% block conteudo %}
   <div class="tela-topo">
     <p class="trilha">
@@ -15,86 +21,89 @@
       <span>Metodologia</span>
     </p>
     <h1>Metodologia</h1>
-    <p class="subtitulo">
+    <p class="tela-sub">
       De onde vem cada número do Panorama Escola, de que ano, e com que limitações.
       Todas as telas mostram o mesmo recorte: <strong>Minas Gerais</strong>, Censo Escolar (INEP).
     </p>
   </div>
 
-  <section class="painel painel--inicial" aria-labelledby="versao">
+  <section class="painel painel--inicial" id="versao" aria-labelledby="titulo-versao">
     <div class="painel__cabecalho">
-      <h2 id="versao">Versão dos dados</h2>
+      <h2 id="titulo-versao">Versão dos dados</h2>
       <p class="painel__nota">
         O que está publicado agora; o ano de referência varia por consulta.
       </p>
     </div>
-    <dl class="lista-definicoes">
-      <dt>Dados publicados</dt>
-      <dd><code>{{ data_version }}</code></dd>
-      <dt>Contrato de serving</dt>
-      <dd><code>{{ contract }} / {{ contract_version }}</code></dd>
-      <dt>Ano de referência</dt>
-      <dd>Informado em cada tela (varia por consulta)</dd>
+    <dl class="rodape-meta">
+      <div>
+        <dt>Dados publicados</dt>
+        <dd><code>{{ data_version }}</code></dd>
+      </div>
+      <div>
+        <dt>Contrato de serving</dt>
+        <dd><code>{{ contract }} / {{ contract_version }}</code></dd>
+      </div>
+      <div>
+        <dt>Ano de referência</dt>
+        <dd>Informado em cada tela (varia por consulta)</dd>
+      </div>
     </dl>
   </section>
 
-  <section class="painel" aria-labelledby="regras">
+  <section class="painel" id="regras" aria-labelledby="titulo-regras">
     <div class="painel__cabecalho">
-      <h2 id="regras">Regras de leitura dos números</h2>
+      <h2 id="titulo-regras">Regras de leitura dos números</h2>
       <p class="painel__nota">
         As cinco regras que mudam a leitura de qualquer número do Panorama.
       </p>
     </div>
-    <ul class="lista-regras">
-      <li>
-        <strong>Ausência de dado não é zero.</strong> Quando a base não informa um valor,
-        a tela mostra <em>sem dado</em> — e o motivo, quando a base registra a flag
-        <code>is_*_missing</code>. Nenhuma tela preenche lacuna com <code>0</code>
-        nem deixa célula vazia ambígua.
-      </li>
-      <li>
-        <strong>Oferta por etapa é tri-estado.</strong> <em>Sim</em> significa matrícula
-        maior que zero; <em>Não</em> significa zero declarado; <em>Desconhecido</em>
-        significa que a base não informou a oferta daquela etapa. {{ explicacao_oferta_desconhecida }}
-      </li>
-      <li>
-        <strong>{{ rotulo_retencao }}.</strong>
-        {{ definicao_retencao }}
-      </li>
-      <li>
-        <strong>Comparação de concorrência é municipal.</strong>
-        {{ definicao_concorrencia }}. Não há comparação por distância.
-      </li>
-      <li>
-        <strong>Educação básica é total oficial.</strong> A etapa
-        <em>Educação básica</em> (<code>bas</code>) é o total publicado pelo Censo;
-        nunca é obtida somando as subetapas.
-      </li>
-    </ul>
+    <div class="definicao">
+      <strong>Ausência de dado não é zero.</strong> Quando a base não informa um valor,
+      a tela mostra <em>sem dado</em> — e o motivo, quando a base registra a flag
+      <code>is_*_missing</code>. Nenhuma tela preenche lacuna com <code>0</code>
+      nem deixa célula vazia ambígua.
+    </div>
+    <div class="definicao">
+      <strong>Oferta por etapa é tri-estado.</strong> <em>Sim</em> significa matrícula
+      maior que zero; <em>Não</em> significa zero declarado; <em>Desconhecido</em>
+      significa que a base não informou a oferta daquela etapa. {{ explicacao_oferta_desconhecida }}
+    </div>
+    <div class="definicao">
+      <strong>{{ rotulo_retencao }}.</strong>
+      {{ definicao_retencao }}
+    </div>
+    <div class="definicao">
+      <strong>Comparação de concorrência é municipal.</strong>
+      {{ definicao_concorrencia }}. Não há comparação por distância.
+    </div>
+    <div class="definicao">
+      <strong>Educação básica é total oficial.</strong> A etapa
+      <em>Educação básica</em> (<code>bas</code>) é o total publicado pelo Censo;
+      nunca é obtida somando as subetapas.
+    </div>
   </section>
 
-  <section class="painel" aria-labelledby="definicoes">
+  <section class="painel" id="definicoes" aria-labelledby="titulo-definicoes">
     <div class="painel__cabecalho">
-      <h2 id="definicoes">Definições semânticas</h2>
+      <h2 id="titulo-definicoes">Definições semânticas</h2>
       <p class="painel__nota">
         O significado de cada campo, na chave do contrato de serving.
       </p>
     </div>
     {% if definicoes %}
-    <dl class="lista-definicoes">
-      {% for chave, texto in definicoes.items() %}
-      <dt><code>{{ chave }}</code></dt>
-      <dd>{{ texto }}</dd>
-      {% endfor %}
-    </dl>
+    {% for chave, texto in definicoes.items() %}
+    <div class="definicao">
+      <strong><code>{{ chave }}</code></strong> {{ texto }}
+    </div>
+    {% endfor %}
     {% else %}
     <p class="sem-dado">sem dado</p>
     {% endif %}
   </section>
 
-  <section class="painel" aria-labelledby="avisos">
+  <section class="painel" id="avisos" aria-labelledby="titulo-avisos">
     <div class="painel__cabecalho">
-      <h2 id="avisos">Avisos que podem aparecer nas telas</h2>
+      <h2 id="titulo-avisos">Avisos que podem aparecer nas telas</h2>
       <p class="painel__nota">
         Cada aviso é um código do contrato que muda a leitura de um número. O
         código fica visível para conferência com o JSON da API; a explicação ao
@@ -102,30 +111,32 @@
       </p>
     </div>
     {% if avisos_conhecidos %}
-    <dl class="lista-definicoes">
-      {% for titulo, texto in avisos_conhecidos %}
-      <dt>{{ titulo }}</dt>
-      <dd>{{ texto }}</dd>
-      {% endfor %}
-    </dl>
+    {% for titulo, texto in avisos_conhecidos %}
+    <div class="aviso">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <div>
+        <p><strong>{{ titulo }}</strong></p>
+        <p>{{ texto }}</p>
+      </div>
+    </div>
+    {% endfor %}
     {% else %}
     <p class="sem-dado">sem dado</p>
     {% endif %}
   </section>
 
-  <section class="painel" aria-labelledby="universo">
+  <section class="painel" id="universo" aria-labelledby="titulo-universo">
     <div class="painel__cabecalho">
-      <h2 id="universo">Universos e fontes</h2>
+      <h2 id="titulo-universo">Universos e fontes</h2>
       <p class="painel__nota">
         Quais escolas entram em cada recorte publicado.
       </p>
     </div>
-    <dl class="lista-definicoes">
-      {% for universo, descricao in universos.items() %}
-      <dt><code>{{ universo }}</code></dt>
-      <dd>{{ descricao }}</dd>
-      {% endfor %}
-    </dl>
+    {% for universo, descricao in universos.items() %}
+    <div class="nota-metodo">
+      <strong><code>{{ universo }}</code></strong> {{ descricao }}
+    </div>
+    {% endfor %}
   </section>
 
   {{ rodape_final() }}
