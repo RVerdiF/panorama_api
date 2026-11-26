@@ -5,8 +5,8 @@ Cobre os critérios de aceite sobre o HTML renderizado de verdade
 
 * busca → ficha da escola (nome é o link); o município é texto sem link
   (D5) e o caminho ao mercado é o botão `formaction` do filtro;
-* mercado → ficha da escola no ranking de share e mercado → busca filtrada
-  pelo próprio município (`/app/?co_municipio=...`);
+* mercado → ficha da escola no ranking de share e mercado → busca e índice
+  pela subnav do protótipo (`#composicao`, `#escolas`, índice, busca);
 * escola → mercado municipal;
 * **todos** os `href` internos das três telas respondem ``200`` — o teste
   percorre os links de verdade em vez de conferir um por um à mão;
@@ -37,7 +37,6 @@ from tests.unit.conftest import (
 BUSCA = "/app/"
 MUNICIPIO = "3106200"
 MERCADO = f"/app/mercados/{MUNICIPIO}"
-ESCOLAS = f"{MERCADO}/escolas"
 ESCOLA = "/app/escolas/31000001"
 #: Qualquer `href` interno (o front nunca gera URL absoluta com host).
 HREF_INTERNO = re.compile(r'href="(/app[^"]*)"')
@@ -147,19 +146,24 @@ def test_busca_com_municipio_nulo_mostra_sem_dado_sem_link_de_mercado(
     assert "sem dado" in html
 
 
-# -- mercado → escola / mercado → busca filtrada ------------------------------
+# -- mercado → escola / mercado → subnav -----------------------------------------
 
 
 def test_mercado_linka_o_nome_no_ranking_de_share(client_links):
-    html = _html(client_links.get(ESCOLAS))
-
-    assert f'<a href="{ESCOLA}">ESCOLA MODELO</a>' in html
-
-
-def test_mercado_tem_link_para_a_busca_filtrada_do_municipio(client_links):
     html = _html(client_links.get(MERCADO))
 
-    assert f'<a href="{BUSCA}?co_municipio={MUNICIPIO}">Ver escolas deste município</a>' in html
+    assert f'<a class="nome-escola" href="{ESCOLA}">ESCOLA MODELO</a>' in html
+
+
+def test_mercado_subnav_leva_as_secoes_e_as_saidas(client_links):
+    """D1-E3: sem o `Ver escolas deste município` — a subnav leva à busca."""
+    html = _html(client_links.get(MERCADO))
+
+    assert "Ver escolas deste município" not in html
+    assert '<a href="#composicao" aria-current="page">Visão geral</a>' in html
+    assert '<a href="#escolas">Escolas do mercado</a>' in html
+    assert '<a href="/app/mercados/">← Índice de municípios</a>' in html
+    assert '<a href="/app/">Buscar escolas</a>' in html
 
 
 def test_mercado_com_nome_nulo_no_share_mostra_sem_dado_dentro_do_link(
@@ -167,19 +171,19 @@ def test_mercado_com_nome_nulo_no_share_mostra_sem_dado_dentro_do_link(
 ):
     repo_links.share = [share_row(no_entidade=None)]
 
-    html = _html(client_links.get(ESCOLAS))
+    html = _html(client_links.get(MERCADO))
 
-    assert f'<a href="{ESCOLA}">sem dado</a>' in html
+    assert f'<a class="nome-escola" href="{ESCOLA}">sem dado</a>' in html
 
 
 def test_mercado_sem_share_nao_inventa_linha_nem_link(client_links, repo_links):
     repo_links.share = []
 
-    html = _html(client_links.get(ESCOLAS))
+    html = _html(client_links.get(MERCADO))
 
     assert f'href="{ESCOLA}"' not in html
-    # O atalho de busca filtrada continua: é do município, não do share.
-    assert f'href="{BUSCA}?co_municipio={MUNICIPIO}"' in html
+    # A subnav continua: é da tela, não do share.
+    assert '<a href="/app/">Buscar escolas</a>' in html
 
 
 # -- escola → mercado --------------------------------------------------------
@@ -235,7 +239,7 @@ def _crawl(client, origem: str) -> list[tuple[str, int, str]]:
 def test_todos_os_links_internos_das_telas_respondem_200(client_links):
     falhas = [
         (origem, status, destino)
-        for origem in (BUSCA + "?q=modelo", MERCADO, ESCOLAS, ESCOLA)
+        for origem in (BUSCA + "?q=modelo", MERCADO, ESCOLA)
         for origem, status, destino in _crawl(client_links, origem)
         if status != 200
     ]
