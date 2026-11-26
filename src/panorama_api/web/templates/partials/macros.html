@@ -6,44 +6,13 @@
 {{ v | fmt_oferta }}
 {%- endmacro %}
 
-{#- Recorte obrigatório (plano §1): ano de referência, etapa, universo, fonte e
-    avisos. Um bloco por resposta consumida, para que a origem de cada número
-    esteja visível na própria seção. Vive aqui porque as duas rotas da ficha
-    (Visão geral e Indicadores e concorrência) exibem o mesmo bloco. -#}
-{% macro recorte(m) -%}
-<dl class="lista-definicoes recorte">
-  <dt>Ano de referência</dt>
-  <dd>{{ m.ano_referencia | fmt_ano }}</dd>
-  <dt>Etapa</dt>
-  <dd>{{ m.etapa }}</dd>
-  <dt>Universo</dt>
-  <dd>
-    <code>{{ m.universo }}</code>
-    {%- if m.universo_texto %} — {{ m.universo_texto }}{% endif %}
-  </dd>
-  <dt>Fonte</dt>
-  <dd>{{ m.orgao }} — {{ m.base }}, tabela <code>{{ m.tabela }}</code></dd>
-  <dt>Avisos</dt>
-  <dd>
-    {% if m.avisos %}
-    <ul class="lista-regras">
-      {% for aviso in m.avisos %}
-      <li>{{ aviso.texto }}</li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    nenhum aviso para este recorte
-    {% endif %}
-  </dd>
-</dl>
-{%- endmacro %}
-
 {#- Seção/rota que não existe para a escola consultada: título fixo + motivo da
-    copy (nunca o `detail` de diagnóstico da API). -#}
+    copy (nunca o `detail` de diagnóstico da API). Componente `div.definicao`
+    do protótipo (card D1-E7): `null ≠ 0` continua explícito no motivo. -#}
 {% macro bloco_nao_se_aplica(titulo, motivo) -%}
-<p class="nao-se-aplica">
+<div class="definicao">
   <strong>{{ titulo }}.</strong> {{ motivo }}
-</p>
+</div>
 {%- endmacro %}
 
 {#- Select de município (card `t_e075a6f6`, spec §6): a lista versionada de 853

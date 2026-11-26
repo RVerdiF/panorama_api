@@ -12,11 +12,11 @@
    - ordenação atual por `th[data-tipo]` (botão criado no `app.js`);
      as setas vivem sob `th[data-tipo][aria-sort]` para não colidir
      com o `th.ordenavel > span` do protótipo;
-   - estados de ausência do SSR (`.nao-se-aplica`, `.aviso--temporario`);
    - trilho do share em linha na tabela do mercado (`td
      .barra-share__trilho`; no ranking vale o flex do protótipo);
-   - `.subnav [aria-current]` escopado a `.subnav ul` (o protótipo usa
-     âncoras diretas com `[aria-current="page"]` e cor própria).
+   - `#movimento-conteudo .ranking` e os `margin-top` do mercado, que
+     transcrevem o `style=` inline do protótipo (CSP `style-src 'self'`);
+   - a pilha de `div.definicao`/`div.aviso` da metodologia.
    Regras de base (a, table, h1…) e componentes do protótipo NÃO são
    redeclarados aqui: valem os dos arquivos vendorizados.
    ============================================================ */
@@ -88,202 +88,7 @@
   border: 0;
 }
 
-/* --- app-only: navbar legada do SSR (o protótipo usa .marca/.menu) --- */
-.topo__interno,
-.rodape__interno,
-.conteudo {
-  max-width: var(--container-max);
-  margin: 0 auto;
-  padding: 0 var(--container-gutter-desktop);
-}
-.topo__interno {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3) var(--space-6);
-  padding: 0;
-}
-.topo__marca {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  min-height: 44px;
-  color: inherit;
-  text-decoration: none;
-}
-
-.topo__sinal {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  border: 1px solid var(--accent-active);
-  color: var(--accent-on);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 16px;
-  box-shadow: var(--bevel-btn);
-}
-.topo__texto {
-  display: flex;
-  flex-direction: column;
-  line-height: 1.15;
-}
-
-.topo__nome {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 17px;
-  letter-spacing: -0.008em;
-}
-
-.topo__sub {
-  margin-top: 2px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: var(--muted-strong);
-}
-
-.topo__nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-}
-.topo__nav a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--fg-2);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-decoration: none;
-  transition:
-    background var(--motion-fast) var(--ease-standard),
-    color var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard);
-}
-
-.topo__nav a:hover {
-  background: var(--surface-sunken);
-  color: var(--fg);
-  border-color: var(--border-soft);
-  text-decoration: none;
-}
-
-.topo__nav a[aria-current] {
-  background: var(--surface-raise);
-  color: var(--accent);
-  border-color: var(--border);
-  box-shadow: var(--bevel-top);
-}
-.topo__submenu > summary {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 14px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--fg-2);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  list-style: none;
-}
-.topo__submenu > summary::-webkit-details-marker {
-  display: none;
-}
-.topo__submenu > summary::after {
-  content: "▾" / "";
-  margin-left: 0.35rem;
-  color: var(--muted-strong);
-}
-.topo__submenu[open] > summary::after {
-  content: "▴" / "";
-}
-.topo__submenu > summary:hover {
-  background: var(--surface-sunken);
-  color: var(--fg);
-  border-color: var(--border-soft);
-}
-
-.topo__submenu > summary[aria-current] {
-  background: var(--surface-raise);
-  color: var(--accent);
-  border-color: var(--border);
-  box-shadow: var(--bevel-top);
-}
-.topo__painel {
-  margin: 0.35rem 0 0;
-  padding: 0.25rem 0 0.25rem 0.75rem;
-  list-style: none;
-  display: grid;
-  gap: 0.1rem;
-  border-left: 1px solid var(--border);
-}
-.topo__painel a {
-  display: flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 10px;
-  border-radius: 5px;
-  color: var(--fg-2);
-  font-size: var(--text-sm);
-  text-decoration: none;
-}
-.topo__painel a:hover {
-  background: var(--surface-sunken);
-  color: var(--accent);
-}
-.selo-dados {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-  padding: 7px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-sunken);
-  border: 1px solid var(--border-soft);
-  color: var(--fg-2);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  box-shadow: var(--inset-well);
-}
-
-.selo-dados__ponto {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
-}
-
-/* --- app-only: pilha da tela e migalhas do SSR --- */
-.conteudo {
-  padding-block: var(--space-8) var(--space-12);
-}
-.tela > * + * {
-  margin-top: var(--space-6);
-}
-
-.tela > .tela-topo + * {
-  margin-top: var(--space-8);
-}
-.nesta-pagina a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-}
-
+/* --- app-only: subtítulo de tela (usa `p.tela-sub` do protótipo como base) --- */
 .subtitulo {
   margin: 0;
   color: var(--fg-2);
@@ -291,30 +96,13 @@
   max-width: 74ch;
 }
 
-/* --- app-only: painel de erro, nota, código de erro, seção --- */
-.painel--erro {
-  border-left: 4px solid var(--danger);
-}
-.painel__cabecalho h3 {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-xl);
-  letter-spacing: -0.01em;
-}
+/* --- app-only: nota e seção --- */
 .nota {
   margin: 0;
   font-size: var(--text-xs);
   color: var(--muted-strong);
   max-width: 62ch;
   line-height: 1.55;
-}
-.codigo-erro {
-  margin: 0 0 0.35rem;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted-strong);
 }
 .secao + .secao {
   margin-top: var(--space-8);
@@ -369,48 +157,11 @@
   border-color: var(--accent);
   box-shadow: var(--inset-well), var(--focus-ring);
 }
-.campo--booleano {
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  padding-top: 18px;
-}
-
-.campo--booleano input {
-  width: 19px;
-  height: 19px;
-  accent-color: var(--accent);
-}
-
-.campo--booleano label {
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--fg-2);
-}
 
 /* Ação do formulário: mantém a coluna de `.campo`, então o botão estica na
    largura da célula — estado do mercado e da busca sem filtro. */
 .campo--acao {
   justify-content: flex-end;
-}
-
-/* Só com o link "Limpar filtros" (busca com filtro) a ação vira linha; `:has`
-   evita classe extra e deixa o mercado com o layout de coluna intacto. */
-.campo--acao:has(.limpar-filtros) {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 1rem;
-}
-.limpar-filtros {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding-inline: 0.25rem;
-  font-size: var(--text-sm);
 }
 
 /* Busca V3 (card `t_9f384f60`): o `style="margin-top:16px"` do segundo
@@ -450,23 +201,6 @@
   color: var(--fg);
 }
 
-.chip a {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  min-height: 24px;
-  border-radius: 5px;
-  color: var(--accent);
-  text-decoration: none;
-  line-height: 1;
-}
-
-.chip a:hover {
-  background: var(--border-soft);
-  color: var(--fg);
-}
-
 /* --- app-only: rolagem horizontal das tabelas do SSR --- */
 .tabela-rolavel {
   overflow-x: auto;
@@ -492,9 +226,6 @@
 .tabela th[data-tipo="numero"] {
   text-align: right;
   font-variant-numeric: tabular-nums;
-}
-.gap-lider {
-  font-weight: 700;
 }
 
 /* --- app-only: ordenação atual (botão criado no app.js) --- */
@@ -570,7 +301,7 @@ td .barra-share__trilho {
   vertical-align: middle;
 }
 
-/* --- app-only: listas, ausência e estados do SSR --- */
+/* --- app-only: listas e definições do SSR --- */
 .lista-definicoes {
   display: grid;
   grid-template-columns: minmax(10rem, 22rem) 1fr;
@@ -592,30 +323,13 @@ td .barra-share__trilho {
   overflow-wrap: anywhere;
 }
 
+/* Lista de avisos da comparação (tela escalada ao dono, P7): o protótipo não
+   tem `<ul>` sem classe, então o espaçamento fica aqui. */
 .lista-regras {
   margin: 0;
   padding-left: 1.15rem;
   display: grid;
   gap: 0.65rem;
-}
-.aviso--temporario {
-  border-left-color: var(--danger);
-}
-
-.nao-se-aplica {
-  margin: var(--space-4) 0;
-  padding: 13px 15px;
-  border-radius: var(--radius-sm);
-  background: var(--surface-raise);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--muted-strong);
-  font-size: var(--text-sm);
-  color: var(--fg-2);
-}
-.estado-vazio .lista-regras {
-  display: inline-grid;
-  text-align: left;
-  max-width: 52ch;
 }
 
 /* --- app-only: landing/hero, recorte e cartões (telas sem contraparte) --- */
@@ -768,52 +482,11 @@ td .barra-share__trilho {
   font-weight: 600;
 }
 
-/* --- app-only: índice da página e saída da subnav --- */
+/* --- app-only: saída da subnav ---
+   As âncoras diretas seguem o protótipo: o estado ativo já vem do bloco
+   herdado (`.subnav a[aria-current]`); só o link de saída precisa do empurrão. */
 .subnav__saida {
   margin-left: auto;
-}
-
-.nesta-pagina p {
-  margin: 0 0 var(--space-4);
-  font-size: var(--text-sm);
-  color: var(--muted-strong);
-  max-width: none;
-}
-
-/* Âncoras diretas, como o protótipo: o estado ativo já vem do bloco herdado
-   (`.subnav a[aria-current]`); nada específico da lista fica aqui. */
-
-/* --- app-only: paginação do SSR --- */
-.paginacao__link {
-  /* Alvo de toque ≥44px (WCAG 2.5.5). */
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  color: var(--accent);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-decoration: none;
-  box-shadow: var(--bevel-top), 0 1px 2px rgba(22, 33, 29, 0.07);
-}
-
-.paginacao__link:hover {
-  background: var(--surface);
-  border-color: var(--accent);
-  color: var(--accent);
-  text-decoration: none;
-}
-
-.paginacao__contagem {
-  margin: 0;
-  padding-top: var(--space-3);
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--muted-strong);
-  max-width: none;
 }
 
 /* --- app-only: série SVG legada do servidor --- */
@@ -869,39 +542,6 @@ td .barra-share__trilho {
   max-width: 62ch;
 }
 
-/* --- app-only: rodapé do SSR --- */
-.rodape {
-  margin-top: var(--space-12);
-  border-top: 1px solid var(--border);
-  background: var(--surface);
-  font-size: var(--text-xs);
-  color: var(--muted-strong);
-}
-
-.rodape__interno {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-4);
-  justify-content: space-between;
-  padding-block: var(--space-5);
-}
-
-.rodape__interno p {
-  margin: 0;
-  max-width: 62ch;
-}
-
-.rodape code {
-  font-size: 11px;
-  color: var(--fg-2);
-}
-
-.rodape-erro {
-  margin-top: var(--space-5);
-  font-size: var(--text-xs);
-  color: var(--muted-strong);
-}
-
 /* --- app-only: responsivo (só seletores desta seção) --- */
 @media (min-width: 48rem) {
   .hero {
@@ -934,42 +574,6 @@ td .barra-share__trilho {
   }
 }
 
-@media (max-width: 60rem) {
-  .topo__nav {
-    width: 100%;
-    margin-left: 0;
-    gap: 2px;
-    padding-top: 8px;
-    border-top: 1px solid var(--border-soft);
-  }
-
-  .topo__nav a {
-    flex: 1;
-    justify-content: center;
-    padding: 0 6px;
-  }
-
-  .topo__submenu {
-    flex: 1;
-  }
-
-  .topo__submenu > summary {
-    width: 100%;
-    justify-content: center;
-    padding: 0 6px;
-  }
-
-  .selo-dados {
-    display: none;
-  }
-
-  .conteudo,
-  .topo__interno,
-  .rodape__interno {
-    padding-inline: var(--space-4);
-  }
-}
-
 @media (max-width: 40rem) {
   .lista-definicoes {
     grid-template-columns: 1fr;
@@ -984,9 +588,6 @@ td .barra-share__trilho {
     padding: var(--space-4);
   }
 
-  .topo__sub {
-    display: none;
-  }
   .subtitulo {
     font-size: var(--text-base);
   }

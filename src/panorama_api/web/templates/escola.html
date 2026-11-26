@@ -192,7 +192,7 @@
           </p>
         </div>
         {% if motivo_concorrencia %}
-        <p class="nao-se-aplica"><strong>{{ nao_se_aplica_titulo }}.</strong> {{ motivo_concorrencia }}</p>
+        <div class="definicao"><strong>{{ nao_se_aplica_titulo }}.</strong> {{ motivo_concorrencia }}</div>
         {% else %}
         {% if aviso_abaixo_porte %}
         <div class="aviso">
@@ -290,11 +290,11 @@
       <dt>Avisos</dt>
       <dd>
         {% if meta.avisos %}
-        <ul class="lista-regras">
+        <div class="nota-metodo">
           {% for aviso in meta.avisos %}
-          <li>{{ aviso.texto }}</li>
+          <p>{{ aviso.texto }}</p>
           {% endfor %}
-        </ul>
+        </div>
         {% else %}
         nenhum aviso para este recorte
         {% endif %}
