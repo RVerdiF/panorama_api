@@ -12,9 +12,10 @@ nenhuma rede/BigQuery):
   página `/app/metodologia` mantém as âncoras de conteúdo;
 * `aria-current`: ``"page"`` no item cuja tela é a própria, ``"true"`` na área
   dona de uma tela-filha (ficha → Escolas, mercado → Municípios);
-* o índice novo ``GET /app/mercados/`` (com barra) responde 200 com o select de
-  municípios, 303 para o mercado escolhido e 422 no código inválido, sempre sem
-  tocar no repositório;
+* o índice novo ``GET /app/mercados/`` (com barra) responde 200 com a tabela
+  de municípios (uma linha SSR por município + filtro no cliente), 303 para
+  o mercado escolhido e 422 no código inválido, sempre sem tocar no
+  repositório;
 * o shell não depende de JS: a única tag de script é o `app.js` com `defer`
   (card `t_71b25279`), sem inline em template nenhum;
 * o `<header>` renderizado cabe em 1,5 KB (spec §6: partials ≤ 1,5 KB).
@@ -288,7 +289,7 @@ def test_rodape_final_omite_a_nota_onde_nao_ha_valor(cliente: TestClient):
 # -- 4. índice `/app/mercados/`: 200, 303 e 422 sem consulta ------------------
 
 
-def test_indice_responde_200_com_o_select_de_municipios_e_sem_consulta(
+def test_indice_responde_200_com_a_tabela_de_municipios_e_sem_consulta(
     cliente: TestClient, navegacao_repo: FakeRepository
 ):
     navegacao_repo.calls.clear()
@@ -297,13 +298,39 @@ def test_indice_responde_200_com_o_select_de_municipios_e_sem_consulta(
     assert resposta.status_code == 200
     assert resposta.headers["content-type"].startswith("text/html")
     html = resposta.text
-    assert 'name="co_municipio"' in html
-    # Todas as 853 da lista versionada + a opção neutra do placeholder.
-    assert html.count("<option") == len(municipios_mg()) + 1
-    assert f'action="{INDICE}"' in html
+    total = len(municipios_mg())
+    # Uma linha SSR por município: só colunas reais (nome + link).
+    assert html.count('class="acao-tabela"') == total
+    assert html.count(f'href="{INDICE}31') == total
+    # Sem o select antigo: nada de `option` nem de campo nomeado.
+    assert 'name="co_municipio"' not in html
+    assert "<option" not in html
     # O número anunciado vem de `len(municipios_mg())`, nunca de literal.
-    assert f"São {len(municipios_mg())} municípios de MG." in html
+    assert f"São {total} municípios de MG." in html
+    assert 'role="status"' in html
+    # Página sem valor nenhum: sem a nota de ausência (regra da landing e da
+    # 1ª visita da busca, achado A3).
+    assert "sem dado" not in html
     assert navegacao_repo.calls == []
+
+
+def test_indice_tem_filtro_progressivo_no_cliente():
+    """O filtro do índice é progressivo: SSR completo + refinamento em JS.
+
+    O JS não roda no TestClient, então a cobertura é estática: o campo de
+    busca, os ids que o `filtrarIndice` (`app.js`) procura e o próprio
+    iniciador com a trava de idempotência.
+    """
+    texto = (TEMPLATES / "mercados_indice.html").read_text(encoding="utf-8")
+
+    assert 'id="filtro-municipio"' in texto
+    assert 'type="search"' in texto
+    assert 'id="retorno-municipios"' in texto
+    assert 'id="tabela-municipios"' in texto
+    assert 'id="indice-municipios"' in texto
+    js = (STATIC / "app.js").read_text(encoding="utf-8")
+    assert "filtrarIndice" in js
+    assert "data-filtro-pronto" in js
 
 
 def test_indice_redireciona_303_para_o_mercado_escolhido(
