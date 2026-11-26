@@ -16,10 +16,10 @@
                        etapas_disponiveis, etapa_selecionada, dica_etapa) }}
     {{ recorte_mercado(meta, "Recorte de mart_mercado") }}
 #}
-{% from "partials/breadcrumb.html" import breadcrumb %}
+{% from "partials/macros.html" import trilha %}
 
 {% macro cabecalho_mercado(migalhas, municipio, municipio_nome) -%}
-{{ breadcrumb(migalhas) }}
+{{ trilha(migalhas) }}
 <h1>Mercado municipal</h1>
 <p class="subtitulo">
   Município <code>{{ municipio }}</code>

@@ -1,33 +1,25 @@
-{# Shell de navegação único do front (card V1 `t_423aa547`).
+{# Shell de navegação único do front (card V3-S0): a marca segue o protótipo do
+   dono — sinal `PE`, nome e subtítulo. O `PE` é decorativo (`aria-hidden`) e
+   o subtítulo é texto de apoio — o nome acessível do link continua sendo
+   "Panorama Escola". O selo à direita declara a fonte do dado exibido.
 
-   A marca segue o protótipo do dono: sinal `PE`, nome e subtítulo. O `PE` é
-   decorativo (`aria-hidden`) e o subtítulo é texto de apoio — o nome acessível
-   do link continua sendo "Panorama Escola". O selo à direita declara a fonte do
-   dado exibido, sem prometer recorte que a tela não tenha. #}
+   `pagina_atual` marca a TELA-índice da seção (`aria-current="page"`); `area`
+   marca a área dona de uma tela-filha (ficha → `"escolas"`, mercado →
+   `"municipios"`) com `aria-current="true"`, marcação mais fraca de
+   propósito. `inicio` e as páginas de erro não passam nenhum dos dois. #}
 <header class="topo">
-  <div class="topo__interno">
-    <a class="topo__marca" href="{{ href_inicio }}">
-      <span class="topo__sinal" aria-hidden="true">PE</span>
-      <span class="topo__texto">
-        <span class="topo__nome">Panorama Escola</span>
-        <span class="topo__sub">Inteligência de mercado · MG</span>
-      </span>
-    </a>
-    <nav class="topo__nav" aria-label="Navegação principal">
-      <a href="{{ href_busca }}"{% if pagina_atual == "escolas" %} aria-current="page"{% elif area_atual == "escolas" %} aria-current="true"{% endif %}>Escolas</a>
-      <a href="{{ href_mercados }}"{% if pagina_atual == "municipios" %} aria-current="page"{% elif area_atual == "municipios" %} aria-current="true"{% endif %}>Municípios</a>
-      <details class="topo__submenu">
-        <summary{% if pagina_atual == "metodologia" %} aria-current="page"{% endif %}>Metodologia</summary>
-        <ul class="topo__painel">
-          <li><a href="{{ href_metodologia }}">Visão geral da metodologia</a></li>
-          <li><a href="{{ href_metodologia }}#versao">Versão dos dados</a></li>
-          <li><a href="{{ href_metodologia }}#regras">Regras de leitura</a></li>
-          <li><a href="{{ href_metodologia }}#definicoes">Definições</a></li>
-          <li><a href="{{ href_metodologia }}#avisos">Avisos dos dados</a></li>
-          <li><a href="{{ href_metodologia }}#universo">Universos e fontes</a></li>
-        </ul>
-      </details>
-    </nav>
-    <span class="selo-dados"><span class="selo-dados__ponto" aria-hidden="true"></span>Censo Escolar · INEP</span>
-  </div>
+  <a class="marca" href="{{ href_inicio }}">
+    <span class="marca__sinal" aria-hidden="true">PE</span>
+    <span class="marca__texto">
+      <span class="marca__nome">Panorama Escola</span>
+      <span class="marca__sub">Inteligência de mercado · MG</span>
+    </span>
+  </a>
+  <nav class="menu" aria-label="Navegação principal">
+    <a href="{{ href_busca }}"{% if pagina_atual == "escolas" %} aria-current="page"{% elif area_atual == "escolas" %} aria-current="true"{% endif %}>Escolas</a>
+    <a href="{{ href_mercados }}"{% if pagina_atual == "municipios" %} aria-current="page"{% elif area_atual == "municipios" %} aria-current="true"{% endif %}>Municípios</a>
+    <span aria-disabled="true">Redes</span>
+    <a href="{{ href_metodologia }}"{% if pagina_atual == "metodologia" %} aria-current="page"{% endif %}>Metodologia</a>
+  </nav>
+  <span class="selo-data"><span class="selo-data__ponto" aria-hidden="true"></span>Censo Escolar · INEP</span>
 </header>

@@ -64,3 +64,26 @@
         {% endfor %}
       </select>
 {%- endmacro %}
+
+{#- Trilha das telas (card V3-S0): os mesmos itens que cada tela já passa em
+    `migalhas` (o último, sem `href`, é a tela atual e não é link). Muda só o
+    DOM: `p.trilha` com separador ›, como o protótipo — sem `nav`/`ol`. -#}
+{% macro trilha(itens) -%}
+<p class="trilha">{% for item in itens %}{% if item.href %}<a href="{{ item.href }}">{{ item.rotulo }}</a>{% else %}<span>{{ item.rotulo }}</span>{% endif %}{% if not loop.last %} <span aria-hidden="true">›</span> {% endif %}{% endfor %}</p>
+{%- endmacro %}
+
+{#- Rodapé único de cada página (card V3-S0): fonte + nota de ausência
+    opcional e as versões publicadas. `mostrar_nota` é falso nas telas que não
+    exibem valor nenhum (landing, índice de municípios, 1ª visita da busca):
+    a nota fala de dado exibido e sairia como ruído nelas (achado A3).
+    Importar `with context`: `data_version`/`contract_version` vêm do contexto. -#}
+{% macro rodape_final(mostrar_nota=True) -%}
+<footer class="rodape-final">
+  <p>
+    Fonte: Censo Escolar (INEP), recorte Minas Gerais.{% if mostrar_nota %}
+    Esta página nunca troca dado ausente por zero: campo sem valor aparece como
+    <strong>sem dado</strong>, com o motivo quando a base informa.{% endif %}
+  </p>
+  <p><code>dados {{ data_version }} · contrato {{ contract_version }}</code></p>
+</footer>
+{%- endmacro %}

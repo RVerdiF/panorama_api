@@ -20,29 +20,15 @@
 </head>
 <body>
   <a class="pular-para-conteudo" href="#conteudo">Pular para o conteúdo</a>
-  {# Navbar de nível 1 num partial único: a landing e as telas do `/app` herdam
-     esta mesma marcação, sem segunda navbar (spec §2.1/§7). #}
-  {% include "partials/topo.html" %}
+  {# Shell do protótipo (card V3-S0): o envoltório agrupa topo e main; o rodapé
+     único de cada página é a macro `rodape_final`, chamada uma vez por tela —
+     não há mais rodapé global aqui. #}
+  <div class="envoltorio">
+    {% include "partials/topo.html" %}
 
-  <main id="conteudo" class="conteudo">
-    {% block conteudo %}{% endblock %}
-  </main>
-
-  <footer class="rodape">
-    <div class="rodape__interno">
-      <p>
-        Fonte: Censo Escolar (INEP), recorte Minas Gerais.
-        Dados publicados: <code>{{ data_version }}</code>; contrato <code>{{ contract_version }}</code>.
-      </p>
-      {# Nota de ausência: só faz sentido numa página que exibe dado. Telas sem
-         consulta (1ª visita à busca) não a herdam (achado A3). #}
-      {% block rodape_nota %}
-      <p>
-        Esta página nunca troca dado ausente por zero: campo sem valor aparece como
-        <strong>sem dado</strong>, com o motivo quando a base informa.
-      </p>
-      {% endblock %}
-    </div>
-  </footer>
+    <main id="conteudo">
+      {% block conteudo %}{% endblock %}
+    </main>
+  </div>
 </body>
 </html>
