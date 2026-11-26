@@ -28,9 +28,9 @@
 {% macro select_municipios(id, selecionado, rotulo_vazio="Todos os municípios de MG") -%}
 <select id="{{ id }}" name="{{ id }}">
         <option value="">{{ rotulo_vazio }}</option>
-        {% for municipio in municipios %}
+        {%- for municipio in municipios -%}
         <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == selecionado %} selected{% endif %}>{{ municipio.no_municipio }}</option>
-        {% endfor %}
+        {%- endfor -%}
       </select>
 {%- endmacro %}
 
