@@ -14,7 +14,7 @@
 {% macro cabecalho_escola(cabecalho, migalhas, sem_nome) -%}
 {{ breadcrumb(migalhas) }}
 <h1>{% if cabecalho.no_entidade %}{{ cabecalho.no_entidade }}{% else %}{{ sem_nome }}{% endif %}</h1>
-<p class="subtitulo">
+<p class="tela-sub">
   Escola <code>{{ cabecalho.co_entidade }}</code> ·
   {# Município é link para o mercado municipal; o código IBGE fica ao lado. #}
   {%- if cabecalho.co_municipio %}

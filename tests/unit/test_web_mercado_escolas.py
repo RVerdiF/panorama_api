@@ -543,13 +543,13 @@ def test_share_nulo_nao_ganha_barra_e_share_presente_ganha(mercado_repo):
 
     html = _html(_client(mercado_repo).get(f"{ESCOLAS}?etapa=bas"))
 
-    assert "<svg" not in _linha_da_escola(html, "31000001")
+    assert "barra-share__preenche" not in _linha_da_escola(html, "31000001")
     assert "sem dado" in _linha_da_escola(html, "31000001")
-    assert '<rect width="37.5"' in _linha_da_escola(html, "31000002")
+    assert 'data-largura="37.5%"' in _linha_da_escola(html, "31000002")
 
 
 def test_barra_limita_share_fora_de_0_100(mercado_repo):
-    """A barra é leitura visual: fora de 0..100 satura, não estoura o viewBox."""
+    """A barra é leitura visual: fora de 0..100 satura, não estoura a faixa."""
     mercado_repo.share = [
         share_row(
             nu_ano_censo=2025,
@@ -568,16 +568,14 @@ def test_barra_limita_share_fora_de_0_100(mercado_repo):
     html = _html(_client(mercado_repo).get(f"{ESCOLAS}?etapa=bas"))
 
     linha_acima = _linha_da_escola(html, "31000003")
-    assert "<svg" in linha_acima
-    assert '<rect width="100"' in linha_acima
+    assert 'data-largura="100.0%"' in linha_acima
 
     linha_abaixo = _linha_da_escola(html, "31000004")
-    assert "<svg" in linha_abaixo
-    assert '<rect width="0"' in linha_abaixo
+    assert 'data-largura="0.0%"' in linha_abaixo
 
 
 def test_barra_e_decorativa_e_nao_duplica_a_leitura(mercado_repo):
-    """O SVG é decorativo; o percentual continua em texto na célula."""
+    """O trilho não tem texto; o percentual continua em texto na célula."""
     mercado_repo.share = [
         share_row(
             nu_ano_censo=2025,
@@ -590,15 +588,13 @@ def test_barra_e_decorativa_e_nao_duplica_a_leitura(mercado_repo):
     html = _html(_client(mercado_repo).get(f"{ESCOLAS}?etapa=bas"))
 
     linha = _linha_da_escola(html, "31000005")
-    svg = re.search(r"<svg\b[^>]*>", linha)
-    assert svg is not None
-    assert 'aria-hidden="true"' in svg.group(0)
-    assert 'focusable="false"' in svg.group(0)
+    trilho = re.search(r"<span\b[^>]*barra-share__trilho[^>]*>", linha)
+    assert trilho is not None
     # A leitura acessível é o número em texto, antes da barra.
     # A célula do share privado é o penúltimo `<td>` da linha.
     celula = linha.split("<td>")[-2]
     assert "37,5%" in celula
-    assert celula.index("37,5%") < celula.index("<svg")
+    assert celula.index("37,5%") < celula.index("barra-share__trilho")
 
 
 def test_barra_share_formata_e_limita_o_valor():
@@ -606,16 +602,18 @@ def test_barra_share_formata_e_limita_o_valor():
     assert barra_share(None) is None
     assert barra_share(float("nan")) is None
     assert barra_share(float("inf")) is None
-    # Largura determinística: sem zeros à direita e sem notação científica.
+    # Largura com uma casa, como o protótipo (`toFixed(1)`).
     for pct, largura in (
         (37.5, "37.5"),
-        (100.0, "100"),
-        (0, "0"),
-        (0.0834, "0.0834"),
-        (137.5, "100"),
-        (-3.2, "0"),
+        (100.0, "100.0"),
+        (0, "0.0"),
+        (0.0834, "0.1"),
+        (137.5, "100.0"),
+        (-3.2, "0.0"),
     ):
-        assert f'<rect width="{largura}"' in str(barra_share(pct)), pct
+        assert f'<span class="barra-share__preenche" data-largura="{largura}%">' in str(
+            barra_share(pct)
+        ), pct
 
 
 def test_custo_de_consultas_nao_muda_com_ancora_e_barra():

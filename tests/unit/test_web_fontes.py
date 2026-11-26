@@ -1,18 +1,19 @@
-"""Fontes self-hosted do front — card V1 `t_423aa547`.
+"""Fontes self-hosted do front — card V1 `t_423aa547`, peça do protótipo V2.
 
 O design do protótipo do dono (Open Design) usa três famílias: Source Serif 4
-nos títulos, Inter no corpo e — no protótipo — IBM Plex Mono nos números. O
-orçamento do card cortou o mono para `system-ui`: **3 arquivos, ≤ 200 KB**, sem
-requisição externa.
+nos títulos, Inter no corpo e IBM Plex Mono nos números: **6 arquivos**,
+servidos com hash e sem requisição externa.
 
 O que este teste protege:
 
-* o diretório `static/fonts/` existe com exatamente os 3 arquivos do subset, e
-  o total não passa de 200 KB;
+* o diretório `static/fonts/` existe com exatamente os 6 arquivos do protótipo,
+  e o total não passa do teto;
 * cada `.woff2` é servido pelo `AssetRegistry` com hash e
   `Cache-Control: immutable` — nada de CDN;
-* o `@font-face` do CSS **como servido** aponta para a URL com hash da fonte e
-  declara `font-display: swap`;
+* cada `@font-face` **efetivo** (o último por família/peso, que é o que o
+  navegador usa) aponta para a URL com hash da fonte e declara
+  `font-display: swap` — o bloco herdado verbatim do protótipo usa URLs
+  relativas, sobrescritas pela seção `app-only`;
 * o `<head>` faz `preload` do Inter 400 (a fonte do corpo), com `crossorigin`,
   e o HTML não referencia nenhuma origem externa.
 """
@@ -31,13 +32,20 @@ from tests.unit.conftest import FakeRepository
 
 FONTES = STATIC_DIR / "fonts"
 
-#: Subset aprovado pelo card: Inter 400/600 + Source Serif 700.
+#: Arquivos do protótipo: Inter 400/600 + Source Serif 600/700 + Plex Mono 400/500.
 ARQUIVOS_ESPERADOS = frozenset(
-    {"inter-400.woff2", "inter-600.woff2", "source-serif-700.woff2"}
+    {
+        "inter-400.woff2",
+        "inter-600.woff2",
+        "source-serif-600.woff2",
+        "source-serif-700.woff2",
+        "plex-mono-400.woff2",
+        "plex-mono-500.woff2",
+    }
 )
 
-#: Orçamento de fontes do card (bytes).
-TETO_FONTES_BYTES = 200 * 1024
+#: Orçamento de fontes (bytes): 6 arquivos do protótipo com folga.
+TETO_FONTES_BYTES = 360 * 1024
 
 INICIO = "/"
 
@@ -73,12 +81,12 @@ def test_subset_de_fontes_tem_tres_arquivos_e_cabe_em_200_kb():
     assert total <= TETO_FONTES_BYTES, f"{total} B > {TETO_FONTES_BYTES} B"
 
 
-def test_mono_cai_para_a_fonte_do_sistema_sem_arquivo_proprio(css_servido: str):
-    """Sem IBM Plex Mono no subset: o `--fonte-mono` é do sistema."""
-    assert "IBM Plex Mono" not in css_servido
-    regra = re.search(r"--fonte-mono:\s*([^;]+);", css_servido)
+def test_mono_do_prototipo_tem_arquivo_proprio(css_servido: str):
+    """O `--font-mono` do protótipo é o IBM Plex Mono, servido aqui."""
+    assert "IBM Plex Mono" in css_servido
+    regra = re.search(r"--font-mono:\s*([^;]+);", css_servido)
     assert regra is not None
-    assert "ui-monospace" in regra.group(1)
+    assert "IBM Plex Mono" in regra.group(1)
 
 
 def test_cada_fonte_e_servida_com_hash_e_cache_imutavel():
@@ -98,20 +106,33 @@ def test_cada_fonte_e_servida_com_hash_e_cache_imutavel():
 
 def test_font_face_aponta_para_a_url_com_hash_e_usa_swap(css_servido: str):
     blocos = re.findall(r"@font-face\s*\{(.*?)\}", css_servido, re.S)
-    assert len(blocos) >= 3, blocos
+    assert len(blocos) >= 6, blocos
 
-    servidas = {registro for registro in re.findall(r'url\("([^"]+)"\)', css_servido)}
     for bloco in blocos:
         assert "font-display: swap" in bloco, bloco
-        fonte = re.search(r'url\("([^"]+)"\)', bloco)
-        assert fonte is not None, bloco
-        assert re.fullmatch(
-            r"/app/static/[0-9a-f]{12}-[a-z0-9-]+\.woff2", fonte.group(1)
-        ), fonte.group(1)
-        assert fonte.group(1) in servidas
 
-    # As três famílias declaradas; o mono não tem `@font-face`.
-    for familia in ("Source Serif 4", "Inter"):
+    # URLs relativas só as do bloco herdado (verbatim do protótipo); as
+    # efetivas — últimas por família/peso — usam hash do próprio app.
+    relativas = set(re.findall(r'url\("\.\./fonts/([a-z0-9-]+\.woff2)"\)', css_servido))
+    assert relativas <= ARQUIVOS_ESPERADOS, relativas
+
+    efetivos: dict[tuple[str, str], str] = {}
+    for bloco in blocos:
+        familia = re.search(r'font-family:\s*"([^"]+)"', bloco)
+        peso = re.search(r"font-weight:\s*(\d+)", bloco)
+        fonte = re.search(r'url\("([^"]+)"\)', bloco)
+        assert familia is not None and peso is not None and fonte is not None, bloco
+        efetivos[(familia.group(1), peso.group(1))] = fonte.group(1)
+
+    servidas = set(re.findall(r'url\("([^"]+)"\)', css_servido))
+    for (familia, peso), fonte in efetivos.items():
+        assert re.fullmatch(
+            r"/app/static/[0-9a-f]{12}-[a-z0-9-]+\.woff2", fonte
+        ), (familia, peso, fonte)
+        assert fonte in servidas
+
+    # As três famílias declaradas, com os pesos do protótipo.
+    for familia in ("Source Serif 4", "Inter", "IBM Plex Mono"):
         assert f'font-family: "{familia}"' in css_servido, familia
 
 

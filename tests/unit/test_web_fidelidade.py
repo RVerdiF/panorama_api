@@ -224,11 +224,11 @@ def test_ano_ausente_na_fonte_aparece_como_linha_sem_dado():
 
     tabela = _tabela(html, "Série de matrículas por ano")
     # O ano que existe no intervalo mas não na fonte continua visível.
-    assert _celulas_da_linha(tabela, "2021") == ["sem dado (ano ausente na fonte)"]
+    assert _celulas_da_linha(tabela, "2021") == ["sem dado (ano ausente na fonte)", "sem dado"]
     # E os anos observados mantêm seu valor — a lacuna não desalinha a série.
-    assert _celulas_da_linha(tabela, "2020") == ["100"]
-    assert _celulas_da_linha(tabela, "2022") == ["120"]
-    assert _celulas_da_linha(tabela, "2023") == ["130"]
+    assert _celulas_da_linha(tabela, "2020")[0] == "100"
+    assert _celulas_da_linha(tabela, "2022")[0] == "120"
+    assert _celulas_da_linha(tabela, "2023")[0] == "130"
     # Todos os anos do intervalo, em ordem (5 anos de 2020 a 2023 inclusive não
     # — 2020..2023 são 4 linhas).
     assert re.findall(r'<th scope="row">(20\d\d)</th>', tabela) == [
@@ -245,7 +245,7 @@ def test_ano_ausente_nunca_vira_zero_na_serie():
     html = _html(_client(repo).get(ESCOLA))
 
     tabela = _tabela(html, "Série de matrículas por ano")
-    assert _celulas_da_linha(tabela, "2024") == ["sem dado (ano ausente na fonte)"]
+    assert _celulas_da_linha(tabela, "2024") == ["sem dado (ano ausente na fonte)", "sem dado"]
     assert ">0<" not in tabela
 
 
@@ -288,6 +288,10 @@ def test_composicao_por_etapa_nao_repete_a_contagem_de_escolas():
 
 
 # -- E5: rótulos INEP completos ---------------------------------------------
+#
+# A ficha segue o protótipo e não tem bloco de definição; os rótulos vivem na
+# tabela da busca ("4 — Privada"), com a mesma leitura da ficha (revisão,
+# item 4). Estes testes cobrem a leitura aqui.
 
 
 @pytest.mark.parametrize(
@@ -301,17 +305,14 @@ def test_composicao_por_etapa_nao_repete_a_contagem_de_escolas():
 )
 def test_rotulo_de_dependencia_usa_o_nome_do_codigo_inep(codigo, esperado):
     repo = _repo(
-        history=_serie(
-            2025,
-            overrides={
-                2025: {"tp_dependencia": codigo, "tp_situacao_funcionamento": "1"}
-            },
-        )
+        schools=[
+            school_row(tp_dependencia=codigo, tp_situacao_funcionamento="1")
+        ]
     )
 
-    html = _html(_client(repo).get(ESCOLA))
+    html = _html(_client(repo).get(BUSCA, params={"co_municipio": "3106200"}))
 
-    assert esperado in html
+    assert f"{codigo} — {esperado}" in html
     assert "não privada" not in html
 
 
@@ -326,37 +327,26 @@ def test_rotulo_de_dependencia_usa_o_nome_do_codigo_inep(codigo, esperado):
 )
 def test_rotulo_de_situacao_usa_o_nome_do_codigo_inep(codigo, esperado):
     repo = _repo(
-        history=_serie(
-            2025,
-            overrides={
-                2025: {"tp_dependencia": "3", "tp_situacao_funcionamento": codigo}
-            },
-        )
+        schools=[
+            school_row(tp_dependencia="3", tp_situacao_funcionamento=codigo)
+        ]
     )
 
-    html = _html(_client(repo).get(ESCOLA))
+    html = _html(_client(repo).get(BUSCA, params={"co_municipio": "3106200"}))
 
-    assert esperado in html
+    assert f"{codigo} — {esperado}" in html
     # "não ativa" colapsava paralisada e extinta num único texto.
     assert "não ativa" not in html
 
 
 def test_codigo_inep_ausente_nao_e_classificado_por_deducao():
     repo = _repo(
-        history=_serie(
-            2025,
-            overrides={
-                2025: {
-                    "tp_dependencia": None,
-                    "tp_situacao_funcionamento": None,
-                    "is_qt_mat_bas_missing": True,
-                    "qt_mat_bas": None,
-                }
-            },
-        )
+        schools=[
+            school_row(tp_dependencia=None, tp_situacao_funcionamento=None)
+        ]
     )
 
-    html = _html(_client(repo).get(ESCOLA))
+    html = _html(_client(repo).get(BUSCA, params={"co_municipio": "3106200"}))
 
     assert "não informado" in html
     assert "não privada" not in html

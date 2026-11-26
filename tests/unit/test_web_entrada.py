@@ -238,19 +238,13 @@ def test_health_continua_json_intacto(cliente: TestClient):
 def test_busca_sem_consulta_orienta_sobre_o_produto(cliente: TestClient):
     html = _get(cliente, BUSCA).text
 
+    # Card V2: o bloco "O que é o Panorama Escola" saiu da busca; a orientação
+    # de produto mora na landing e no rodapé final, que ainda declara o recorte
+    # (Minas Gerais) e a fonte (INEP).
+    assert "<h1>Busca de escolas</h1>" in html
     assert "Minas Gerais" in html
     assert "INEP" in html
-    # Os anos publicados vêm de APP_ANOS_DISPONIVEIS, nunca de literal no template.
-    for ano in ANOS:
-        assert str(ano) in html
-    # O bloco de orientação encolheu no card `t_2c2e564b`: fica o parágrafo e o
-    # link para a landing. Os três atalhos de uso moraram para `/`, que agora
-    # apresenta o produto; `/app/` segue como porta de entrada por deep-link.
-    assert '<a href="/">Sobre o Panorama Escola</a>' in html
-    assert "orientacao__atalhos" not in html
-    assert 'href="#formulario-busca"' not in html
-    assert 'href="#co_municipio"' not in html
-    # Os alvos continuam no formulário, para os fluxos que os usam.
+    # Os alvos do formulário continuam no lugar, para os fluxos que os usam.
     assert 'id="formulario-busca"' in html
     assert 'id="co_municipio"' in html
 
@@ -266,15 +260,22 @@ def test_busca_sem_consulta_nao_mostra_sem_dado(cliente: TestClient):
 def test_busca_com_consulta_volta_a_mostrar_o_recorte(cliente: TestClient):
     html = _get(cliente, BUSCA, params={"co_municipio": MUNICIPIO}).text
 
-    assert "Recorte da busca" in html
+    # Card V2: o recorte da consulta virou a lista `rodape-meta` abaixo da
+    # tabela (o painel "Recorte da busca" saiu).
+    assert "Origem dos números da consulta" in html
     assert "Ano de referência" in html
+    assert "Recorte da busca" not in html
 
 
-def test_busca_usa_os_anos_do_setting_nao_um_literal(entrada_repo: FakeRepository):
-    """Dois settings diferentes → cada página anuncia o próprio recorte."""
+def test_mercado_usa_os_anos_do_setting_nao_um_literal(entrada_repo: FakeRepository):
+    """Dois settings diferentes → cada seletor anuncia o próprio recorte.
+
+    Card V2: a busca deixou de listar os anos publicados (a orientação saiu);
+    o seletor de ano do mercado é quem lê `APP_ANOS_DISPONIVEIS`.
+    """
     app = create_app(settings=_settings(anos="2024,2025"), repository=entrada_repo)
     with TestClient(app) as cliente:
-        html = _get(cliente, BUSCA).text
+        html = _get(cliente, MERCADO).text
 
     assert "2024" in html and "2025" in html
     assert "2021" not in html

@@ -338,6 +338,25 @@ def test_busca_por_municipio_renderiza_a_escola_e_o_recorte_obrigatorio(
     assert not TEXTO_DE_TOTAL.search(html)
 
 
+def test_busca_por_municipio_mostra_codigo_inep_com_rotulo(
+    client, repository
+):
+    """Dependência e situação com a leitura do código ("4 — Privada").
+
+    Rodada 1 da revisão, item 4: os códigos crus `4`/`1` ganham o rótulo da
+    ficha; sem matrícula no schema, a coluna não anuncia ordenação.
+    """
+    repository.schools = [school_row()]
+
+    resposta = _get(client, params={"co_municipio": "3106200"})
+    html = resposta.text
+
+    assert resposta.status_code == 200
+    assert "4 — Privada" in html
+    assert "1 — Em atividade" in html
+    assert "aria-sort" not in html
+
+
 def test_busca_envia_limit_20_e_os_filtros_ao_repositorio(client, repository):
     repository.schools = [school_row()]
 
@@ -389,11 +408,11 @@ def test_valor_ausente_sai_como_sem_dado_e_oferta_desconhecida(
     html = _get(client, params={"co_municipio": "3106200"}).text
 
     assert "sem dado" in html
-    # `oferta.bas = null` é "Desconhecido", nunca "Não" nem 0.
-    assert "Desconhecido" in html
+    # A tabela de busca não tem mais coluna de oferta (card V2); quando a base
+    # não informa a oferta, o marcador em português acompanha o nome da escola.
+    assert "Oferta desconhecida" in html
     # E6: a flag interna não é exibida como texto; o leitor vê o português.
     assert "is_oferta_desconhecida" not in html
-    assert "Oferta desconhecida" in html
 
 
 def test_busca_nao_usa_termos_geograficos_proibidos(client, repository):

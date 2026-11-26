@@ -7,19 +7,16 @@ review. Os limites, em bytes:
 | Item | Bruto | gzip nível 6 |
 |---|---|---|
 | HTML de `/` | 65.536 B | 14.336 B |
-| `app.css` | 45.056 B | 10.240 B |
+| `app.css` | 65.536 B | 14.336 B |
 
 O orçamento do **CSS** foi reescrito no card V1 (`t_423aa547`) quando o dono
-entregou o protótipo do Open Design: o `app.css` deixou de ser uma folha de
-documento (15.650 B) e passou a carregar o sistema visual inteiro — tokens,
-escala tipográfica, cartões, navbar com bisel, tabela ordenável, chips,
-paginação e estados —, o que vale 32,9 KB brutos e 7,9 KB em gzip medidos.
-O teto antigo (16.384 B / 4.608 B) era de outra peça; mantê-lo obrigaria a
-rejeitar o design que o card manda aplicar. O que o orçamento continua
-protegendo é a **forma** do recurso: um único stylesheet, sem `@import`, sem
-origem externa, e o custo comprimido contido em ~10 KB.
+entregou o protótipo do Open Design e revisto no V2 (`t_cbd54a92`): o `app.css`
+é a cópia verbatim do `panorama.css` mais a seção `app-only` do SSR — 61,2 KB
+brutos e 12,7 KB em gzip medidos. O que o orçamento continua protegendo é a
+**forma** do recurso: um único stylesheet, sem `@import`, sem origem externa,
+e o custo comprimido contido em ~14 KB.
 
-As fontes são orçamento à parte (`test_web_fontes.py`): 3 arquivos, ≤ 200 KB.
+As fontes são orçamento à parte (`test_web_fontes.py`): 6 arquivos, ≤ 360 KB.
 
 Além do peso, o orçamento inclui a forma do recurso: **4 requests** na primeira
 visita (o HTML, um único stylesheet, o `app.js` com `defer` — card
@@ -48,12 +45,12 @@ from tests.unit.conftest import FakeRepository
 INICIO = "/"
 CSS = STATIC_DIR / "app.css"
 
-#: Limites do orçamento (bytes). O do CSS foi revisto no card V1 `t_423aa547`
-#: (ver o docstring): o app.css agora carrega o sistema visual do protótipo.
+#: Limites do orçamento (bytes). O do CSS foi revisto no card V2 `t_cbd54a92`
+#: (ver o docstring): cópia verbatim do protótipo + seção `app-only` do SSR.
 LIMITE_HTML_BRUTO = 65_536
 LIMITE_HTML_GZIP = 14_336
-LIMITE_CSS_BRUTO = 45_056
-LIMITE_CSS_GZIP = 10_240
+LIMITE_CSS_BRUTO = 65_536
+LIMITE_CSS_GZIP = 14_336
 
 #: Nível fixo: gzip -6 é o default dos servidores e o que o teste deve medir
 #: para que o número não dependa do compressor do ambiente.
@@ -165,16 +162,21 @@ def test_css_sem_import_e_sem_url_externa():
     css = asset.corpo.decode("utf-8")
 
     assert "@import" not in css
-    # Fontes self-hosted (card V1 `t_423aa547`): o CSS ganhou `url()`, mas só
-    # para assets locais com hash, servidos pelo próprio app. Nenhuma origem
-    # externa, nenhum caminho relativo solto e nenhum placeholder: a referência
-    # `{{asset:...}}` tem de estar resolvida nos bytes que o navegador recebe.
+    # Fontes self-hosted: o CSS tem `url()` só para fontes locais — com hash
+    # (seção `app-only`, o que o navegador usa) ou relativas ao bloco herdado
+    # verbatim do protótipo (sobrescritas pelas com hash). Nenhuma origem
+    # externa e nenhum placeholder: a referência `asset:` tem de estar
+    # resolvida nos bytes que o navegador recebe.
     assert "http://" not in css
     assert "https://" not in css
     assert "{{asset:" not in css
     urls = re.findall(r"url\(([^)]*)\)", css)
     assert urls, "o CSS deve referenciar as fontes locais"
     for url in urls:
+        if url.startswith('"../fonts/'):
+            nome = url.strip('"').rsplit("/", 1)[-1]
+            assert (STATIC_DIR / "fonts" / nome).is_file(), url
+            continue
         assert re.fullmatch(r'"/app/static/[0-9a-f]{12}-[a-z0-9-]+\.woff2"', url), url
         # A URL aponta para um asset que o handler de fato serve.
         assert registro.get(url.strip('"').rsplit("/", 1)[-1]) is not None, url

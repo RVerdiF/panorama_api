@@ -93,6 +93,344 @@
     }
   });
 
+  /* Barras de share (card V2 `t_cbd54a92`, rodada 1 item 1): o SSR emite
+     `data-largura="X%"` no `.barra-share__preenche` e este iniciador aplica
+     via CSSOM (`el.style.width`), que a CSP `style-src 'self'` permite — o
+     atributo `style="width:…"` era descartado pelo navegador e nenhuma barra
+     ganhava largura em produção. Sem este JS, a barra fica vazia e o número
+     ao lado continua legível: ausência de largura, nunca largura errada. */
+  registrar(function aplicarBarras(raiz) {
+    var barras = raiz.querySelectorAll
+      ? raiz.querySelectorAll(".barra-share__preenche[data-largura]")
+      : [];
+    for (var i = 0; i < barras.length; i += 1) {
+      var largura = barras[i].getAttribute("data-largura") || "";
+      if (/^[0-9]+(\.[0-9]+)?%$/.test(largura)) barras[i].style.width = largura;
+    }
+  });
+
+  /* Gráfico da série de matrículas (card V2 `t_cbd54a92`): linha com área,
+     portado do protótipo (`panorama-design/assets/js/app.js`: `px`/`py`,
+     `medir`/`desenhar`, `posicionarTip`/`ativar`/`maisProximo`, ponteiro,
+     teclado setas/Home/End/Escape e `ResizeObserver` com debounce).
+     Os dados vêm do SSR, nunca de mock: primeiro de uma ilha JSON
+     (`<script type="application/json">` com `{"anos": [...], "valores": [...]}`,
+     nulos onde não há dado) dentro da mesma `section#serie`; sem ilha, da
+     tabela SSR da seção (ano no `th` e matrícula no primeiro `td.num`,
+     ambos lidos como texto). Sem dados, não faz nada: o SVG do
+     servidor (ou o "sem dado") continua valendo. Todo o SVG nasce de
+     `createElementNS` e `textContent` — nenhuma escrita de marcação por
+     string (CSP estrita) — e
+     a caixa de leitura tem `aria-live="polite"`. */
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function numeroBR(casas) {
+    return new Intl.NumberFormat("pt-BR", {
+      minimumFractionDigits: casas || 0,
+      maximumFractionDigits: casas || 0
+    });
+  }
+  function inteiroOuNulo(v) {
+    return v === null || v === undefined ? null : numeroBR(0).format(v);
+  }
+  function variacaoAnual(serie, i) {
+    if (i <= 0) return null;
+    var atual = serie[i];
+    var anterior = serie[i - 1];
+    if (atual === null || anterior === null || !anterior) return null;
+    return ((atual - anterior) / anterior) * 100;
+  }
+  function numeroPtBR(texto) {
+    var limpo = String(texto).trim();
+    if (limpo === "" || /sem dado/i.test(limpo)) return null;
+    var n = Number(limpo.replace(/\./g, "").replace(",", "."));
+    return isFinite(n) ? n : null;
+  }
+  function serieDaIlha(secao) {
+    var ilha = secao.querySelector('script[type="application/json"]');
+    if (!ilha) return null;
+    var dado;
+    try {
+      dado = JSON.parse(ilha.textContent);
+    } catch (erro) {
+      return null;
+    }
+    if (!dado || typeof dado !== "object") return null;
+    var anos = dado.anos;
+    var valores = dado.valores || dado.serie;
+    if (!anos || !valores || !anos.length || anos.length !== valores.length) return null;
+    return { anos: anos, valores: valores };
+  }
+  function serieDaTabela(secao) {
+    var linhas = secao.querySelectorAll("table tbody tr");
+    if (!linhas.length) return null;
+    var anos = [];
+    var valores = [];
+    for (var i = 0; i < linhas.length; i += 1) {
+      var anoCel = linhas[i].querySelector("th");
+      var valorCel = linhas[i].querySelector("td.num");
+      if (!anoCel || !valorCel) return null;
+      var m = (anoCel.textContent || "").match(/(\d{4})/);
+      if (!m) return null;
+      anos.push(Number(m[1]));
+      valores.push(numeroPtBR(valorCel.textContent || ""));
+    }
+    return { anos: anos, valores: valores };
+  }
+  function el(tag, attrs, texto) {
+    var no = documento.createElementNS(SVG_NS, tag);
+    if (attrs) {
+      for (var chave in attrs) {
+        if (Object.prototype.hasOwnProperty.call(attrs, chave)) no.setAttribute(chave, attrs[chave]);
+      }
+    }
+    if (texto !== undefined && texto !== null) no.textContent = texto;
+    return no;
+  }
+  registrar(function graficoSerie(raiz) {
+    var secoes = raiz.querySelectorAll ? raiz.querySelectorAll("section#serie div.grafico") : [];
+    for (var s = 0; s < secoes.length; s += 1) {
+      desenharSerie(secoes[s]);
+    }
+  });
+  function desenharSerie(caixa) {
+    if (!caixa || caixa.getAttribute("data-grafico-pronto") === "true") return;
+    var secao = caixa.closest ? caixa.closest("section#serie") : null;
+    if (!secao) return;
+    var dados = serieDaIlha(secao) || serieDaTabela(secao);
+    if (!dados) return;
+    var anos = dados.anos;
+    var serie = dados.valores;
+    var n = serie.length;
+    if (!anos || n < 2 || anos.length !== n) return;
+    var temDado = false;
+    for (var v = 0; v < n; v += 1) {
+      if (serie[v] !== null) { temDado = true; break; }
+    }
+    if (!temDado) return;
+    var validos = [];
+    for (v = 0; v < n; v += 1) {
+      if (serie[v] !== null) validos.push(serie[v]);
+    }
+    var maxV = Math.max.apply(null, validos) * 1.08;
+    var minV = Math.min.apply(null, validos) * 0.86;
+    var spanV = maxV - minV || 1;
+    var ativoIdx = -1;
+    var ativarPonto = null;
+    var pontos = [];
+    var dim = { W: 780, H: 320, PL: 84, PR: 28, PT: 28, PB: 58 };
+    function px(i) { return dim.PL + (i * (dim.W - dim.PL - dim.PR)) / (n - 1); }
+    function py(val) { return dim.PT + (1 - (val - minV) / spanV) * (dim.H - dim.PT - dim.PB); }
+    function medir() {
+      var largura = caixa.clientWidth || 780;
+      var estreito = largura < 560;
+      dim.W = Math.max(280, Math.round(largura));
+      dim.H = estreito ? 258 : 320;
+      dim.PL = estreito ? 54 : 84;
+      dim.PR = estreito ? 14 : 28;
+      dim.PT = estreito ? 22 : 28;
+      dim.PB = estreito ? 46 : 58;
+    }
+    function desenhar() {
+      medir();
+      var W = dim.W, H = dim.H, PL = dim.PL, PR = dim.PR, PT = dim.PT, PB = dim.PB;
+      var estreito = W < 560;
+      pontos = [];
+      for (var i = 0; i < n; i += 1) {
+        if (serie[i] !== null) pontos.push([px(i), py(serie[i]), serie[i], i]);
+      }
+      if (!pontos.length) return;
+      caixa.textContent = "";
+      var svg = el("svg", {
+        viewBox: "0 0 " + W + " " + H,
+        width: String(W),
+        height: String(H),
+        role: "img",
+        tabindex: "0",
+        "aria-label": "Série de matrículas de " + anos[0] + " a " + anos[n - 1] +
+          ". Use as setas para percorrer os anos; a tabela abaixo traz os mesmos números."
+      });
+      var grupoGrades = el("g");
+      var passos = estreito ? 2 : 3;
+      for (var g = 0; g <= passos; g += 1) {
+        var vv = minV + (spanV * g) / passos;
+        var yy = py(vv);
+        grupoGrades.appendChild(el("line", {
+          class: "grafico__grade", x1: String(PL), y1: yy.toFixed(1),
+          x2: String(W - PR), y2: yy.toFixed(1)
+        }));
+        grupoGrades.appendChild(el("text", { x: String(PL - 10), y: (yy + 5).toFixed(1), "text-anchor": "end" },
+          inteiroOuNulo(Math.round(vv))));
+      }
+      svg.appendChild(grupoGrades);
+      var linha = "";
+      for (var k = 0; k < pontos.length; k += 1) {
+        linha += (k === 0 ? "M" : "L") + pontos[k][0].toFixed(1) + "," + pontos[k][1].toFixed(1);
+      }
+      var area = linha + " L" + pontos[pontos.length - 1][0].toFixed(1) + "," + (H - PB) +
+        " L" + pontos[0][0].toFixed(1) + "," + (H - PB) + " Z";
+      svg.appendChild(el("path", { class: "grafico__area", d: area }));
+      svg.appendChild(el("path", { class: "grafico__linha", d: linha }));
+      var grupoGuia = el("g", { class: "grafico__guia-grupo", "aria-hidden": "true" });
+      var guia = el("line", { class: "grafico__guia", hidden: "" });
+      var halo = el("circle", { class: "grafico__halo", r: "0", hidden: "" });
+      grupoGuia.appendChild(guia);
+      grupoGuia.appendChild(halo);
+      svg.appendChild(grupoGuia);
+      for (k = 0; k < pontos.length; k += 1) {
+        svg.appendChild(el("circle", {
+          class: "grafico__ponto", "data-ponto": String(k),
+          "data-ativo": k === ativoIdx ? "true" : "false",
+          cx: pontos[k][0].toFixed(1), cy: pontos[k][1].toFixed(1),
+          r: k === ativoIdx ? "5.5" : "4"
+        }));
+      }
+      var ultimoP = pontos[pontos.length - 1];
+      var rotuloFinal = el("text", {
+        class: "grafico__rotulo",
+        x: (ultimoP[0] - 10).toFixed(1), y: (ultimoP[1] - 16).toFixed(1), "text-anchor": "end"
+      }, inteiroOuNulo(ultimoP[2]));
+      if (ativoIdx === pontos.length - 1) rotuloFinal.setAttribute("hidden", "");
+      svg.appendChild(rotuloFinal);
+      var grupoEixos = el("g", { class: "grafico__eixos" });
+      for (i = 0; i < n; i += 1) {
+        grupoEixos.appendChild(el("text", {
+          x: px(i).toFixed(1), y: String(H - PB + (estreito ? 24 : 28)), "text-anchor": "middle"
+        }, String(anos[i])));
+      }
+      svg.appendChild(grupoEixos);
+      svg.appendChild(el("rect", {
+        class: "grafico__captura", x: String(PL - 16), y: String(PT - 14),
+        width: String(W - PL - PR + 34), height: String(H - PT - PB + 28)
+      }));
+      caixa.appendChild(svg);
+      var tip = documento.createElement("div");
+      tip.setAttribute("class", "grafico__tip");
+      tip.setAttribute("aria-live", "polite");
+      tip.hidden = true;
+      var tipAno = documento.createElement("p");
+      tipAno.setAttribute("class", "grafico__tip-ano");
+      var tipValor = documento.createElement("p");
+      tipValor.setAttribute("class", "grafico__tip-valor");
+      var tipVar = documento.createElement("p");
+      tipVar.setAttribute("class", "grafico__tip-var");
+      tip.appendChild(tipAno);
+      tip.appendChild(tipValor);
+      tip.appendChild(tipVar);
+      caixa.appendChild(tip);
+      caixa.setAttribute("data-grafico-pronto", "true");
+      ligar(svg, guia, halo, tip, tipAno, tipValor, tipVar, rotuloFinal);
+      if (ativoIdx > -1 && ativarPonto) ativarPonto(ativoIdx);
+    }
+    function posicionarTip(svg, tip, p) {
+      var r = svg.getBoundingClientRect();
+      var escala = r.width / dim.W || 1;
+      var x = p[0] * escala;
+      var y = p[1] * escala;
+      tip.hidden = false;
+      var largura = tip.offsetWidth;
+      var altura = tip.offsetHeight;
+      var esq = Math.min(Math.max(x, largura / 2 + 2), r.width - largura / 2 - 2);
+      tip.style.left = esq + "px";
+      if (y - altura - 14 < 0) {
+        tip.dataset.pos = "baixo";
+        tip.style.top = Math.min(y + 18, r.height - altura) + "px";
+      } else {
+        tip.dataset.pos = "cima";
+        tip.style.top = (y - 14) + "px";
+      }
+    }
+    function limpar(svg, guia, halo, tip, rotuloFinal) {
+      ativoIdx = -1;
+      guia.setAttribute("hidden", "");
+      halo.setAttribute("hidden", "");
+      tip.hidden = true;
+      var circulos = svg.querySelectorAll(".grafico__ponto");
+      for (var i = 0; i < circulos.length; i += 1) {
+        circulos[i].dataset.ativo = "false";
+        circulos[i].setAttribute("r", "4");
+      }
+      if (rotuloFinal) rotuloFinal.removeAttribute("hidden");
+    }
+    function ligar(svg, guia, halo, tip, tipAno, tipValor, tipVar, rotuloFinal) {
+      ativarPonto = ativar;
+      function ativar(k) {
+        var p = pontos[k];
+        if (!p) return;
+        ativoIdx = k;
+        guia.removeAttribute("hidden");
+        guia.setAttribute("x1", p[0].toFixed(1));
+        guia.setAttribute("x2", p[0].toFixed(1));
+        guia.setAttribute("y1", p[1].toFixed(1));
+        guia.setAttribute("y2", (dim.H - dim.PB).toFixed(1));
+        halo.removeAttribute("hidden");
+        halo.setAttribute("cx", p[0].toFixed(1));
+        halo.setAttribute("cy", p[1].toFixed(1));
+        halo.setAttribute("r", "9");
+        var circulos = svg.querySelectorAll(".grafico__ponto");
+        for (var i = 0; i < circulos.length; i += 1) {
+          circulos[i].dataset.ativo = i === k ? "true" : "false";
+          circulos[i].setAttribute("r", i === k ? "5.5" : "4");
+        }
+        if (rotuloFinal) {
+          if (k === pontos.length - 1) rotuloFinal.setAttribute("hidden", "");
+          else rotuloFinal.removeAttribute("hidden");
+        }
+        var va = variacaoAnual(serie, p[3]);
+        tipAno.textContent = String(anos[p[3]]);
+        tipValor.textContent = inteiroOuNulo(p[2]) + " matrículas";
+        if (va === null) tipVar.textContent = "Primeiro ano do recorte";
+        else tipVar.textContent = (va >= 0 ? "▲ +" : "▼ −") + numeroBR(1).format(Math.abs(va)) +
+          "% sobre " + anos[p[3] - 1];
+        tip.dataset.sinal = va === null ? "neutro" : va >= 0 ? "pos" : "neg";
+        posicionarTip(svg, tip, p);
+      }
+      function maisProximo(clientX) {
+        var r = svg.getBoundingClientRect();
+        var xUser = ((clientX - r.left) / r.width) * dim.W;
+        var melhor = 0, dist = Infinity;
+        for (var k = 0; k < pontos.length; k += 1) {
+          var d = Math.abs(pontos[k][0] - xUser);
+          if (d < dist) { dist = d; melhor = k; }
+        }
+        return melhor;
+      }
+      svg.addEventListener("pointermove", function (ev) { ativar(maisProximo(ev.clientX)); });
+      svg.addEventListener("pointerdown", function (ev) { ativar(maisProximo(ev.clientX)); });
+      svg.addEventListener("pointerleave", function (ev) { if (ev.pointerType === "mouse") limpar(svg, guia, halo, tip, rotuloFinal); });
+      svg.addEventListener("focus", function () { ativar(pontos.length - 1); });
+      svg.addEventListener("blur", function () { limpar(svg, guia, halo, tip, rotuloFinal); });
+      svg.addEventListener("keydown", function (ev) {
+        var k = ativoIdx < 0 ? pontos.length - 1 : ativoIdx;
+        if (ev.key === "ArrowRight" || ev.key === "ArrowDown") { ev.preventDefault(); ativar(Math.min(k + 1, pontos.length - 1)); }
+        else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") { ev.preventDefault(); ativar(Math.max(k - 1, 0)); }
+        else if (ev.key === "Home") { ev.preventDefault(); ativar(0); }
+        else if (ev.key === "End") { ev.preventDefault(); ativar(pontos.length - 1); }
+        else if (ev.key === "Escape") { ev.preventDefault(); limpar(svg, guia, halo, tip, rotuloFinal); }
+      });
+    }
+    desenhar();
+    var larguraAnterior = caixa.clientWidth;
+    var tRedesenho = null;
+    function reagendar() {
+      clearTimeout(tRedesenho);
+      tRedesenho = setTimeout(desenhar, 90);
+    }
+    if (window.ResizeObserver) {
+      var ro = new ResizeObserver(function () {
+        var l = caixa.clientWidth;
+        if (!l || Math.abs(l - larguraAnterior) < 2) return;
+        larguraAnterior = l;
+        reagendar();
+      });
+      ro.observe(caixa);
+    } else {
+      window.addEventListener("resize", function () {
+        clearTimeout(tRedesenho);
+        tRedesenho = setTimeout(desenhar, 120);
+      });
+    }
+  }
+
   global.Panorama = global.Panorama || {};
   global.Panorama.iniciar = iniciar;
   global.Panorama.registrar = registrar;

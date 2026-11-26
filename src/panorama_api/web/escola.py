@@ -21,6 +21,7 @@ Duas decisões moram neste módulo:
 
 from __future__ import annotations
 
+import json
 from typing import Any, Mapping, NamedTuple, Protocol, Sequence, TypeVar
 
 from markupsafe import Markup
@@ -65,7 +66,8 @@ from panorama_api.web.conteudo import (
     traduzir_aviso,
     traduzir_avisos,
 )
-from panorama_api.web.filters import SEM_DADO, fmt_nulo
+from panorama_api.web.filters import SEM_DADO, fmt_ano, fmt_nulo
+from panorama_api.web.mercado import barra_share
 
 #: Códigos INEP usados na classificação (os mesmos de `services/schools.py`).
 DEPENDENCIA_PRIVADA = "4"
@@ -244,7 +246,7 @@ def _motivo(flag: bool | None, nome_flag: str) -> str | None:
     return nome_flag if flag else None
 
 
-def _rotulo_dependencia(codigo: str | None) -> str:
+def rotulo_dependencia(codigo: str | None) -> str:
     """Leitura do código INEP de dependência (1 Federal … 4 Privada).
 
     Código ausente é "não informado" e código fora da tabela é "código não
@@ -256,7 +258,7 @@ def _rotulo_dependencia(codigo: str | None) -> str:
     return ROTULOS_DEPENDENCIA.get(codigo, ROTULO_NAO_RECONHECIDO)
 
 
-def _rotulo_situacao(codigo: str | None) -> str:
+def rotulo_situacao(codigo: str | None) -> str:
     """Leitura do código INEP de situação de funcionamento.
 
     Cada código tem seu texto (2 Paralisada e 3 Extinta não são o mesmo estado);
@@ -285,7 +287,25 @@ def serie_matriculas(items: Sequence[HistoryItem]) -> dict[str, Any]:
     template mostra "sem dado" em vez de um gráfico de zeros.
     """
     pontos = _pontos_da_serie(items)
-    return {"pontos": pontos, "svg": svg_serie(pontos)}
+    return {"pontos": pontos, "svg": svg_serie(pontos), "ilha": _ilha_serie(pontos)}
+
+
+def _ilha_serie(pontos: Sequence[dict[str, Any]]) -> Markup:
+    """Ilha JSON da série para hidratação no cliente (`static/app.js`).
+
+    ``{"anos": [...], "valores": [...]}`` com os números do SSR — ``null``
+    onde falta dado, nunca ``0``. O `app.js` lê a ilha por
+    ``JSON.parse(textContent)`` dentro da `section#serie` e desenha linha/área
+    com dica `aria-live`; sem ilha válida, ele usa a tabela SSR da seção.
+    O JSON nasce só de inteiros/`None` (`json.dumps`), então o ``Markup`` é
+    seguro sem escape adicional.
+    """
+    anos = [int(ponto["ano"]) for ponto in pontos]
+    valores = [
+        int(ponto["valor"]) if ponto["valor"] is not None else None
+        for ponto in pontos
+    ]
+    return Markup(json.dumps({"anos": anos, "valores": valores}))
 
 
 def _pontos_da_serie(items: Sequence[HistoryItem]) -> list[dict[str, Any]]:
@@ -308,7 +328,222 @@ def _pontos_da_serie(items: Sequence[HistoryItem]) -> list[dict[str, Any]]:
                 ),
             }
         )
+    _acrescentar_variacoes(pontos)
     return pontos
+
+
+def _acrescentar_variacoes(pontos: list[dict[str, Any]]) -> None:
+    """Variação ano a ano de cada ponto (card V2 `t_cbd54a92`).
+
+    Compara cada ano observado com o **ano observado anterior** (não o ano
+    anterior no calendário): uma lacuna no meio da série não transforma a
+    variação seguinte numa taxa contra zero. Sem ano anterior observado, ou com
+    base zero, a variação é ``None`` — nunca ``0`` nem ``100%`` inventado.
+    """
+    anterior: int | None = None
+    for ponto in pontos:
+        valor = ponto["valor"]
+        if valor is None or anterior is None or not anterior:
+            ponto["variacao"] = None
+        else:
+            ponto["variacao"] = (valor - anterior) / anterior * 100
+        if valor is not None:
+            anterior = valor
+
+
+# -- ficha consolidada (V2 `t_cbd54a92`): KPIs, posição e ranking municipal ---
+
+
+def texto_variacao(pct: float | None) -> str:
+    """Variação anual com sinal tipográfico; ausência continua ``sem dado``."""
+    if pct is None:
+        return SEM_DADO
+    return f"{'+' if pct >= 0 else '−'}{fmt_nulo(abs(pct))}%"
+
+
+def _classe_variacao(pct: float | None) -> str:
+    """Classe de cor do valor: ``var-pos``/``var-neg``; vazio quando sem dado."""
+    if pct is None:
+        return ""
+    return "var-pos" if pct >= 0 else "var-neg"
+
+
+def total_privadas_ativas(competicao: Competicao | None) -> int | None:
+    """Privadas ativas do município/ano contando a própria escola.
+
+    `n_concorrentes_privados_municipio` exclui esta escola; a posição ("de N
+    escolas privadas ativas") conta todas. ``None`` quando a base não traz a
+    contagem — nunca ``1`` por suposição.
+    """
+    if competicao is None or competicao.n_concorrentes_privados_municipio is None:
+        return None
+    return competicao.n_concorrentes_privados_municipio + 1
+
+
+def kpis_da_escola(
+    *,
+    recente: HistoryItem | None,
+    item: IndicatorItem | None,
+    competicao: Competicao | None,
+) -> list[dict[str, Any]]:
+    """Os quatro KPIs do topo da ficha (card V2 `t_cbd54a92`).
+
+    Matrícula BAS do ano recente, variação anual, posição municipal por
+    matrícula e o gap para o líder. Cada número sai da resposta de indicadores
+    quando ela existe; a matrícula cai na série (`history`) quando não há linha
+    na mart. Ausência é sempre ``sem dado``, nunca ``0``.
+    """
+    ano = getattr(recente, "nu_ano_censo", None)
+    qt_mat = (
+        getattr(item, "qt_mat_bas", None)
+        if item is not None
+        else getattr(recente, "qt_mat_bas", None)
+    )
+    prev = getattr(item, "prev_qt_mat_bas", None) if item is not None else None
+    variacao = getattr(item, "crescimento_yoy_pct", None) if item is not None else None
+    if variacao is None and qt_mat is not None and prev:
+        variacao = (qt_mat - prev) / prev * 100
+
+    rank = competicao.rank_mat_bas_municipio if competicao is not None else None
+    total = total_privadas_ativas(competicao)
+    gap = competicao.gap_mat_bas_para_lider if competicao is not None else None
+    lider = competicao.lider_no_entidade if competicao is not None else None
+    lider_mat = competicao.lider_qt_mat_bas if competicao is not None else None
+
+    if gap is None:
+        nota_gap = SEM_DADO
+    elif gap == 0:
+        nota_gap = "a escola é a maior do município"
+    elif lider:
+        nota_gap = f"matrículas atrás de {lider}"
+        if lider_mat is not None:
+            nota_gap += f" ({fmt_nulo(lider_mat)} matrículas)"
+    else:
+        nota_gap = "escola líder do município sem nome publicado"
+
+    return [
+        {
+            "rotulo": f"Matrícula {fmt_ano(ano)}",
+            "valor": fmt_nulo(qt_mat),
+            "classe": "",
+            "nota": "educação básica · total oficial do Censo",
+        },
+        {
+            "rotulo": "Variação anual",
+            "valor": texto_variacao(variacao),
+            "classe": _classe_variacao(variacao),
+            "nota": (
+                f"matrícula vs. {fmt_ano(ano - 1)}"
+                if variacao is not None and ano is not None
+                else "sem ano anterior observado para comparar"
+            ),
+        },
+        {
+            "rotulo": "Posição no município",
+            "valor": f"{rank}.º" if rank is not None else SEM_DADO,
+            "classe": "",
+            "nota": (
+                f"de {total} escolas privadas ativas"
+                if total is not None
+                else "sem comparação municipal para este ano"
+            ),
+        },
+        {
+            "rotulo": "Gap para o líder",
+            "valor": "lidera" if gap == 0 else fmt_nulo(gap),
+            "classe": "",
+            "nota": nota_gap,
+        },
+    ]
+
+
+def posicao_crescimento(
+    *, item: IndicatorItem | None, total: int | None
+) -> dict[str, Any]:
+    """Posições por **crescimento** (município e MG) para a lista de posição.
+
+    `rank_crec_*` é posição por crescimento anual da matrícula, não por
+    matrícula nem de creche (`conteudo.ROTULO_POSICAO_CRESCIMENTO_*`).
+    """
+    return {
+        "municipio": {
+            "rank": getattr(item, "rank_crec_municipio", None),
+            "total": total,
+        },
+        "mg": {"rank": getattr(item, "rank_crec_mg", None), "total": None},
+    }
+
+
+def ranking_municipal(
+    *,
+    cabecalho: Mapping[str, Any],
+    item: IndicatorItem | None,
+    competicao: Competicao | None,
+) -> dict[str, Any]:
+    """Ranking municipal por matrícula reduzido à **própria escola**.
+
+    `mart_competidores` publica contagens e a posição da escola, mas **não** a
+    lista nominal de concorrentes (ver `schemas/competitors.py`). Por isso o
+    `<ul class="ranking">` traz só a linha desta escola, com a posição, o nome
+    (link para a ficha) e a matrícula; a lista completa vive no ranking de share
+    do mercado (`/app/mercados/{co}/escolas`), que é quem consulta
+    `mart_market_share`. Inventar as demais linhas não é uma opção.
+    """
+    rank = competicao.rank_mat_bas_municipio if competicao is not None else None
+    qt_mat = (
+        getattr(item, "qt_mat_bas", None)
+        if item is not None
+        else None
+    )
+    share = getattr(item, "share_privado_pct", None) if item is not None else None
+    linhas: list[dict[str, Any]] = []
+    if rank is not None or qt_mat is not None:
+        linhas.append(
+            {
+                "posicao": rank,
+                "id_entidade": cabecalho["co_entidade"],
+                "no_entidade": cabecalho.get("no_entidade"),
+                "matricula": qt_mat,
+                "share_privado_pct": share,
+                "barra": barra_share(share),
+                "destaque": True,
+            }
+        )
+    return {
+        "linhas": linhas,
+        "total": total_privadas_ativas(competicao),
+        "co_municipio": cabecalho.get("co_municipio"),
+    }
+
+
+def contexto_concorrencia_na_ficha(
+    *,
+    item: IndicatorItem | None,
+    competicao: Competicao | None,
+    cabecalho: Mapping[str, Any],
+    aviso_abaixo_porte: bool,
+) -> dict[str, Any]:
+    """Bloco ``#concorrencia`` da ficha: posição por crescimento e ranking."""
+    total = total_privadas_ativas(competicao)
+    return {
+        "indicador": item,
+        "competicao": competicao,
+        "posicao": posicao_crescimento(item=item, total=total),
+        "rotulo_posicao_municipio": ROTULO_POSICAO_CRESCIMENTO_MUNICIPIO,
+        "rotulo_posicao_mg": ROTULO_POSICAO_CRESCIMENTO_MG,
+        "ranking": ranking_municipal(
+            cabecalho=cabecalho, item=item, competicao=competicao
+        ),
+        "definicao_concorrencia": DEFINICAO_CONCORRENCIA,
+        "aviso_abaixo_porte": aviso_abaixo_porte,
+        "texto_abaixo_porte": EXPLICACAO_ABAIXO_PORTE,
+        "motivo_sem_comparacao": (
+            None
+            if competicao is not None
+            else MOTIVO_SECAO_COMPETIDORES
+        ),
+    }
+
 
 
 def _valor_bruto(valor: int) -> str:
@@ -602,19 +837,20 @@ def itens_subnav(
     ativo: str,
     mostra_concorrencia: bool,
 ) -> list[dict[str, Any]]:
-    """Itens do subnav de seções da ficha — macro única, sem JS (spec §2.2).
+    """Itens do subnav de seções da ficha — âncoras na **mesma** página (V2).
 
-    "Indicadores e concorrência" só entra quando a seção existe para a escola
-    (`mostra_concorrencia`); o link de saída para o mercado acompanha o
-    município. A mesma lista serve a Visão geral, a rota de concorrência e, no
-    NAV-3, o mercado.
+    A ficha e os indicadores viraram uma única página (card V2 `t_cbd54a92`):
+    o subnav aponta para as âncoras internas ``#resumo`` e ``#concorrencia`` em
+    vez de rotas separadas. "Indicadores e concorrência" só entra quando a seção
+    existe para a escola (`mostra_concorrencia`); o link de saída para o mercado
+    acompanha o município. ``ativo`` é mantido por compatibilidade da assinatura
+    (as duas âncoras vivem na mesma tela).
     """
-    visao_geral = f"{PREFIXO_WEB}/escolas/{cabecalho['co_entidade']}"
     itens: list[dict[str, Any]] = [
         {
             "rotulo": ROTULO_VISAO_GERAL,
-            "href": visao_geral,
-            "ativo": ativo == VISAO_GERAL,
+            "href": "#resumo",
+            "ativo": True,
             "classe": "",
         }
     ]
@@ -622,8 +858,8 @@ def itens_subnav(
         itens.append(
             {
                 "rotulo": TITULO_SECAO_CONCORRENCIA,
-                "href": f"{visao_geral}/concorrencia",
-                "ativo": ativo == CONCORRENCIA,
+                "href": "#concorrencia",
+                "ativo": False,
                 "classe": "",
             }
         )
@@ -676,10 +912,10 @@ def contexto_visao_geral(*, historico: HistoryResponse) -> dict[str, Any]:
         "recente": recente,
         "ano_inicial": min((item.nu_ano_censo for item in itens), default=None),
         "dependencia_rotulo": (
-            _rotulo_dependencia(recente.tp_dependencia) if recente else None
+            rotulo_dependencia(recente.tp_dependencia) if recente else None
         ),
         "situacao_rotulo": (
-            _rotulo_situacao(recente.tp_situacao_funcionamento) if recente else None
+            rotulo_situacao(recente.tp_situacao_funcionamento) if recente else None
         ),
         "serie": serie_matriculas(itens),
         "etapas": etapas_do_ano(recente) if recente is not None else [],
@@ -979,10 +1215,10 @@ def _escola_unica(historico: HistoryResponse) -> dict[str, Any]:
         "itens": itens,
         "serie": serie_matriculas(itens),
         "dependencia_rotulo": (
-            _rotulo_dependencia(recente.tp_dependencia) if recente is not None else None
+            rotulo_dependencia(recente.tp_dependencia) if recente is not None else None
         ),
         "situacao_rotulo": (
-            _rotulo_situacao(recente.tp_situacao_funcionamento)
+            rotulo_situacao(recente.tp_situacao_funcionamento)
             if recente is not None
             else None
         ),
@@ -1049,13 +1285,21 @@ __all__ = [
     "VISAO_GERAL",
     "contexto_comparacao",
     "contexto_concorrencia",
+    "contexto_concorrencia_na_ficha",
     "contexto_concorrencia_nao_se_aplica",
     "contexto_visao_geral",
     "etapas_comparadas",
     "item_mais_recente",
     "itens_subnav",
+    "kpis_da_escola",
     "motivo_concorrencia_nao_se_aplica",
     "pertence_ao_universo_privado",
+    "posicao_crescimento",
+    "ranking_municipal",
+    "rotulo_dependencia",
+    "rotulo_situacao",
     "serie_comparada",
+    "texto_variacao",
+    "total_privadas_ativas",
     "svg_serie_comparada",
 ]

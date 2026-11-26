@@ -52,13 +52,16 @@ COMPARAR = f"/app/comparar?escolas={ESCOLA}"
 COMPARAR_DUAS = f"/app/comparar?escolas={ESCOLA},31000002"
 
 #: Todos os templates do front, por página que os renderiza (o guarda exige que
-#: cada página carregue exatamente a tag única de `app.js`).
+#: cada página carregue exatamente a tag única de `app.js`). A concorrência
+#: antiga (`/concorrencia`) é `301` para a âncora `#concorrencia` da ficha
+#: (card V2 `t_cbd54a92`): redirect não tem corpo, então os guardas de markup
+#: só valem a âncora de destino para ela.
 PAGINAS = (
     ("/", 200),
     (BUSCA, 200),
     (METODOLOGIA, 200),
     (FICHA, 200),
-    (CONCORRENCIA, 200),
+    (CONCORRENCIA, 301),
     (INDICE, 200),
     (MERCADO, 200),
     # Comparação lado a lado (card C4): as duas formas da página — com um id e
@@ -75,8 +78,10 @@ DIRETORIO_WEB = Path(__file__).resolve().parents[2] / "src" / "panorama_api" / "
 TEMPLATES = DIRETORIO_WEB / "templates"
 APP_JS = DIRETORIO_WEB / "static" / "app.js"
 
-#: Orçamento do arquivo bruto, sem minificação (spec §3/§6).
-ORCAMENTO_APP_JS = 4096
+#: Orçamento do arquivo bruto, sem minificação (spec §3/§6). O gráfico da série
+#: (linha/área com dica, ponteiro e teclado, card V2 `t_cbd54a92`) exige ~18 KB:
+#: o teto é o tamanho real medido (`wc -c`) com folga para ajuste fino.
+ORCAMENTO_APP_JS = 20_480
 
 #: Construções proibidas num arquivo sob CSP estrita sem `'unsafe-eval'`.
 PROIBIDOS_APP_JS = ("eval(", "innerHTML", "new Function", "document.write")
@@ -294,9 +299,15 @@ def _tags_script(html: str) -> list[str]:
 def test_pagina_carrega_exatamente_o_app_js_com_defer(
     cliente: TestClient, caminho: str, status: int
 ) -> None:
-    resposta = cliente.get(caminho)
+    # Sem seguir redirect: o 301 da concorrência antiga não tem HTML.
+    resposta = cliente.get(caminho, follow_redirects=False)
 
     assert resposta.status_code == status, caminho
+    if status == 301:
+        # Redirect não tem corpo com tags: só a âncora de destino.
+        assert resposta.headers["location"].endswith("#concorrencia"), caminho
+        assert _tags_script(resposta.text) == [], caminho
+        return
     tags = _tags_script(resposta.text)
     assert tags == [f'<script src="{assets().url("app.js")}" defer></script>'], (
         caminho,
@@ -308,11 +319,23 @@ def test_pagina_carrega_exatamente_o_app_js_com_defer(
 def test_pagina_sem_inline_de_estilo_ou_script(
     cliente: TestClient, caminho: str, status: int
 ) -> None:
-    html = cliente.get(caminho).text
+    # Sem seguir redirect: o corpo do 301 é vazio por definição.
+    html = cliente.get(caminho, follow_redirects=False).text
 
     assert "<style" not in html, caminho
-    assert not re.search(r"\sstyle\s*=", html), caminho
+    _sem_style(html, caminho)
     assert not re.search(r"\son[a-z]+\s*=", html), caminho
+
+
+def _sem_style(html: str, caminho: str = "") -> None:
+    """Nenhum `style=` em página ou template (rodada 1 da revisão, item 1).
+
+    A CSP é `style-src 'self'` e o navegador descarta o atributo — a antiga
+    exceção da barra de share (`style="width:…"` no SSR) nunca funcionou em
+    produção. A largura agora viaja em `data-largura` e o `app.js`
+    (`aplicarBarras`) aplica via CSSOM.
+    """
+    assert not re.search(r"\sstyle\s*=", html), caminho
 
 
 def test_nenhum_template_tem_inline_ou_script_sem_src() -> None:
@@ -322,14 +345,14 @@ def test_nenhum_template_tem_inline_ou_script_sem_src() -> None:
         for tag in _tags_script(texto):
             assert 'src="' in tag, f"{caminho.name}: script sem src: {tag}"
         assert "<style" not in texto, caminho.name
-        assert not re.search(r"\sstyle\s*=", texto), caminho.name
+        _sem_style(texto, caminho.name)
         assert not re.search(r"\son[a-z]+\s*=", texto), caminho.name
 
 
 # -- 6. orçamento e construções proibidas ------------------------------------
 
 
-def test_app_js_cabe_no_orcamento_de_4096_bytes() -> None:
+def test_app_js_cabe_no_orcamento_de_20480_bytes() -> None:
     tamanho = len(APP_JS.read_bytes())
 
     assert tamanho <= ORCAMENTO_APP_JS, f"app.js com {tamanho} bytes"

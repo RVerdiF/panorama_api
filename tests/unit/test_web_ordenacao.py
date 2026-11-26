@@ -7,8 +7,9 @@ evidência de navegador anexada ao card, porque o CI é Python (spec §9).
 O que fica travado aqui, sobre o HTML renderizado de verdade (``TestClient`` +
 repositório fake):
 
-* só **T5** (mercado, composição por etapa), **T3** (ficha, rendimento por ano)
-  e **T2** (ficha, oferta e matrícula por etapa) têm `data-ordenavel`;
+* só **T5** (mercado, composição por etapa) e **T3** (ficha, rendimento por ano)
+  têm `data-ordenavel` — a oferta por etapa é o `div.grupos-oferta` do
+  protótipo (rodada 1 da revisão, item 5), sem tabela e sem ordenação;
 * as colunas ordenáveis têm `data-tipo="numero"` e cada célula delas carrega
   `data-valor` com o valor **bruto** (ponto decimal), nunca o texto formatado
   (`1.234,5` não é número em JavaScript);
@@ -52,12 +53,12 @@ ANOS = (2021, 2022, 2023, 2024, 2025)
 #: tabela no HTML — nenhum teste depende da posição dela na página.
 LEGENDA_T5 = "Tamanho do mercado por etapa"
 LEGENDA_T3 = "Rendimento escolar por ano censitário"
-LEGENDA_T2 = "Oferta por etapa e matrícula observada"
 
 #: Tabelas fora da lista do card (rejeitadas na spec §2): não ordenam.
+#: A tabela de concorrentes por etapa saiu no card V2 `t_cbd54a92` (a ficha
+#: passou a mostrar KPIs, posição e ranking em vez da lista por etapa).
 LEGENDAS_SEM_ORDENACAO = (
     "Série de matrículas por ano censitário",  # T1
-    "Concorrentes privadas com matrícula observada por etapa",  # T4
     "Cobertura de matrícula na etapa",  # T6
     "Movimento de escolas na etapa",  # T7
 )
@@ -295,37 +296,34 @@ def test_t3_cada_celula_tem_o_valor_bruto_e_ausencia_vazia(ficha: str) -> None:
     assert celulas[2][2] == "88,0%"
 
 
-# -- T2: ficha, oferta e matrícula por etapa ---------------------------------
+# -- oferta: grupos do protótipo, sem tabela e sem ordenação ------------------
 
 
-def test_t2_ordena_so_a_matricula_e_respeita_os_grupos(ficha: str) -> None:
-    atributos, corpo = _tabela(ficha, LEGENDA_T2)
+def test_oferta_usa_os_grupos_do_prototipo(ficha: str) -> None:
+    """Oferta por etapa é `div.grupos-oferta`, não tabela (revisão, item 5).
 
-    assert "data-ordenavel" in atributos
-    assert '<th scope="col" data-tipo="numero">Matrícula</th>' in corpo
-    # Oferta é tri-estado: não ordena.
-    assert '<th scope="col">Oferta</th>' in corpo
-    assert "aria-sort" not in corpo
+    Três grupos (total oficial, etapas que somam, modalidades que não somam);
+    o total traz a matrícula e cada etapa traz o estado da oferta em
+    `data-estado` — o `celulaOferta` do `app.js` do protótipo, em SSR.
+    """
+    assert 'class="grupos-oferta"' in ficha
+    assert ficha.count("grupo-oferta__titulo") == 3
+    # Total oficial do ano de referência, com separador de milhar.
+    assert "1.320" in ficha
+    secao = ficha.split('id="oferta"')[1].split("</section>")[0]
+    # Nada de tabela ordenável na oferta: sem `th`, sem `aria-sort`.
+    assert "<table" not in secao
+    assert "data-ordenavel" not in secao
+    assert "aria-sort" not in secao
 
-    # Ordem canônica de etapa: nenhum `aria-sort` inicial, mas toda linha de
-    # grupo é `data-fixa`, assim como a linha do total oficial.
-    assert corpo.count('class="grupo-etapas" data-fixa') == 3
-    _tr_total, celulas = _linha_de(_linhas(corpo), "Educação básica (total)")
-    assert celulas[2][2] == "1.320"
-    assert re.search(r'<tr data-fixa>\s*<th scope="row">Educação básica', corpo)
 
+def test_oferta_marca_o_estado_tri_estado_por_etapa(ficha: str) -> None:
+    """Cada etapa carrega `sim` no `data-estado` (fixture toda ofertada)."""
+    secao = ficha.split('id="oferta"')[1].split("</section>")[0]
 
-def test_t2_guarda_o_valor_bruto_e_a_ausencia_vazia(ficha: str) -> None:
-    _atributos, corpo = _tabela(ficha, LEGENDA_T2)
-    linhas = _linhas(corpo)
-
-    _tr, celulas = _linha_de(linhas, "Creche")
-    assert celulas[2][2] == "40"
-    assert 'data-valor="40"' in celulas[2][1]
-
-    # 2024 tem creche sem dado (flag de origem), 2025 tem 40: o último item da
-    # série é o que a tabela de oferta mostra — a ausência não virou zero.
-    assert "sem dado" not in celulas[2][2]
+    assert secao.count('data-estado="sim"') == 8
+    assert 'data-estado="nao"' not in secao
+    assert 'data-estado="desconhecido"' not in secao
 
 
 # -- fora da lista: nenhuma tabela paginada ou natural ordena ----------------
@@ -342,10 +340,12 @@ def test_tabelas_fora_da_lista_nao_tem_data_ordenavel(paginas: dict[str, str]) -
         assert "data-ordenavel" not in paginas[pagina], pagina
 
 
-def test_so_as_tres_tabelas_do_card_ordenam(paginas: dict[str, str]) -> None:
+def test_so_as_tabelas_do_card_ordenam(paginas: dict[str, str]) -> None:
     assert paginas["mercado"].count("data-ordenavel") == 1
-    assert paginas["ficha"].count("data-ordenavel") == 2
-    assert paginas["concorrencia"].count("data-ordenavel") == 0
+    assert paginas["ficha"].count("data-ordenavel") == 1
+    # `/concorrencia` é `301` para a ficha (card V2): o corpo é o mesmo, com a
+    # mesma tabela ordenável (rendimento; a oferta virou grupos do protótipo).
+    assert paginas["concorrencia"].count("data-ordenavel") == 1
     assert paginas["ranking"].count("data-ordenavel") == 0
     assert paginas["busca"].count("data-ordenavel") == 0
 

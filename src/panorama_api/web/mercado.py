@@ -7,15 +7,16 @@ devolve o contexto do template. Nenhum acesso a dado — quem consulta é
 Duas rotas, uma consulta cara cada (spec §5.3):
 
 * `/app/mercados/{co_municipio}` — **Visão geral**: tamanho, composição,
-  cobertura e entrada/saída. Consulta só `dados.mercado` (3 consultas,
-  ~63,7 MB).
+  cobertura e entrada/saída. Consulta `dados.mercado` mais o top-10 do share
+  (`dados.share_mercado` com `limit=10`, na etapa do recorte) para a tabela do
+  painel "Escolas do mercado por share" (card V2 `t_cbd54a92`, rodada 1,
+  item 2); a lista completa e paginada continua na rota abaixo.
 * `/app/mercados/{co_municipio}/escolas` — **Escolas do mercado**: o ranking de
   share paginado. Consulta só `dados.share_mercado` (3 consultas, ~203,5 MB).
 
-O ranking saiu da abertura porque era a consulta mais cara do produto
-(`mart_market_share` ≈ 181 MB): antes, toda abertura, troca de etapa ou página
-do ranking custava 6 consultas / ~267 MB. Agora a abertura custa 3 / 63,7 MB e
-cada página do ranking 3 / 203,5 MB, sem recomputar a composição.
+O ranking saiu da abertura no card NAV-3 (a consulta `mart_market_share` é
+cara: ~181 MB) e voltou como top-10 no card V2, por exigência da especificação
+do protótipo; a paginação completa continua fora da abertura.
 
 Decisões que moram neste módulo:
 
@@ -53,6 +54,8 @@ from panorama_api.web.conteudo import (
     rotulo_etapa,
     traduzir_aviso,
 )
+
+from panorama_api.web.filters import SEM_DADO, fmt_ano, fmt_contagem, fmt_nulo
 
 #: Identificador de cada seção do mercado no subnav (spec §2.2).
 VISAO_GERAL = "visao_geral"
@@ -153,38 +156,34 @@ def _item_da_etapa(items: Sequence[MarketItem], etapa: str) -> MarketItem | None
     return next((item for item in items if item.etapa == etapa), None)
 
 
-def _formatar_largura(valor: float) -> str:
-    """Largura do `<rect>`: determinística, sem zeros à direita e sem expoente.
-
-    ``37.5`` → ``37.5``, ``100.0`` → ``100``, ``0.0834`` → ``0.0834``. Quatro
-    casas bastam para o share (o menor passo do contrato é 0,0001 p.p.) e
-    evitam a notação científica que ``str(float)`` produziria para valores
-    ínfimos — o atributo só aceita número decimal.
-    """
-    return f"{valor:.4f}".rstrip("0").rstrip(".")
-
-
 def barra_share(pct: float | None) -> Markup | None:
-    """Barra decorativa do share em matrícula privada (SVG inline, sem JS).
+    """Barra decorativa do share em matrícula privada (CSS do protótipo).
 
-    Devolve ``None`` quando **não há share** (``None``, ``NaN``, ``inf``): a
-    ausência nunca vira zero (AGENTS.md §6) — a célula fica só com o número
-    "sem dado". Valor fora de 0..100 é limitado à faixa, porque a barra é uma
-    leitura visual e não pode estourar o `viewBox`.
+    Devolve o trilho com o preenchimento em ``data-largura="X%"`` — o
+    percentual real, saturado em 0..100 com uma casa (par do protótipo) — ou
+    ``None`` quando **não há share** (``None``, ``NaN``, ``inf``): a ausência
+    nunca vira zero (AGENTS.md §6) — a célula fica só com o número
+    "sem dado".
 
-    O SVG é ``aria-hidden``/``focusable="false"``: o número em texto na célula
-    continua sendo a leitura acessível, a barra não duplica a informação.
+    Sem ``style=`` de propósito: a CSP é `style-src 'self'` (sem
+    `'unsafe-inline'`) e o navegador descarta o atributo — a barra nunca
+    ganhava largura em produção (rodada 1 da revisão, item 1). A largura é
+    aplicada pelo `app.js` (`data-largura` → CSSOM, que a CSP permite); sem
+    JS, o número ao lado continua legível e a barra fica vazia — nunca
+    errada.
+
+    O trilho não carrega texto: a leitura acessível é o número ao lado
+    (`.barra-share__valor` no ranking, o `<td>` na tabela do mercado).
     Nada externo é interpolado além do número já limitado — por isso o
-    ``Markup`` pode ser usado sem abrir escape no template. Sem ``xmlns``: o SVG
-    é inline no HTML, onde o namespace já é o do documento (e o atributo
-    custaria ~38 B em cada linha do ranking).
+    ``Markup`` pode ser usado sem abrir escape no template.
     """
     if pct is None or not math.isfinite(pct):
         return None
-    largura = _formatar_largura(min(max(float(pct), 0.0), 100.0))
+    largura = f"{min(max(float(pct), 0.0), 100.0):.1f}"
     return Markup(
-        '<svg class="barra-share" viewBox="0 0 100 8" aria-hidden="true" '
-        f'focusable="false"><rect width="{largura}" height="8"/></svg>'
+        '<span class="barra-share__trilho">'
+        f'<span class="barra-share__preenche" data-largura="{largura}%"></span>'
+        "</span>"
     )
 
 
@@ -205,6 +204,53 @@ def _linhas_share(share: ShareResponse) -> list[dict[str, Any]]:
             "barra_share": barra_share(item.share_privado_pct),
         }
         for indice, item in enumerate(share.data.items)
+    ]
+
+
+def kpis_mercado(
+    *, denominadores: dict[str, Any], ano: int | None
+) -> list[dict[str, Any]]:
+    """Os quatro KPIs do topo do mercado (card V2 `t_cbd54a92`).
+
+    Matrícula privada, escolas privadas ativas, cobertura privada
+    (`qt_mat_privada / qt_mat_total`) e a variação anual. A tela cobre **um**
+    ano (a composição é por etapa, não por ano), então não há ano anterior no
+    próprio recorte para a variação: ela sai como ``sem dado`` com o motivo —
+    nunca ``0`` nem um número de outro recorte.
+    """
+    priv = denominadores.get("qt_mat_privada")
+    total = denominadores.get("qt_mat_total")
+    cobertura = (priv / total * 100) if priv is not None and total else None
+    return [
+        {
+            "rotulo": f"Matrícula privada {fmt_ano(ano)}",
+            "valor": fmt_contagem(priv),
+            "classe": "",
+            "nota": "soma das escolas privadas ativas do recorte",
+        },
+        {
+            "rotulo": "Escolas privadas ativas",
+            "valor": fmt_contagem(denominadores.get("n_escolas_privadas")),
+            "classe": "",
+            "nota": "no município e no ano",
+        },
+        {
+            "rotulo": "Cobertura privada",
+            "valor": (
+                f"{fmt_nulo(cobertura)}%" if cobertura is not None else SEM_DADO
+            ),
+            "classe": "",
+            "nota": "matrícula privada sobre a matrícula total do município",
+        },
+        {
+            "rotulo": "Variação anual",
+            "valor": SEM_DADO,
+            "classe": "",
+            "nota": (
+                "o recorte desta tela é de um único ano — sem ano anterior "
+                "para comparar"
+            ),
+        },
     ]
 
 
@@ -323,6 +369,22 @@ def contexto_escolas_mercado(
     }
 
 
+def contexto_share_visao_geral(
+    *, share: ShareResponse
+) -> dict[str, Any]:
+    """As 10 primeiras linhas do share para a **Visão geral** (card V2).
+
+    A mesma leitura de `_linhas_share` do ranking (posição, nome com link da
+    ficha, matrícula e share privado com barra), limitada à consulta da rota
+    (`limit=10`, primeira página). A lista completa e paginada continua em
+    `/app/mercados/{co}/escolas`.
+    """
+    return {
+        "linhas_share": _linhas_share(share),
+        "texto_abaixo_porte": TEXTO_ABAIXO_PORTE,
+    }
+
+
 __all__ = [
     "COBERTURA",
     "ESCOLAS",
@@ -331,6 +393,8 @@ __all__ = [
     "VISAO_GERAL",
     "barra_share",
     "contexto_escolas_mercado",
+    "contexto_share_visao_geral",
     "contexto_visao_geral",
     "itens_subnav",
+    "kpis_mercado",
 ]

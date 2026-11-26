@@ -39,7 +39,10 @@
 
   {% if duas %}
   {% if aviso_municipios %}
-  <p class="aviso">{{ aviso_municipios }}</p>
+  <div class="aviso">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+    <p>{{ aviso_municipios }}</p>
+  </div>
   {% endif %}
 
   <section class="painel painel--inicial" aria-labelledby="escolas-comparadas">
@@ -160,7 +163,7 @@
       </table>
     </div>
     {% elif motivo_sem_ano_comum %}
-    <p class="sem-dado">sem dado — {{ motivo_sem_ano_comum }}</p>
+    <div class="nota-metodo"><p><strong>sem dado</strong> — {{ motivo_sem_ano_comum }}</p></div>
     {% endif %}
   </section>
 
@@ -326,13 +329,20 @@
       </table>
     </div>
     {% if resultados_tem_mais %}
-    <p class="aviso">
-      Há mais escolas do que as listadas. Refine a busca — um nome mais
-      específico — para ver outras.
-    </p>
+    <div class="aviso">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <p>
+        Há mais escolas do que as listadas. Refine a busca — um nome mais
+        específico — para ver outras.
+      </p>
+    </div>
     {% endif %}
     {% else %}
-    <p class="sem-dado">Nenhuma escola encontrada para esta busca.</p>
+    <div class="estado-vazio">
+      <svg class="estado-vazio__icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <h3>Nenhuma escola encontrada para esta busca.</h3>
+      <p>Ajuste o termo da busca para escolher a segunda escola.</p>
+    </div>
     {% endif %}
     {% endif %}
   </section>

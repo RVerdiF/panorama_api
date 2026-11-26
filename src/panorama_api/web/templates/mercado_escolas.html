@@ -34,10 +34,13 @@
   {% if sem_dados_ano %}
   <section aria-labelledby="sem-dados-ano" class="painel painel--erro">
     <h2 id="sem-dados-ano">{{ pagina_erro_titulo }}</h2>
-    <p class="aviso aviso--temporario">
-      {{ detalhe }} — o recorte escolhido não está publicado. Selecione outro ano
-      ou etapa acima; nada foi exibido parcialmente.
-    </p>
+    <div class="aviso aviso--temporario">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <p>
+        {{ detalhe }} — o recorte escolhido não está publicado. Selecione outro ano
+        ou etapa acima; nada foi exibido parcialmente.
+      </p>
+    </div>
     <p class="nota">Código de erro <code>{{ codigo }}</code>.</p>
   </section>
   {% else %}
@@ -51,19 +54,22 @@
       </p>
     </div>
 
-    <p class="aviso">
-      Escola ausente desta tabela <strong>não</strong> tem 0% de share: a
-      ausência significa matrícula não observada para a etapa. Share nulo
-      aparece como <em>sem dado</em>.
-    </p>
+    <div class="aviso">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <p>
+        Escola ausente desta tabela <strong>não</strong> tem 0% de share: a
+        ausência significa matrícula não observada para a etapa. Share nulo
+        aparece como <em>sem dado</em>.
+      </p>
+    </div>
 
     {% if alem_do_fim %}
-    <p class="sem-dado">{{ motivo_alem_do_fim }}</p>
+    <div class="nota-metodo"><p><strong>sem dado</strong> — {{ motivo_alem_do_fim }}</p></div>
     <p>
       <a class="paginacao__link" href="{{ url_primeira_pagina }}">Voltar à primeira página</a>
     </p>
     {% elif sem_privadas %}
-    <p class="sem-dado">{{ motivo_sem_privadas }}.</p>
+    <div class="nota-metodo"><p><strong>sem dado</strong> — {{ motivo_sem_privadas }}.</p></div>
     {% else %}
     <p class="paginacao__contagem">Mostrando {{ paginacao.mostrando }}.</p>
     <div class="tabela-rolavel" role="region" aria-label="Share de matrícula por escola (tabela com rolagem)" tabindex="0">
@@ -98,8 +104,8 @@
             <td><code>{{ linha.id_entidade }}</code></td>
             <td>{{ linha.mat_entidade | fmt_contagem }}</td>
             <td>{# O número é a leitura acessível da célula; a barra ao lado é
-                  decorativa (SVG `aria-hidden`) e só existe quando há share —
-                  `sem dado` não ganha barra nem vira zero. #}{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}{% if linha.barra_share %}{{ linha.barra_share }}{% endif %}</td>
+                  decorativa (só trilho/preenche, sem texto) e só existe quando
+                  há share — `sem dado` não ganha barra nem vira zero. #}{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}{% if linha.barra_share %}{{ linha.barra_share }}{% endif %}</td>
             <td>{{ linha.share_total_pct | fmt_nulo }}{% if linha.share_total_pct is not none %}%{% endif %}</td>
           </tr>
           {% endfor %}
@@ -116,9 +122,12 @@
       {% endif %}
     </nav>
     {% if paginacao.refinar %}
-    <p class="aviso">
-      Limite de paginação atingido. Escolha outra etapa para continuar a leitura.
-    </p>
+    <div class="aviso">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <p>
+        Limite de paginação atingido. Escolha outra etapa para continuar a leitura.
+      </p>
+    </div>
     {% endif %}
     {% endif %}
   </section>

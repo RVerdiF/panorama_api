@@ -10,12 +10,18 @@
     <p class="subtitulo">{{ detalhe }}</p>
 
     {% if retry_after %}
-    <p class="aviso aviso--temporario">
-      Tente novamente em alguns minutos (nova tentativa sugerida em {{ retry_after }} segundos).
-      Nada foi exibido parcialmente: a página inteira é recarregada quando a fonte voltar.
-    </p>
+    <div class="aviso aviso--temporario">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <p>
+        Tente novamente em alguns minutos (nova tentativa sugerida em {{ retry_after }} segundos).
+        Nada foi exibido parcialmente: a página inteira é recarregada quando a fonte voltar.
+      </p>
+    </div>
     {% elif sugestao %}
-    <p class="aviso">{{ sugestao }}</p>
+    <div class="aviso">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+      <p>{{ sugestao }}</p>
+    </div>
     {% endif %}
 
     {% if acao %}

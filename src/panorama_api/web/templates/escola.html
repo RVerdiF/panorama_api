@@ -1,25 +1,32 @@
 {% extends "base.html" %}
 {% from "partials/cabecalho_escola.html" import cabecalho_escola with context %}
-{% from "partials/macros.html" import recorte, bloco_nao_se_aplica with context %}
 {% from "partials/subnav.html" import subnav with context %}
 
 {% block titulo %}{{ escola.no_entidade or "Escola " ~ escola.co_entidade }} — Panorama Escola{% endblock %}
 
-{# A nota de ausência do rodapé fala de dado exibido: só faz sentido na tela que
-   tem dado. A ficha tem, então herda a nota do `base.html`. #}
+{# Estado da oferta no componente do protótipo (`div.grupos-oferta`): o
+   tri-estado `true/false/None` vira `data-estado` + rótulo, como o
+   `celulaOferta` do `app.js` do protótipo. #}
+{% macro span_oferta(valor) -%}
+{% if valor is true %}{% set estado = "sim" %}{% elif valor is false %}{% set estado = "nao" %}{% else %}{% set estado = "desconhecido" %}{% endif %}
+<span class="oferta" data-estado="{{ estado }}"><span class="oferta__ponto" aria-hidden="true"></span>{{ valor | fmt_oferta }}</span>
+{%- endmacro %}
 
-{#
-  Visão geral da escola (spec §2.2): uma única consulta (`history`) alimenta
-  cabeçalho, identificação, oferta do ano recente, série (SVG + tabela) e
-  rendimento. Indicadores e comparação municipal moram na rota própria
-  `/app/escolas/{id}/concorrencia` — aqui não se gasta cota com elas.
+{# A nota de ausência do rodapé fala de dado exibido: a ficha tem dado, então
+   herda a nota do `base.html`. #}
 
-  A ordem das seções é contrato: resumo → `#oferta` → `#serie` → `#rendimento`,
-  os mesmos `id`s que a linha "Nesta página:" aponta.
+{# 
+  Ficha consolidada (card V2 `t_cbd54a92`): estrutura do protótipo
+  (`panorama-escola-escola.html`), dados do SSR. `section#resumo` só com
+  `div.kpis` (o link de comparar é parágrafo simples) → `section#serie` →
+  `div.duas-col` (oferta em `div.grupos-oferta` | rendimento + `#concorrencia`
+  na coluna direita) → ranking municipal em `ul.ranking` → rodapé.
 
-  Card V1 `t_423aa547`: o cabeçalho de tela passou a viver em `.tela-topo` (fora
-  dos painéis) e cada bloco de conteúdo virou `.painel` com `.painel__cabecalho`
-  — a hierarquia do protótipo. Os `id`s de âncora e a ordem não mudaram.
+  Um dado que a base não publica aparece como `sem dado` — nunca 0. Em
+  especial a lista nominal de concorrentes do ranking: `mart_competidores`
+  publica a posição e as contagens, não os nomes das outras escolas (a lista
+  completa exigiria a consulta cara de `mart_market_share` em cada ficha;
+  ela vive no ranking de share do mercado).
 #}
 {% block conteudo %}
 <div class="tela">
@@ -28,139 +35,57 @@
     {{ subnav(subnav_itens) }}
   </div>
 
-  <div class="painel painel--inicial">
-    {#- Entrada da comparação lado a lado (card C4): a ficha já tem o id e abre a
-        página com um id, onde se busca a segunda escola sem JS. -#}
+  <section id="resumo" aria-label="Resumo da escola">
+    {#- Entrada da comparação lado a lado: a ficha já tem o id e abre a página
+        com um id, onde se busca a segunda escola sem JS. Parágrafo simples:
+        o protótipo não tem painel nem bloco de definição aqui. -#}
     <p><a href="{{ href_comparar }}">{{ rotulo_comparar }}</a></p>
 
-    {% if motivo_concorrencia %}
-    {# Escola fora do universo de privadas ativas: a ausência da seção é
-       explicada sem consulta (decisão pelo item mais recente da série). #}
-    <p class="nao-se-aplica">{{ motivo_concorrencia }}</p>
-    {% endif %}
-
-    <nav class="nesta-pagina" aria-label="Nesta página">
-      <p>
-        {{ texto_nesta_pagina }}
-        <a href="#oferta">Oferta e matrícula</a> ·
-        <a href="#serie">Série de matrículas</a> ·
-        <a href="#rendimento">Rendimento</a>
-      </p>
-    </nav>
-
-    {% if recente %}
-    <dl class="lista-definicoes">
-      <dt>Dependência administrativa (código INEP)</dt>
-      <dd>
-        <code>{{ recente.tp_dependencia | fmt_nulo }}</code> — {{ dependencia_rotulo }}
-      </dd>
-      <dt>Situação de funcionamento (código INEP)</dt>
-      <dd>
-        <code>{{ recente.tp_situacao_funcionamento | fmt_nulo }}</code> — {{ situacao_rotulo }}
-      </dd>
-      <dt>Anos na série</dt>
-      <dd>
-        {{ itens | length }}
-        {%- if ano_inicial is not none and ano_inicial != recente.nu_ano_censo %}
-        (de {{ ano_inicial | fmt_ano }} a {{ recente.nu_ano_censo | fmt_ano }})
-        {%- else %}
-        ({{ recente.nu_ano_censo | fmt_ano }})
-        {%- endif %}
-      </dd>
-    </dl>
-    {% endif %}
-  </div>
-
-  {% if etapas %}
-  <section class="painel" aria-labelledby="oferta">
-    <div class="painel__cabecalho">
-      <h2 id="oferta">Oferta e matrícula por etapa ({{ recente.nu_ano_censo | fmt_ano }})</h2>
-      <p class="painel__nota">
-        Três grupos distintos: o total oficial, as etapas que somam e as
-        modalidades que <strong>não</strong> somam.
-      </p>
-    </div>
-    <p class="subtitulo">
-      Oferta é tri-estado: <em>Sim</em> (matrícula maior que zero),
-      <em>Não</em> (zero declarado) e <em>Desconhecido</em> (a base não
-      informou). <em>Desconhecido</em> não é "não oferta".
-    </p>
-    {% if recente.is_oferta_desconhecida %}
-    <p class="aviso">{{ texto_oferta_desconhecida }}</p>
-    {% endif %}
-    <div class="tabela-rolavel" role="region" aria-label="Oferta e matrícula por etapa (tabela com rolagem)" tabindex="0">
-      {# Ordenável no cliente (card `t_ee9b1eec`): só a coluna de matrícula tem
-         `data-tipo` — Oferta é tri-estado e não ordena. Cada `<tbody>` é um
-         grupo semântico, então a ordenação acontece **dentro** do grupo: o
-         cabeçalho dele e a linha de total (`data-fixa`) não se movem. #}
-      <table class="tabela" data-ordenavel>
-        <caption>Oferta por etapa e matrícula observada em {{ recente.nu_ano_censo | fmt_ano }}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Etapa</th>
-            <th scope="col">Oferta</th>
-            <th scope="col" data-tipo="numero">Matrícula</th>
-          </tr>
-        </thead>
-        {# Um `<tbody>` por grupo semântico: somar as linhas de grupos
-           diferentes não dá o total (card F11). #}
-        {% for grupo in etapas %}
-        <tbody>
-          <tr class="grupo-etapas" data-fixa>
-            <th colspan="3" scope="rowgroup">{{ grupo.titulo }} — {{ grupo.nota }}</th>
-          </tr>
-          {% for linha in grupo.linhas %}
-          <tr{% if grupo.fixa %} data-fixa{% endif %}>
-            <th scope="row">{{ linha.rotulo }}</th>
-            <td>{{ linha.oferta | fmt_oferta }}</td>
-            <td data-valor="{{ linha.matricula.valor | fmt_bruto }}">{{ linha.matricula | fmt_celula }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-        {% endfor %}
-      </table>
+    <div class="kpis">
+      {% for kpi in kpis %}
+      <div class="kpi">
+        <p class="kpi__rotulo">{{ kpi.rotulo }}</p>
+        <p class="kpi__valor{% if kpi.classe %} {{ kpi.classe }}{% endif %}">{{ kpi.valor }}</p>
+        <p class="kpi__nota">{{ kpi.nota }}</p>
+      </div>
+      {% endfor %}
     </div>
   </section>
-  {% endif %}
 
-  <section class="painel" aria-labelledby="serie">
+  <section class="painel" id="serie" aria-labelledby="titulo-serie">
     <div class="painel__cabecalho">
-      <h2 id="serie">Série de matrículas</h2>
+      <h2 id="titulo-serie">Série de matrículas</h2>
       <p class="painel__nota">
-        Ano sem valor aparece como <em>sem dado</em> — nunca como zero.
+        Educação básica (total oficial do Censo, não a soma das subetapas) por
+        ano censitário. Ano sem valor aparece como <em>sem dado</em> — nunca
+        como zero.
       </p>
     </div>
-    <p class="subtitulo">
-      Matrícula da educação básica (total oficial do Censo, não a soma das
-      subetapas) por ano censitário.
+    <script type="application/json" id="dados-serie">{{ serie.ilha }}</script>
+    <div class="grafico">
+      {% if serie.svg %}{{ serie.svg }}{% else %}<p class="sem-dado">sem dado</p>{% endif %}
+    </div>
+    <p class="legenda">
+      <span><i></i>matrícula em educação básica</span>
+      <span>eixo Y em matrículas</span>
     </p>
-    <figure class="serie-figura">
-      {% if serie.svg %}
-      {{ serie.svg }}
-      <figcaption>
-        Cada barra é a matrícula de um ano; o traço tracejado marca um ano sem
-        dado. A tabela abaixo traz os mesmos valores com a origem de cada
-        ausência.
-      </figcaption>
-      {% else %}
-      <p class="sem-dado">sem dado</p>
-      <figcaption>Nenhum ano da série tem matrícula observada.</figcaption>
-      {% endif %}
-    </figure>
-    <div class="tabela-rolavel" role="region" aria-label="Série de matrículas por ano (tabela com rolagem)" tabindex="0">
-      <table class="tabela">
+
+    <div class="tabela-rolagem" role="region" aria-label="Série de matrículas por ano (tabela com rolagem)" tabindex="0">
+      <table class="tabela tabela--compacta">
         <caption>Série de matrículas por ano censitário</caption>
         <thead>
           <tr>
             <th scope="col">Ano</th>
-            <th scope="col">Matrícula — educação básica</th>
+            <th scope="col" class="num">Matrícula</th>
+            <th scope="col" class="num">Variação anual</th>
           </tr>
         </thead>
         <tbody>
           {% for ponto in serie.pontos %}
           <tr>
             <th scope="row">{{ ponto.ano | fmt_ano }}</th>
-            <td>{{ ponto.valor | fmt_contagem(ponto.motivo) }}</td>
+            <td class="num">{{ ponto.valor | fmt_contagem(ponto.motivo) }}</td>
+            <td class="num{% if ponto.variacao is not none %} {{ 'var-pos' if ponto.variacao >= 0 else 'var-neg' }}{% endif %}">{{ ponto.variacao | variacao_texto }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -168,50 +93,222 @@
     </div>
   </section>
 
-  {% if rendimento %}
-  <section class="painel" aria-labelledby="rendimento">
+  <div class="duas-col">
+    <section class="painel" id="oferta" aria-labelledby="titulo-oferta">
+      <div class="painel__cabecalho">
+        <h2 id="titulo-oferta">Oferta por etapa</h2>
+        <p class="painel__nota">
+          Três grupos distintos: o total oficial, as etapas que somam e as
+          modalidades que <strong>não</strong> somam.
+        </p>
+      </div>
+      {% if recente and recente.is_oferta_desconhecida %}
+      <div class="aviso">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+        <p>{{ texto_oferta_desconhecida }}</p>
+      </div>
+      {% endif %}
+      {% if etapas %}
+      {# Componente do protótipo: total oficial, etapas que somam e
+         modalidades que não somam — `dl`s, não tabela ordenável. O estado da
+         oferta viaja em `data-estado` (sim/nao/desconhecido). #}
+      <div class="grupos-oferta">
+        <div class="grupo-oferta grupo-oferta--total">
+          <p class="grupo-oferta__titulo">{{ etapas[0].titulo }} <small>{{ etapas[0].nota }}</small></p>
+          <dl class="grupo-oferta__total">
+            {% for linha in etapas[0].linhas %}
+            <div><dt>{{ linha.rotulo }}</dt><dd class="metrica">{{ linha.matricula | fmt_celula }}</dd></div>
+            {% endfor %}
+          </dl>
+        </div>
+        {% for grupo in etapas[1:] %}
+        <div class="grupo-oferta">
+          <p class="grupo-oferta__titulo">{{ grupo.titulo }} <small>{{ grupo.nota }}</small></p>
+          <dl>
+            {% for linha in grupo.linhas %}
+            <div><dt>{{ linha.rotulo }}</dt><dd>{{ span_oferta(linha.oferta) }}</dd></div>
+            {% endfor %}
+          </dl>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="nota-metodo"><p><strong>sem dado</strong> de oferta para o ano de referência.</p></div>
+      {% endif %}
+      <div class="nota-metodo">
+        <strong>Como ler:</strong> <em>Desconhecido</em> significa que o Censo não
+        informou a oferta — não é o mesmo que "não oferta". Educação profissional
+        é subconjunto do ensino médio e educação especial é modalidade
+        transversal: nenhuma das duas soma ao total.
+      </div>
+    </section>
+
+    <div>
+      <section class="painel" id="rendimento" aria-labelledby="titulo-rendimento">
+        <div class="painel__cabecalho">
+          <h2 id="titulo-rendimento">Rendimento</h2>
+          <p class="painel__nota">
+            Taxas do Censo, em porcentagem; ausência com a flag de origem.
+          </p>
+        </div>
+        <div class="tabela-rolagem" role="region" aria-label="Rendimento por ano (tabela com rolagem)" tabindex="0">
+          {# Ordenável no cliente: Ano e cada taxa. A ordem inicial é
+             cronológica, então o `aria-sort` do servidor é verdade também
+             sem JS. #}
+          <table class="tabela" data-ordenavel>
+            <caption>Rendimento escolar por ano censitário</caption>
+            <thead>
+              <tr>
+                <th scope="col" data-tipo="numero" aria-sort="ascending">Ano</th>
+                {% for coluna in colunas_rendimento %}
+                <th scope="col" data-tipo="numero">{{ coluna }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for linha in rendimento %}
+              <tr>
+                <th scope="row" data-valor="{{ linha.ano | fmt_bruto }}">{{ linha.ano | fmt_ano }}</th>
+                {% for celula in linha.celulas %}
+                <td data-valor="{{ celula.valor | fmt_bruto }}">{{ celula | fmt_celula }}</td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="nota-metodo">
+          <strong>{{ rotulo_retencao }}:</strong>
+          {% if indicador and indicador.retencao_liquida_proxy_pct is not none %}{{ indicador.retencao_liquida_proxy_pct | fmt_nulo }}%{% else %}sem dado{% endif %}
+          — o indicador mede saldo de matrícula dentro da própria escola; não
+          mede saída de alunos do sistema.
+        </div>
+      </section>
+
+      <section class="painel" id="concorrencia" aria-labelledby="titulo-posicao">
+        <div class="painel__cabecalho">
+          <h2 id="titulo-posicao">Posição no município</h2>
+          <p class="painel__nota">
+            Sempre municipal e no mesmo ano censitário dos indicadores.
+          </p>
+        </div>
+        {% if motivo_concorrencia %}
+        <p class="nao-se-aplica"><strong>{{ nao_se_aplica_titulo }}.</strong> {{ motivo_concorrencia }}</p>
+        {% else %}
+        {% if aviso_abaixo_porte %}
+        <div class="aviso">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+          <p>{{ texto_abaixo_porte }}</p>
+        </div>
+        {% endif %}
+        {% if motivo_sem_comparacao %}
+        <div class="nota-metodo"><p><strong>sem dado</strong> — {{ motivo_sem_comparacao }}</p></div>
+        {% endif %}
+        <div id="posicao-crescimento">
+          <dl class="lista-posicao">
+            <div>
+              <dt>{{ rotulo_posicao_municipio }}</dt>
+              <dd>
+                {% if posicao.municipio.rank is not none %}{{ posicao.municipio.rank | fmt_contagem }}.º{% if posicao.municipio.total %} de {{ posicao.municipio.total | fmt_contagem }}{% endif %} <small>1.º = maior crescimento</small>{% else %}sem dado{% endif %}
+              </dd>
+            </div>
+            <div>
+              <dt>{{ rotulo_posicao_mg }}</dt>
+              <dd>
+                {% if posicao.mg.rank is not none %}{{ posicao.mg.rank | fmt_contagem }}.º <small>1.º = maior crescimento</small>{% else %}sem dado{% endif %}
+              </dd>
+            </div>
+          </dl>
+        </div>
+        <div class="definicao">
+          <strong>Concorrência</strong> = {{ definicao_concorrencia }} O ranking de
+          share usa a matrícula de educação básica do ano de referência.
+        </div>
+        {% endif %}
+      </section>
+    </div>
+  </div>
+
+  {% if not motivo_concorrencia %}
+  <section class="painel" aria-labelledby="titulo-ranking">
     <div class="painel__cabecalho">
-      <h2 id="rendimento">Rendimento por ano</h2>
+      <h2 id="titulo-ranking">Ranking municipal por matrícula</h2>
       <p class="painel__nota">
-        Taxas do Censo, em porcentagem; ausência com a flag de origem
-        (<code>is_*_missing</code>).
+        Escolas privadas ativas do município e ano. A escola desta ficha está
+        destacada; a lista nominal completa de concorrentes não é publicada pela
+        base — ela vive no ranking de share do mercado.
       </p>
     </div>
-    <div class="tabela-rolavel" role="region" aria-label="Rendimento por ano (tabela com rolagem)" tabindex="0">
-      {# Ordenável no cliente (card `t_ee9b1eec`): Ano e cada taxa. A ordem
-         inicial é cronológica, então o `aria-sort` do servidor é verdade
-         também sem JS. #}
-      <table class="tabela" data-ordenavel>
-        <caption>Rendimento escolar por ano censitário</caption>
-        <thead>
-          <tr>
-            <th scope="col" data-tipo="numero" aria-sort="ascending">Ano</th>
-            {% for coluna in colunas_rendimento %}
-            <th scope="col" data-tipo="numero">{{ coluna }}</th>
-            {% endfor %}
-          </tr>
-        </thead>
-        <tbody>
-          {% for linha in rendimento %}
-          <tr>
-            <th scope="row" data-valor="{{ linha.ano | fmt_bruto }}">{{ linha.ano | fmt_ano }}</th>
-            {% for celula in linha.celulas %}
-            <td data-valor="{{ celula.valor | fmt_bruto }}">{{ celula | fmt_celula }}</td>
-            {% endfor %}
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
+    {% if ranking.linhas %}
+    <ul class="ranking">
+      {% for linha in ranking.linhas %}
+      <li{% if linha.destaque %} data-destaque{% endif %}>
+        <span class="ranking__pos">{% if linha.posicao is not none %}{{ linha.posicao }}.{% else %}—{% endif %}</span>
+        <div>
+          <p class="ranking__nome">
+            <a href="{{ app_prefix }}/escolas/{{ linha.id_entidade }}">{{ linha.no_entidade | fmt_nulo }}</a>{% if linha.destaque %} · esta escola{% endif %}
+          </p>
+          <p class="ranking__meta">
+            {% if linha.matricula is not none %}{{ linha.matricula | fmt_contagem }} matrículas{% else %}sem dado{% endif %}
+          </p>
+        </div>
+        <span class="barra-share">{% if linha.barra %}{{ linha.barra }}{% endif %}<span class="barra-share__valor">{% if linha.share_privado_pct is not none %}{{ linha.share_privado_pct | fmt_nulo }}%{% else %}sem dado{% endif %}</span></span>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="nota-metodo"><p><strong>sem dado</strong> de ranking para o ano de referência.</p></div>
+    {% endif %}
+    <nav class="paginacao" aria-label="Mais escolas do mercado">
+      <p class="paginacao__estado">
+        {% if ranking.total %}de {{ ranking.total }} escolas privadas ativas no município{% else %}sem dado de contagem de escolas{% endif %}
+      </p>
+      <div class="paginacao__botoes">
+        <a class="botao botao--secundario" href="{{ app_prefix }}/mercados/{{ ranking.co_municipio }}/escolas">Ver todas no mercado</a>
+      </div>
+    </nav>
   </section>
   {% endif %}
 
-  <section class="painel" aria-labelledby="recorte-serie">
-    <div class="painel__cabecalho">
-      <h2 id="recorte-serie">Recorte da série de matrículas</h2>
-      <p class="painel__nota">A origem de cada número desta tela.</p>
+  <dl class="rodape-meta" aria-label="Origem dos números da série de matrículas">
+    <div>
+      <dt>Ano de referência</dt>
+      <dd>{{ meta.ano_referencia | fmt_ano }}</dd>
     </div>
-    {{ recorte(meta) }}
-  </section>
+    <div>
+      <dt>Etapa</dt>
+      <dd>{{ meta.etapa }}</dd>
+    </div>
+    <div>
+      <dt>Universo</dt>
+      <dd><code>{{ meta.universo }}</code>{% if meta.universo_texto %} — {{ meta.universo_texto }}{% endif %}</dd>
+    </div>
+    <div>
+      <dt>Fonte</dt>
+      <dd>{{ meta.orgao }} · {{ meta.base }} · <code>{{ meta.tabela }}</code></dd>
+    </div>
+    <div>
+      <dt>Avisos</dt>
+      <dd>
+        {% if meta.avisos %}
+        <ul class="lista-regras">
+          {% for aviso in meta.avisos %}
+          <li>{{ aviso.texto }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        nenhum aviso para este recorte
+        {% endif %}
+      </dd>
+    </div>
+  </dl>
+
+  <footer class="rodape-final">
+    <p>
+      Fonte: Censo Escolar da Educação Básica (<abbr title="Instituto Nacional de Estudos e Pesquisas Educacionais Anísio Teixeira">INEP</abbr>), recorte Minas Gerais.
+      Nenhum valor ausente é trocado por zero: campo sem dado aparece como <strong>sem dado</strong>.
+    </p>
+    <p><a href="{{ href_metodologia }}">Metodologia e definições</a></p>
+  </footer>
 </div>
 {% endblock %}

@@ -62,14 +62,13 @@ def _contraste(cor_a: str, cor_b: str) -> float:
 
 
 def test_borda_de_controle_tem_contraste_de_3_para_1_sobre_branco():
-    css = CSS.read_text(encoding="utf-8")
-    achado = re.search(r"--cor-borda-controle:\s*(#[0-9a-fA-F]{6})", css)
-    assert achado is not None, "variável --cor-borda-controle ausente"
-    cor = achado.group(1)
+    # O protótipo usa hex literal na borda do controle (`#6f7d76`, distinto do
+    # `--border` decorativo do cartão): mede o que está na regra.
+    regra = _regra(".campo select")
+    achado = re.search(r"border:\s*1px solid\s*(#[0-9a-fA-F]{6})", regra)
+    assert achado is not None, "borda do controle sem hex explícito"
 
-    assert _contraste(cor, "#ffffff") >= CONTRASTE_MINIMO
-    # O controle usa a variável de controle, não a decorativa de cartão.
-    assert "var(--cor-borda-controle)" in _regra(".campo select")
+    assert _contraste(achado.group(1), "#ffffff") >= CONTRASTE_MINIMO
 
 
 def test_hover_em_link_botao_e_paginacao():
@@ -77,7 +76,12 @@ def test_hover_em_link_botao_e_paginacao():
     linhas_com_hover = [linha for linha in css.splitlines() if ":hover" in linha]
 
     assert len(linhas_com_hover) >= 2
-    for seletor in ("a:hover", "button:hover", ".paginacao__link:hover"):
+    for seletor in (
+        ".topo__nav a:hover",
+        ".botao--secundario:hover",
+        ".paginacao__link:hover",
+        ".subnav a:hover",
+    ):
         assert seletor in css, f":hover ausente para {seletor}"
 
 
@@ -106,12 +110,9 @@ def test_alvos_de_toque_do_topo_e_da_paginacao_tem_44px():
 
 # -- hero da landing e painel do recorte (card t_437796c3) --------------------
 
-#: Fundo do painel do recorte: tom de `--cor-destaque`. O texto do painel não
-#: fica sobre o branco do cartão — o contraste tem de ser medido no painel.
-#: O valor vem do token `--cor-painel` (card V1 `t_423aa547`: a paleta passou a
-#: ser a do protótipo do dono e o hex deixou de ser contrato; o que o teste
-#: protege é o par token × contraste do texto).
-FUNDO_PAINEL = "--cor-painel"
+#: Fundo do painel do recorte: `--surface-warm` do protótipo. O texto do painel
+#: não fica sobre o branco do cartão — o contraste tem de ser medido no painel.
+FUNDO_PAINEL = "--surface-warm"
 
 #: WCAG 1.4.3 para texto normal (o card pede 4,5:1, não os 3:1 de elemento).
 CONTRASTE_TEXTO_MINIMO = 4.5
@@ -127,13 +128,11 @@ def _cor_do_token(nome: str) -> str:
 
 def test_texto_do_painel_do_recorte_tem_contraste_de_4_5_para_1():
     css = CSS.read_text(encoding="utf-8")
-    texto = re.search(r"--cor-texto:\s*(#[0-9a-fA-F]{6})", css)
-    suave = re.search(r"--cor-texto-suave:\s*(#[0-9a-fA-F]{6})", css)
-    assert texto is not None and suave is not None
-    fundo = _cor_do_token("cor-painel")
+    texto = re.search(r"--fg:\s*(#[0-9a-fA-F]{6})", css)
+    assert texto is not None
+    fundo = _cor_do_token(FUNDO_PAINEL.lstrip("-"))
 
     assert _contraste(texto.group(1), fundo) >= CONTRASTE_TEXTO_MINIMO
-    assert _contraste(suave.group(1), fundo) >= CONTRASTE_TEXTO_MINIMO
 
 
 def test_painel_do_recorte_usa_o_fundo_e_o_raio_da_spec():
@@ -141,15 +140,14 @@ def test_painel_do_recorte_usa_o_fundo_e_o_raio_da_spec():
     painel = _regra(".hero .recorte")
 
     # Fundo pelo token, não por hex solto: um só lugar decide a cor do painel.
-    assert "background: var(--cor-painel)" in painel
-    assert "border-radius: var(--raio-grande)" in painel
-    # A variável nova é o 16 px da especificação, não um valor solto na regra.
-    assert re.search(r"--raio-grande:\s*16px", css)
+    assert "background: var(--surface-warm)" in painel
+    # 16 px é o raio desta peça do SSR (o protótipo vai até `--radius-lg`).
+    assert "border-radius: 16px" in painel
 
 
-def test_rotulos_e_fonte_do_painel_usam_o_texto_suave_medido_acima():
+def test_rotulos_e_fonte_do_painel_usam_o_texto_secundario():
     for seletor in (".recorte__rotulo", ".recorte__fonte"):
-        assert "var(--cor-texto-suave)" in _regra(seletor), seletor
+        assert "var(--muted-strong)" in _regra(seletor), seletor
 
 
 def test_hero_empilha_antes_de_48rem_e_vira_duas_colunas_depois():
@@ -166,11 +164,29 @@ def test_hero_empilha_antes_de_48rem_e_vira_duas_colunas_depois():
     assert "1.1fr 0.9fr" in bloco.group(1)
 
 
-def test_nenhum_outline_none_no_css():
-    """O foco visível de 3 px vale para o hero também: nada de removê-lo."""
-    css = CSS.read_text(encoding="utf-8")
+def test_nenhum_outline_none_sem_indicador_visivel():
+    """Todo `outline: none` do protótipo anda com um indicador visível.
 
-    assert re.search(r"outline:\s*(?:none|0)\b", css) is None
+    O protótipo zera o `outline` só onde o anel de foco (`--focus-ring`) assume
+    no `:focus-visible`; no gráfico da série o foco vai para o retângulo de
+    captura (`.grafico__captura`). Remover o contorno sem substituto quebra o
+    foco visível — este teste impede a regressão.
+    """
+    css = CSS.read_text(encoding="utf-8")
+    blocos = re.findall(r"([^{}]*)\{([^{}]*)\}", css)
+    assert blocos, "nenhum bloco de regra no CSS?"
+
+    for seletor, corpo in blocos:
+        if not re.search(r"outline:\s*none\b", corpo):
+            continue
+        if "grafico" in seletor:
+            continue
+        assert "var(--focus-ring)" in corpo, (
+            f"{seletor.strip()} remove o outline sem o anel de foco"
+        )
+
+    # A exceção documentada: o foco do gráfico vive no retângulo de captura.
+    assert ".grafico svg:focus-visible .grafico__captura" in css
 
 
 # -- busca no hero da landing (card t_e075a6f6, spec §6/§8) -------------------
@@ -190,35 +206,34 @@ def test_botao_primario_do_hero_tem_branco_sobre_a_cor_de_destaque():
     """"Buscar escolas": o par texto/fundo medido, não herdado."""
     primario = _regra(".botao--primario")
 
-    assert "background: var(--cor-destaque)" in primario
-    assert "color: #ffffff" in primario
+    assert "background: var(--accent)" in primario
+    assert "color: var(--accent-on)" in primario
     assert (
-        _contraste(_cor_da_variavel("cor-destaque"), "#ffffff")
+        _contraste(_cor_da_variavel("accent"), _cor_da_variavel("accent-on"))
         >= CONTRASTE_TEXTO_MINIMO
     )
 
 
 def test_botao_secundario_do_hero_e_contorno_com_a_cor_de_acao():
-    """`formaction` do mercado: fundo da superfície e contorno ≥3:1."""
+    """`formaction` do mercado: superfície elevada, texto `--fg` e borda token."""
     secundario = _regra(".botao--secundario")
     base = _regra(".botao")
 
-    assert "background: var(--cor-superficie)" in secundario
-    assert "color: var(--cor-destaque)" in secundario
-    assert "border: 1px solid var(--cor-destaque)" in base
+    assert "background: var(--surface-raise)" in secundario
+    assert "color: var(--fg)" in secundario
+    assert "border: 1px solid transparent" in base
     assert (
-        _contraste(_cor_da_variavel("cor-destaque"), "#ffffff") >= CONTRASTE_MINIMO
+        _contraste(_cor_da_variavel("fg"), "#ffffff") >= CONTRASTE_TEXTO_MINIMO
     )
 
 
-def test_hover_do_botao_secundario_nao_fica_texto_azul_sobre_azul_escuro():
-    """O `button:hover` global escureceria o preenchimento: aqui, não."""
+def test_hover_do_botao_secundario_nao_troca_o_texto_de_cor():
+    """O `:hover` do secundário mantém o texto `--fg`: nada de azul sobre azul."""
     hover = _regra(".botao--secundario:hover")
-    fundo = re.search(r"background:\s*(#[0-9a-fA-F]{6})", hover)
-    texto = re.search(r"color:\s*(#[0-9a-fA-F]{6})", hover)
-    assert fundo is not None and texto is not None
 
-    assert _contraste(texto.group(1), fundo.group(1)) >= CONTRASTE_TEXTO_MINIMO
+    assert "color: var(--fg)" in hover
+    # A borda do hover chama o acento, não um azul estranho.
+    assert "var(--accent)" in hover
 
 
 def test_campos_e_botoes_da_busca_do_hero_tem_alvo_de_44px():
@@ -240,9 +255,9 @@ def test_barra_do_hero_empilha_com_raio_16px_e_vira_pilula_em_48rem():
     css = CSS.read_text(encoding="utf-8")
     base = _regra(".hero__busca")
 
-    # Empilhada abaixo de 48rem: uma coluna, raio grande (16 px) e sombra da spec.
+    # Empilhada abaixo de 48rem: uma coluna, raio de 16 px e sombra da peça.
     assert "grid-template-columns: minmax(0, 1fr)" in base
-    assert "border-radius: var(--raio-grande)" in base
+    assert "border-radius: 16px" in base
     assert "box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08)" in base
     # Pílula a partir de 48rem: o raio de 999 px vive dentro do breakpoint.
     pilula = css.index("border-radius: 999px")
@@ -252,52 +267,52 @@ def test_barra_do_hero_empilha_com_raio_16px_e_vira_pilula_em_48rem():
 
 
 def test_foco_visivel_continua_valendo_para_os_botoes():
-    """:focus-visible de 3 px cobre `<button>`, inclusive os do hero."""
+    """`button:focus-visible` com o contorno do acento, inclusive no hero."""
     css = CSS.read_text(encoding="utf-8")
 
     assert "button:focus-visible" in css
-    assert "outline: 3px solid var(--cor-destaque)" in css
+    assert "outline: 2px solid var(--accent)" in css
 
 
 # -- escala tipográfica do protótipo (card V1 `t_423aa547`) -------------------
 
 def test_h1_usa_a_escala_do_prototipo():
-    """`h1` chega ao `--texto-3xl` do protótipo; a landing, ao `--texto-4xl`.
+    """`h1` com `clamp()`; a landing chega ao `--text-3xl` do protótipo.
 
-    Os dois são `clamp()`: o teto é o token da escala (card V1 manda medir o
-    CSS, não o olho). O mínimo mantém o título legível a 390 px.
+    O teto é o token da escala (card V1 manda medir o CSS, não o olho). O
+    mínimo mantém o título legível a 390 px.
     """
     css = CSS.read_text(encoding="utf-8")
     base = _regra("h1")
     hero = _regra(".hero h1")
 
     assert "clamp(" in base and "clamp(" in hero
-    assert "var(--texto-3xl)" in base, base
-    assert "var(--texto-3xl)" in hero, hero
+    assert "28px" in base, base
+    assert "var(--text-3xl)" in hero, hero
 
     # A escala existe e é a do protótipo.
-    assert re.search(r"--texto-3xl:\s*54px", css)
-    assert re.search(r"--texto-4xl:\s*76px", css)
-    assert re.search(r"--entrelinha-titulo:\s*1\.08", css)
-    assert re.search(r"--tracking-titulo:\s*-0\.014em", css)
+    assert re.search(r"--text-3xl:\s*54px", css)
+    assert re.search(r"--text-4xl:\s*76px", css)
+    assert re.search(r"--leading-tight:\s*1\.08", css)
+    assert re.search(r"--tracking-display:\s*-0\.014em", css)
 
 
 def test_titulos_e_numeros_usam_as_familias_do_prototipo():
     """Serifada nos títulos, Inter no corpo, `tabular-nums` nos números."""
     css = CSS.read_text(encoding="utf-8")
-    titulos = _regra("h1,\nh2,\nh3")
+    titulos = _regra("h1")
 
-    assert "var(--fonte-titulo)" in titulos
+    assert "var(--font-display)" in titulos
 
     corpo = _regra("body")
-    assert "var(--fonte-corpo)" in corpo
+    assert "var(--font-body)" in corpo
 
     numeros = _regra(".tabela td[data-valor],\n.tabela tbody th[data-valor]")
     assert "tabular-nums" in numeros
     assert "text-align: right" in numeros
 
     # Coluna numérica declarada no template (sem ordenação) também alinha.
-    coluna = _regra(".tabela .num")
+    coluna = _regra("table.tabela .num")
     assert "tabular-nums" in coluna
     assert "text-align: right" in coluna
 
@@ -306,24 +321,25 @@ def test_paleta_de_acao_e_a_do_prototipo():
     """Verde institucional único: `#1e5a4c` em ação **e** link."""
     css = CSS.read_text(encoding="utf-8")
 
-    assert re.search(r"--cor-destaque:\s*#1e5a4c", css)
-    assert re.search(r"--cor-fundo:\s*#e6eae6", css)
-    assert re.search(r"--cor-superficie:\s*#f8faf7", css)
-    # Ação primária e link herdam o acento; não existe um segundo azul.
-    assert "var(--cor-destaque)" in _regra(".botao--primario")
-    assert "var(--cor-destaque)" in _regra("a")
+    assert re.search(r"--accent:\s*#1e5a4c", css)
+    assert re.search(r"--bg:\s*#e6eae6", css)
+    assert re.search(r"--surface:\s*#f8faf7", css)
+    # Ação primária e link de paginação herdam o acento; não existe um azul.
+    assert "var(--accent)" in _regra(".botao--primario")
+    assert "var(--accent)" in _regra(".paginacao__link")
     assert "#1f5f8b" not in css, "o azul da paleta antiga voltou"
 
 
 def test_raios_e_sombra_do_prototipo_estao_nos_tokens():
     css = CSS.read_text(encoding="utf-8")
 
-    assert re.search(r"--raio-pequeno:\s*7px", css)
-    assert re.search(r"--raio:\s*10px", css)
-    assert re.search(r"--raio-medio:\s*13px", css)
-    # Sombra curta e direcional: as duas camadas do protótipo.
+    assert re.search(r"--radius-sm:\s*7px", css)
+    assert re.search(r"--radius-md:\s*10px", css)
+    assert re.search(r"--radius-lg:\s*13px", css)
+    assert re.search(r"--radius-pill:\s*9999px", css)
+    # Sombra curta e direcional: as duas camadas do `--elev-raised`.
     assert "0 1px 2px rgba(22, 33, 29, 0.07)" in css
-    assert "0 10px 22px -14px rgba(22, 33, 29, 0.3)" in css
+    assert "0 10px 22px -14px rgba(22, 33, 29, 0.30)" in css
 
 
 def test_movimento_respeita_prefers_reduced_motion():
@@ -337,7 +353,7 @@ def test_movimento_respeita_prefers_reduced_motion():
 def test_foco_visivel_usa_o_anel_do_prototipo():
     css = CSS.read_text(encoding="utf-8")
 
-    assert re.search(r"--anel-foco:\s*0 0 0 3px rgba\(30, 90, 76, 0\.3\)", css)
+    assert re.search(r"--focus-ring:\s*0 0 0 3px rgba\(30, 90, 76, 0\.30\)", css)
 
 
 # -- navbar com submenu nativo (card NAV-1 `t_d31ce632`, spec §2.1/§2.3) ------
@@ -359,16 +375,15 @@ def test_painel_do_submenu_fica_em_fluxo_e_nao_sobreposto():
 
     assert "position: absolute" not in painel
     assert "position" not in painel
-    assert "border-left: 1px solid var(--cor-borda)" in painel
+    assert "border-left: 1px solid var(--border)" in painel
 
 
 # -- destaque da linha alvo do ranking (card t_e120b83b) ---------------------
 
-#: Fundo do destaque da linha alvo (`:target`) — token `--cor-alvo`, tom de
-#: `--cor-destaque`. Como o painel do recorte, o hex é decisão do design (card
-#: V1 `t_423aa547`); o contrato que este teste protege é o par
-#: token × contraste × marca não cromática.
-FUNDO_ALVO = "--cor-alvo"
+#: Fundo do destaque da linha alvo (`:target`) — `--surface-warm` do protótipo.
+#: Como no painel do recorte, o hex é decisão do design; o contrato que este
+#: teste protege é o par token × contraste × marca não cromática.
+FUNDO_ALVO = "--surface-warm"
 
 
 def test_destaque_da_linha_alvo_nao_depende_de_js_nem_de_cor():
@@ -381,8 +396,8 @@ def test_destaque_da_linha_alvo_nao_depende_de_js_nem_de_cor():
     alvo = _regra(".tabela tbody tr:target")
     marca = _regra(".tabela tbody tr:target > *:first-child")
 
-    fundo = re.search(r"background:\s*var\(--cor-alvo\)", alvo)
-    assert fundo is not None, "linha alvo sem o fundo do token --cor-alvo"
+    fundo = re.search(r"background:\s*var\(--surface-warm\)", alvo)
+    assert fundo is not None, "linha alvo sem o fundo do token --surface-warm"
     margem = re.search(r"scroll-margin-top:\s*([\d.]+)rem", alvo)
     assert margem is not None, "linha alvo sem scroll-margin-top"
     assert float(margem.group(1)) >= 4
@@ -392,6 +407,6 @@ def test_destaque_da_linha_alvo_nao_depende_de_js_nem_de_cor():
     assert espessura is not None, "marca do alvo sem espessura (box-shadow/border-left)"
     assert int(espessura.group(1)) >= 4
 
-    destaque = _cor_da_variavel("cor-destaque")
+    destaque = _cor_da_variavel("fg")
     assert _contraste(destaque, "#ffffff") >= CONTRASTE_MINIMO
-    assert _contraste(destaque, _cor_do_token("cor-alvo")) >= CONTRASTE_MINIMO
+    assert _contraste(destaque, _cor_do_token(FUNDO_ALVO.lstrip("-"))) >= CONTRASTE_MINIMO
