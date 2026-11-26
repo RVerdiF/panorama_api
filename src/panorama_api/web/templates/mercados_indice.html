@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import select_municipios, rodape_final with context %}
+{% from "partials/macros.html" import rodape_final with context %}
 
 {% block titulo %}Mercados municipais — Panorama Escola{% endblock %}
 
@@ -11,34 +11,49 @@
       <span>Municípios</span>
     </p>
     <h1>Municípios</h1>
-    <p class="subtitulo">
+    <p class="tela-sub">
       Escolha um município de Minas Gerais para ver o mercado da educação básica:
       tamanho, composição, cobertura e movimento do setor privado.
     </p>
   </div>
 
-  <section class="painel painel--inicial" aria-labelledby="escolher-municipio">
-    <div class="painel__cabecalho">
-      <h2 id="escolher-municipio">Escolha um município</h2>
-      <p class="painel__nota">
-        A lista cobre os municípios de MG publicados nesta versão dos dados.
-      </p>
-    </div>
-
-    <form class="formulario" method="get" action="{{ href_mercados }}" role="search">
-      <div class="campo">
-        <label for="co_municipio">Município</label>
-        {{ select_municipios("co_municipio", "", rotulo_vazio="Escolha um município") }}
-        <p class="dica">São {{ municipios|length }} municípios de MG.</p>
+  <div id="indice-municipios">
+    <section class="painel" aria-labelledby="titulo-municipios">
+      <div class="painel__cabecalho">
+        <h2 id="titulo-municipios">Municípios de Minas Gerais</h2>
+        <p class="painel__nota">
+          A lista cobre os municípios de MG publicados nesta versão dos dados.
+        </p>
       </div>
 
-      <div class="campo campo--acao">
-        <button type="submit">Ver mercado</button>
+      <div class="barra-ferramentas">
+        <div class="campo">
+          <label for="filtro-municipio">Filtrar por município</label>
+          <input id="filtro-municipio" type="search" autocomplete="off" placeholder="Ex.: Uberlândia, Contagem, Vale">
+        </div>
+        <p class="resultado-contagem" id="retorno-municipios" role="status" aria-live="polite">São {{ municipios|length }} municípios de MG.</p>
       </div>
-    </form>
-  </section>
 
-  {# A página não exibe valor nenhum: sem a nota de ausência (mesma regra da
-     landing e da 1ª visita da busca, achado A3). #}
-  {{ rodape_final(False) }}
+      <div class="tabela-rolagem" role="region" aria-label="Municípios de Minas Gerais (tabela com rolagem)" tabindex="0">
+        <table class="tabela" id="tabela-municipios">
+          <caption>Municípios de Minas Gerais</caption>
+          <thead>
+            <tr><th scope="col">Município</th><th scope="col">Mercado</th></tr>
+          </thead>
+          <tbody>
+            {% for municipio in municipios %}
+            <tr>
+              <td>{{ municipio.no_municipio }}</td>
+              <td><a class="acao-tabela" href="{{ href_mercados }}{{ municipio.co_municipio }}">Ver mercado</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <p class="nota-metodo">A lista cobre os municípios de MG publicados nesta versão dos dados. Cada linha abre o mercado do município.</p>
+    </section>
+
+    {{ rodape_final(False) }}
+  </div>
 {% endblock %}

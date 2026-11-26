@@ -642,6 +642,43 @@
     }
   });
 
+  /* Índice de municípios (`#indice-municipios`): filtro progressivo por nome
+     (card D1-E4a). O SSR entrega a tabela completa (853 linhas) e este
+     iniciador só refina: normaliza com `normalizarBusca` (NFD sem
+     diacríticos + minúsculas), alterna `hidden` nas linhas e atualiza a
+     contagem em `p#retorno-municipios`. Sem JS a lista continua completa. */
+  registrar(function filtrarIndice(raiz) {
+    var caixa = null;
+    if (!raiz || !raiz.querySelector) return;
+    if (raiz.id === "indice-municipios") caixa = raiz;
+    else caixa = raiz.querySelector("#indice-municipios");
+    if (!caixa || caixa.getAttribute("data-filtro-pronto") === "true") return;
+    var campo = caixa.querySelector("input#filtro-municipio");
+    var retorno = caixa.querySelector("p#retorno-municipios");
+    var linhas = caixa.querySelectorAll("table#tabela-municipios tbody tr");
+    if (!campo || !retorno || !linhas.length) return;
+    caixa.setAttribute("data-filtro-pronto", "true");
+    var total = linhas.length;
+    var nomes = [];
+    for (var i = 0; i < linhas.length; i += 1) {
+      nomes.push(normalizarBusca(linhas[i].cells[0] ? linhas[i].cells[0].textContent : ""));
+    }
+    campo.addEventListener("input", function () {
+      var termo = normalizarBusca(campo.value.trim());
+      var visiveis = 0;
+      for (var j = 0; j < linhas.length; j += 1) {
+        var mostra = termo === "" || nomes[j].indexOf(termo) !== -1;
+        linhas[j].hidden = !mostra;
+        if (mostra) visiveis += 1;
+      }
+      if (visiveis === total) {
+        retorno.textContent = "São " + total + " municípios de MG.";
+      } else {
+        retorno.textContent = "São " + visiveis + " de " + total + " municípios.";
+      }
+    });
+  });
+
   global.Panorama = global.Panorama || {};
   global.Panorama.iniciar = iniciar;
   global.Panorama.registrar = registrar;
