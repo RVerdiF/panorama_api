@@ -66,9 +66,7 @@ PENDENTES: dict[str, frozenset[str]] = {
     # HTML semantico sem classe no que nao tem componente.
     "erro.html": frozenset(),
     # Zera no card da metodologia (ordem 5, heranca).
-    "metodologia.html": frozenset(
-        {"lista-definicoes", "lista-regras", "subtitulo"}
-    ),
+    "metodologia.html": frozenset(),
     # Zera no card da ficha (ordem 6, residuo).
     "escola.html": frozenset({"lista-regras", "nao-se-aplica"}),
     # Zera no card da limpeza (ordem 7).

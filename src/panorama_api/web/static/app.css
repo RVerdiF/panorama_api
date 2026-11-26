@@ -1059,3 +1059,11 @@ td .barra-share__trilho {
 #mercado section[aria-labelledby="titulo-cobertura"] > .definicao {
   margin-top: 12px;
 }
+
+/* --- app-only: pilha da metodologia (card D1-E6) ---
+   Tela sem contraparte no protótipo: os componentes repetidos num painel
+   (`div.definicao`, `div.aviso`) não têm margem própria — no protótipo o vão
+   vinha de `style=` inline, proibido aqui. Mesmo valor (12px). */
+#regras > .definicao + .definicao,
+#definicoes > .definicao + .definicao,
+#avisos > .aviso + .aviso { margin-top: var(--space-3); }
