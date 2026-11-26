@@ -10,6 +10,8 @@
      obrigatório para o preload de fonte bater com a requisição do `@font-face`,
      mesmo na própria origem. A URL tem hash, como todo asset do front. #}
   <link rel="preload" href="{{ fonte_corpo_url }}" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="{{ css_prototipo_url }}">
+  <link rel="stylesheet" href="{{ css_prototipo_telas_url }}">
   <link rel="stylesheet" href="{{ css_url }}">
   {# Base única de JS (card t_71b25279): asset com hash servido pelo
      AssetRegistry, `defer` para não bloquear o parser, CSP estrita do /app.

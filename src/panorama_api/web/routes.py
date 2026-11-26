@@ -200,6 +200,12 @@ def contexto_base(
         "app_prefix": PREFIXO_WEB,
         "app_version": __version__,
         "css_url": assets().url("app.css"),
+        # CSS do protótipo vendorizado (D1-a): arquivos byte a byte do design,
+        # publicados pelo mesmo registro — com hash, sem duplicar hash no
+        # template. Entram ANTES do `app.css`, que agora contém só o app-only
+        # e sobrescreve o protótipo na cascata.
+        "css_prototipo_url": assets().url("panorama.css"),
+        "css_prototipo_telas_url": assets().url("panorama-telas.css"),
         # Inter 400 é a fonte do corpo: o `<head>` faz `preload` dela para o
         # texto não esperar o parse do CSS (card V1 `t_423aa547`). A URL sai do
         # mesmo registro — com hash, servida pelo app.
