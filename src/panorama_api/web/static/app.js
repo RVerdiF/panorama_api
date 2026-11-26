@@ -101,7 +101,7 @@
      ao lado continua legível: ausência de largura, nunca largura errada. */
   registrar(function aplicarBarras(raiz) {
     var barras = raiz.querySelectorAll
-      ? raiz.querySelectorAll(".barra-share__preenche[data-largura]")
+      ? raiz.querySelectorAll(".barra-share__preenche[data-largura], .comp-preenche[data-largura]")
       : [];
     for (var i = 0; i < barras.length; i += 1) {
       var largura = barras[i].getAttribute("data-largura") || "";

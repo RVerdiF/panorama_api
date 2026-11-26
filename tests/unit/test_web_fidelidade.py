@@ -169,14 +169,13 @@ def test_mercado_nao_mostra_contagem_com_decimal_nas_celulas_de_contagem():
     cliente = _client(repo)
 
     html = _html(cliente.get(MERCADO))
-    ranking = _html(cliente.get(f"{MERCADO}/escolas"))
 
     assert not CONTAGEM_COM_DECIMAL.search(html), CONTAGEM_COM_DECIMAL.search(html)
     # As contagens aparecem como inteiros; o percentual mantém a casa.
     assert ">172.322<" in html
-    assert ">43<" in html
-    # O percentual do share está no ranking desde o NAV-3.
-    assert "8,7%" in ranking
+    assert "43 entraram · 7 saíram" in html
+    # O percentual do share está no ranking da própria página (2 casas, D1-E3).
+    assert "8,70%" in html
 
 
 def test_mercado_formatos_de_contagem_em_todas_as_secoes_sem_decimal():
@@ -277,14 +276,11 @@ def test_composicao_por_etapa_nao_repete_a_contagem_de_escolas():
 
     html = _html(_client(repo).get(MERCADO))
 
-    tabela = _tabela(html, "Tamanho do mercado por etapa")
-    assert "Escolas ativas" not in tabela
-    assert "Privadas ativas" not in tabela
-    # O total aparece uma única vez, em "Tamanho do mercado".
-    assert html.count("Escolas privadas ativas no município e ano") == 1
-    assert html.count("Escolas ativas no município e ano (todas as dependências)") == 1
-    # E a explicação de onde o total vive acompanha a tabela.
-    assert "aparecem uma única vez em" in html
+    composicao = html.split('id="composicao-etapas"')[-1].split("</ul>")[0]
+    assert "Escolas ativas" not in composicao
+    assert "Privadas ativas" not in composicao
+    # O total aparece uma única vez, no KPI — a composição só tem matrícula.
+    assert html.count('<p class="kpi__rotulo">Escolas privadas ativas</p>') == 1
 
 
 # -- E5: rótulos INEP completos ---------------------------------------------
@@ -364,7 +360,6 @@ def _telas(repo: FakeRepository) -> dict[str, str]:
         "escola": _html(client.get(ESCOLA)),
         "concorrencia": _html(client.get(f"{ESCOLA}/concorrencia")),
         "mercado": _html(client.get(MERCADO)),
-        "mercado_escolas": _html(client.get(f"{MERCADO}/escolas")),
         "metodologia": _html(client.get(METODOLOGIA)),
     }
 
@@ -394,8 +389,9 @@ def test_nenhuma_tela_exibe_jargao_interno_como_texto():
             assert jargao not in html, f"{jargao!r} visível na tela {nome!r}"
 
     telas = _telas(repo)
-    # O mesmo texto em português explica os dois estados.
-    assert "abaixo do porte mínimo de comparabilidade" in telas["mercado_escolas"]
+    # A D1-E3 tirou o marcador de porte do ranking do mercado (a classe `nota`
+    # saiu do template); o aviso continua onde é regra: na concorrência.
+    assert "abaixo do porte mínimo de comparabilidade" not in telas["mercado"]
     # O aviso de porte é dos indicadores: mora na rota de concorrência (NAV-2).
     assert "abaixo do porte mínimo de comparabilidade" in telas["concorrencia"]
     # A busca V3 não exibe marcador de oferta (D5); a ficha mantém o dela.

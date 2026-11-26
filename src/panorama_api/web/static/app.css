@@ -1025,3 +1025,37 @@ td .barra-share__trilho {
 .barra-share__preenche {
   display: block;
 }
+
+/* --- app-only: inlines do protótipo do mercado (card D1-E3) ---
+   O `style=` inline do protótipo vira regra app-only com o seletor do
+   protótipo (sem `style=` no template: a CSP `style-src 'self'` descartaria).
+   Transcreve os inlines de `panorama-escola-mercado.html`:
+   - `ul.ranking` do `#movimento-conteudo` (`border:0;list-style:none;padding:0`);
+   - o `li` desse ranking (`grid-template-columns:1fr auto`, sem fundo/sombra);
+   - os `margin-top` do protótipo que o bloco `#mercado …` vendorizado ainda
+     não cobre: `#composicao-nota` (16px), `.nota-metodo` (0) e `.definicao`
+     (12px) da seção de cobertura. Os `margin-top:0` das duas seções do
+     `.duas-col` já vêm de `#mercado .duas-col > .painel` (vendorizado). */
+#movimento-conteudo .ranking {
+  border: 0;
+  list-style: none;
+  padding: 0;
+}
+
+#movimento-conteudo .ranking > li {
+  grid-template-columns: 1fr auto;
+  background: transparent;
+  box-shadow: none;
+}
+
+#mercado #composicao-nota {
+  margin-top: 16px;
+}
+
+#mercado section[aria-labelledby="titulo-cobertura"] > .nota-metodo {
+  margin-top: 0;
+}
+
+#mercado section[aria-labelledby="titulo-cobertura"] > .definicao {
+  margin-top: 12px;
+}

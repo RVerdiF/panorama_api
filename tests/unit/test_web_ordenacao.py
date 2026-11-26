@@ -7,9 +7,10 @@ evidência de navegador anexada ao card, porque o CI é Python (spec §9).
 O que fica travado aqui, sobre o HTML renderizado de verdade (``TestClient`` +
 repositório fake):
 
-* só **T5** (mercado, composição por etapa) e **T3** (ficha, rendimento por ano)
-  têm `data-ordenavel` — a oferta por etapa é o `div.grupos-oferta` do
-  protótipo (rodada 1 da revisão, item 5), sem tabela e sem ordenação;
+* só **T3** (ficha, rendimento por ano) tem `data-ordenavel` — a composição do
+  mercado virou o `ul.composicao` do protótipo no card D1-E3 (barras com
+  `data-largura`, sem tabela e sem ordenação) e a oferta por etapa é o
+  `div.grupos-oferta` do protótipo (rodada 1 da revisão, item 5);
 * as colunas ordenáveis têm `data-tipo="numero"` e cada célula delas carrega
   `data-valor` com o valor **bruto** (ponto decimal), nunca o texto formatado
   (`1.234,5` não é número em JavaScript);
@@ -19,7 +20,7 @@ repositório fake):
   não as mover;
 * nenhum `<button>` no HTML do servidor dentro de `<th>` (o botão nasce no JS,
   que é progressive enhancement) e nenhum `aria-sort` onde a ordem inicial não
-  é de coluna (T5/T2); `aria-sort="ascending"` só no Ano de T3.
+  é de coluna (T2); `aria-sort="ascending"` só no Ano de T3.
 """
 
 from __future__ import annotations
@@ -45,22 +46,18 @@ FICHA = f"/app/escolas/{ESCOLA}"
 CONCORRENCIA = f"{FICHA}/concorrencia"
 MUNICIPIO = "3106200"
 MERCADO = f"/app/mercados/{MUNICIPIO}"
-RANKING = f"{MERCADO}/escolas"
 BUSCA = "/app/"
 ANOS = (2021, 2022, 2023, 2024, 2025)
 
 #: Legendas (`<caption>`) das tabelas do card. A legenda é o que identifica a
 #: tabela no HTML — nenhum teste depende da posição dela na página.
-LEGENDA_T5 = "Tamanho do mercado por etapa"
 LEGENDA_T3 = "Rendimento escolar por ano censitário"
 
 #: Tabelas fora da lista do card (rejeitadas na spec §2): não ordenam.
-#: A tabela de concorrentes por etapa saiu no card V2 `t_cbd54a92` (a ficha
-#: passou a mostrar KPIs, posição e ranking em vez da lista por etapa).
+#: As tabelas de cobertura (T6) e movimento (T7) do mercado saíram no card
+#: D1-E3 (o protótipo usa `nota-metodo`/`definicao` e `ul.ranking`).
 LEGENDAS_SEM_ORDENACAO = (
     "Série de matrículas por ano censitário",  # T1
-    "Cobertura de matrícula na etapa",  # T6
-    "Movimento de escolas na etapa",  # T7
 )
 
 TABELA = re.compile(r"<table\b([^>]*)>(.*?)</table>", re.S)
@@ -208,59 +205,49 @@ def paginas(client, repository) -> dict[str, str]:
         "ficha": _html(client.get(FICHA)),
         "concorrencia": _html(client.get(CONCORRENCIA)),
         "mercado": _html(client.get(MERCADO)),
-        "ranking": _html(client.get(RANKING)),
         "busca": _html(client.get(f"{BUSCA}?q=modelo")),
     }
 
 
-# -- T5: mercado, composição por etapa ---------------------------------------
+# -- composição: lista do protótipo, sem tabela e sem ordenação (D1-E3) -------
 
 
-def test_t5_declara_as_tres_colunas_ordenaveis(mercado_html: str) -> None:
-    atributos, corpo = _tabela(mercado_html, LEGENDA_T5)
+def test_composicao_e_lista_com_barras_sem_tabela_ordenavel(
+    mercado_html: str,
+) -> None:
+    """A composição é `ul.composicao` (5 etapas), com `data-largura` (D9).
 
-    assert "data-ordenavel" in atributos
-    for rotulo in ("Matrícula total", "Matrícula privada", "Privada no total"):
-        assert f'<th scope="col" data-tipo="numero">{rotulo}</th>' in corpo, rotulo
-    # A coluna de etapa não ordena: ordem canônica do servidor.
-    assert '<th scope="col">Etapa</th>' in corpo
-    # T5 não tem ordem de coluna inicial: nada de `aria-sort` no HTML.
-    assert "aria-sort" not in corpo
-
-
-def test_t5_guarda_o_valor_bruto_nao_o_texto_formatado(mercado_html: str) -> None:
-    _atributos, corpo = _tabela(mercado_html, LEGENDA_T5)
-    linhas = _linhas(corpo)
-
-    # `mart_mercado` devolve float integral: 50.000 na tela, 50000.0 no dado.
-    _tr, celulas = _linha_de(linhas, "Educação básica")
-    assert _valores(celulas) == [None, "50000.0", "15000.0", "30.0"]
-    assert celulas[1][2] == "50.000"
-    assert celulas[3][2] == "30,0%"
-    assert "50.000" not in celulas[1][1], "o texto formatado não pode ir em data-valor"
-
-    # Etapa sem dado: `data-valor=""` e o texto continua "sem dado".
-    _tr, celulas = _linha_de(linhas, "Ensino médio")
-    assert _valores(celulas) == [None, "", "", ""]
-    assert all("sem dado" in celula[2] for celula in celulas[1:])
-
-
-def test_t5_marca_so_o_total_oficial_como_data_fixa(mercado_html: str) -> None:
-    """O total oficial (`bas`) não é etapa do mercado: não se move na ordenação.
-
-    A marcação vem da chave da etapa no dado (`ETAPA_PADRAO_MERCADO`), não do
-    rótulo renderizado — trocar o texto de "Educação básica (total)" não pode
-    tirar a linha da posição original.
+    A tabela ordenável T5 saiu com o porte para o DOM do protótipo: nada de
+    `table`, `data-ordenavel`, `data-tipo`, `data-valor`, `data-fixa` nem
+    `aria-sort` nesta seção — a largura das barras vem de `aplicarBarras`.
     """
-    _atributos, corpo = _tabela(mercado_html, LEGENDA_T5)
-    linhas = _linhas(corpo)
+    secao = mercado_html.split('id="composicao"')[-1].split("</section>")[0]
 
-    atributos_fixa, _celulas = _linha_de(linhas, "Educação básica (total)")
-    assert "data-fixa" in atributos_fixa
+    assert '<ul class="composicao" id="composicao-etapas">' in secao
+    assert secao.count("<li>") == 5
+    assert 'data-largura="' in secao
+    assert "<table" not in secao
+    assert "data-ordenavel" not in secao
+    assert "data-tipo" not in secao
+    assert "data-valor" not in secao
+    assert "data-fixa" not in secao
+    assert "aria-sort" not in secao
 
-    # Nenhuma outra linha da composição é fixa: só o total oficial.
-    fixas = [celulas[0][2] for atributos, celulas in linhas if "data-fixa" in atributos]
-    assert fixas == ["Educação básica (total)"]
+
+def test_composicao_valores_formatados_e_sem_dado(mercado_html: str) -> None:
+    """Matrícula com milhar + % com 1 casa; etapa sem valor vira `sem dado`.
+
+    A fixture tem creche com 2.000 (13,3% do total `bas`) e med sem matrícula:
+    a barra de creche existe, a de med não — ausência nunca vira zero (`bas`
+    é o total oficial e fica fora do gráfico, decisão D9).
+    """
+    secao = mercado_html.split('id="composicao-etapas"')[-1].split("</ul>")[0]
+
+    assert "2.000 <small>13,3%</small>" in secao
+    assert '<span class="sem-dado">sem dado</span>' in secao
+    assert secao.count("comp-preenche") == 1
+    assert "data-ordenavel" not in mercado_html
+    assert "data-fixa" not in mercado_html
 
 
 # -- T3: ficha, rendimento por ano -------------------------------------------
@@ -335,18 +322,17 @@ def test_tabelas_fora_da_lista_nao_tem_data_ordenavel(paginas: dict[str, str]) -
                                     + paginas["mercado"], legenda)
         assert "data-ordenavel" not in atributos, legenda
 
-    # Busca e ranking de share são paginados: ordenar no cliente enganaria.
-    for pagina in ("ranking", "busca"):
-        assert "data-ordenavel" not in paginas[pagina], pagina
+    # Busca e share do mercado são paginados: ordenar no cliente enganaria.
+    assert "data-ordenavel" not in paginas["busca"]
+    assert "data-ordenavel" not in paginas["mercado"]
 
 
 def test_so_as_tabelas_do_card_ordenam(paginas: dict[str, str]) -> None:
-    assert paginas["mercado"].count("data-ordenavel") == 1
+    assert paginas["mercado"].count("data-ordenavel") == 0
     assert paginas["ficha"].count("data-ordenavel") == 1
     # `/concorrencia` é `301` para a ficha (card V2): o corpo é o mesmo, com a
     # mesma tabela ordenável (rendimento; a oferta virou grupos do protótipo).
     assert paginas["concorrencia"].count("data-ordenavel") == 1
-    assert paginas["ranking"].count("data-ordenavel") == 0
     assert paginas["busca"].count("data-ordenavel") == 0
 
 

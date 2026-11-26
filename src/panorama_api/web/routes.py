@@ -15,6 +15,7 @@ import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, Response
@@ -71,11 +72,7 @@ from panorama_api.web.filters import (
     fmt_oferta,
 )
 from panorama_api.web.mercado import (
-    ESCOLAS,
-    ROTULO_ESCOLAS_MERCADO,
-    VISAO_GERAL,
     contexto_escolas_mercado,
-    contexto_share_visao_geral,
     contexto_visao_geral as contexto_mercado_visao_geral,
     itens_subnav,
     kpis_mercado,
@@ -735,7 +732,12 @@ def _resultado_comparavel(escola: Any, co_entidade_a: str) -> dict[str, Any]:
     include_in_schema=False,
     summary="Atalho do hero: mercado do município escolhido",
 )
-def mercado_atalho(request: Request, co_municipio: str | None = None) -> Response:
+def mercado_atalho(
+    request: Request,
+    co_municipio: str | None = None,
+    ano: int | None = None,
+    etapa: str | None = None,
+) -> Response:
     """Atalho `GET /app/mercados?co_municipio=` → tela do mercado (spec §6).
 
     É o segundo botão da barra de busca do hero: o `<form>` é ``GET /app/``, e
@@ -743,7 +745,9 @@ def mercado_atalho(request: Request, co_municipio: str | None = None) -> Respons
 
     * ``co_municipio`` válido (``^31\\d{5}$``, a mesma validação de
       `core.validation`) → **303** `Location: /app/mercados/{co}`, ignorando
-      `q` e qualquer outro parâmetro que o form tenha enviado;
+      `q` e qualquer outro parâmetro que o form tenha enviado, mas repassa
+      `ano`/`etapa` quando presentes (a validação deles continua na tela de
+      destino);
     * ausente, vazio ou inválido → **422** em HTML (`pagina_erro`), com
       "Escolha um município" e a volta para a landing.
 
@@ -764,8 +768,17 @@ def mercado_atalho(request: Request, co_municipio: str | None = None) -> Respons
             sugestao=SUGESTAO_ATALHO_SEM_MUNICIPIO,
             acao=ACAO_ATALHO_SEM_MUNICIPIO,
         )
+    destino = f"{PREFIXO_WEB}/mercados/{codigo}"
+    repasse = urlencode(
+        [
+            (chave, valor)
+            for chave, valor in (("ano", ano), ("etapa", (etapa or "").strip()))
+            if valor is not None and str(valor) != ""
+        ]
+    )
     return RedirectResponse(
-        url=f"{PREFIXO_WEB}/mercados/{codigo}", status_code=303
+        url=f"{destino}?{repasse}" if repasse else destino,
+        status_code=303,
     )
 
 
@@ -821,7 +834,7 @@ def mercado(
     etapa: str | None = None,
     offset: int | None = None,
 ) -> Response:
-    """**Visão geral** do mercado do município (cards F5 e NAV-3).
+    """**Mercado** do município (cards F5, V2 e D1-E3).
 
     * o ano sai de `APP_ANOS_DISPONIVEIS` (setting validado no boot); sem `ano`,
       o padrão é o **maior** ano da lista, nunca o ano corrente inventado;
@@ -829,21 +842,17 @@ def mercado(
       `mart_mercado`) responde ``404`` com o seletor de outro ano — o recorte é
       substituível pelo usuário, não é erro de sistema;
     * a composição é consultada **sem** recorte de etapa (a tela cobre todas);
-      a etapa selecionada vale para cobertura, entrada/saída e denominadores;
-    * o top-10 do share é consultado aqui (a mesma etapa do recorte,
-      `limit=10`): a tabela do painel "Escolas do mercado por share" sai de
-      `dados.share_mercado` e a lista completa e paginada continua em
-      `/app/mercados/{co_municipio}/escolas` (card V2 `t_cbd54a92`, rodada 1,
-      item 2);
-    * ``offset`` não é recorte desta tela: presente, responde ``422``
-      `PARAMETRO_INVALIDO` em vez de silêncio — a paginação é do ranking.
+      a etapa selecionada vale para o movimento e os denominadores;
+    * o ranking de share (`section#escolas`) é paginado **na própria página**:
+      `dados.share_mercado` com `limit=10` e o `offset` do recorte (decisão
+      D4 — o 301 de `/escolas` cai aqui). `offset` fora de `0..1000` responde
+      ``422`` `PARAMETRO_INVALIDO` pela validação de `core.validation`, sem
+      consultar o repositório.
     """
-    if offset is not None:
-        raise invalid(
-            "a Visão geral do mercado não pagina; use "
-            f"{PREFIXO_WEB}/mercados/{co_municipio}/escolas para o ranking",
-            loc=("query", "offset"),
-        )
+    # `offset` recorta a `section#escolas` desta página (decisão D4, registrada
+    # em D1-g): fora de `0..1000` é `422` sem consultar nada; o ranking
+    # completo vive na própria página, não numa rota separada.
+    deslocamento = validation.offset(offset)
 
     settings = _settings(request)
     anos = settings.anos_disponiveis
@@ -857,9 +866,7 @@ def mercado(
             anos=anos,
             ano=ano,
             etapa=etapa_ref,
-            caminho=caminho,
-            caminho_mercado=caminho,
-            ativo=VISAO_GERAL,
+            prefixo=PREFIXO_WEB,
         ),
     }
 
@@ -893,10 +900,11 @@ def mercado(
             headers={"Cache-Control": CACHE_CONTROL_ERRO},
         )
 
-    contexto.update(contexto_mercado_visao_geral(mercado=resposta_mercado, etapa=etapa_ref))
-    # Top-10 do share na própria Visão geral (card V2 `t_cbd54a92`, rodada 1,
-    # item 2): a mesma etapa do recorte, primeira página. A lista completa e
-    # paginada continua em `/app/mercados/{co}/escolas`.
+    contexto.update(
+        contexto_mercado_visao_geral(mercado=resposta_mercado, etapa=etapa_ref, anos=anos)
+    )
+    # O ranking de share mora na `section#escolas` da própria página (decisão
+    # D4): a mesma etapa do recorte, 10 linhas, deslocadas por `offset`.
     resposta_share = dados.share_mercado(
         request,
         co_municipio=co_municipio,
@@ -904,9 +912,17 @@ def mercado(
         etapa=etapa_ref,
         entidade_tipo="escola",
         limit=10,
-        offset=0,
+        offset=deslocamento,
     )
-    contexto.update(contexto_share_visao_geral(share=resposta_share))
+    contexto.update(
+        contexto_escolas_mercado(
+            share=resposta_share,
+            caminho=caminho,
+            filtros_pagina={"ano": str(ano_ref), "etapa": etapa_ref},
+            montar_paginacao=montar_paginacao,
+            url_lista=url_lista,
+        )
+    )
     contexto["kpis"] = kpis_mercado(
         denominadores=contexto["denominadores"], ano=contexto["ano_selecionado"]
     )
@@ -933,79 +949,41 @@ def mercado_escolas(
     etapa: str | None = None,
     offset: int | None = None,
 ) -> Response:
-    """**Escolas do mercado** — ranking de share paginado (card NAV-3, spec §5.3).
+    """**301** da rota antiga do ranking para a `section#escolas` (decisão D4).
 
-    Consulta **só** `dados.share_mercado` (3 consultas / ~203,5 MB); a
-    composição por etapa não é recomputada a cada página e o ranking deixou de
-    pesar na abertura da Visão geral.
+    O ranking de share agora é paginado na própria página do mercado
+    (`/app/mercados/{co}?ano&etapa&offset#escolas`, 10 linhas por página).
+    Este handler só redireciona, preservando os parâmetros válidos:
 
-    * o ano sai de `APP_ANOS_DISPONIVEIS`; sem `ano`, o **maior** da lista;
-    * `ANO_FORA_DO_CONTRATO` (ano fora da lista ou sem linha para o recorte)
-      responde ``404`` com o seletor de outro ano, sem cache;
-    * share é sempre de **uma** etapa (`bas` quando não informada) e paginado
-      (`limit=50`, só `page.has_more`); ``items: []`` é estado legítimo da tela;
-    * ``offset`` é recorte desta rota (a Visão geral responde 422 a ele).
+    * `etapa` é validada (`_etapa_do_seletor`, `422` se inválida) e `offset`
+      também (`validation.offset`, `422` fora de `0..1000`) — parâmetro
+      inválido nunca vira redirect;
+    * `ano` passa cru: quem valida contra o contrato é a tela de destino
+      (`404` se fora de `APP_ANOS_DISPONIVEIS`);
+    * só entram na query os parâmetros presentes e não-vazios, com `#escolas`
+      no `Location` permanente (`301`, que o navegador pode cachear).
     """
-    settings = _settings(request)
-    anos = settings.anos_disponiveis
-    etapa_ref = (etapa or "").strip() or ETAPA_PADRAO_MERCADO
-    caminho_mercado = f"{PREFIXO_WEB}/mercados/{co_municipio}"
-    caminho = f"{caminho_mercado}/escolas"
-    filtros_pagina = {"ano": "", "etapa": etapa_ref}
-
-    contexto: dict[str, Any] = {
-        **contexto_base(request, area="municipios"),
-        **_contexto_comum_mercado(
-            co_municipio=co_municipio,
-            anos=anos,
-            ano=ano,
-            etapa=etapa_ref,
-            caminho=caminho,
-            caminho_mercado=caminho_mercado,
-            ativo=ESCOLAS,
-        ),
-    }
-
-    try:
-        ano_ref = _ano_do_seletor(ano, anos)
-        filtros_pagina["ano"] = str(ano_ref)
-        resposta_share = dados.share_mercado(
-            request,
-            co_municipio=co_municipio,
-            ano=ano_ref,
-            etapa=etapa_ref,
-            entidade_tipo="escola",
-            limit=dados.LIMITE_SHARE_PADRAO,
-            offset=offset,
-        )
-    except ProblemError as erro:
-        if erro.code is not ErrorCode.ANO_FORA_DO_CONTRATO:
-            raise
-        contexto.update(
-            sem_dados_ano=True,
-            ano_selecionado=ano if ano is not None else max(anos),
-            detalhe=erro.detail,
-            codigo=erro.code.value,
-            pagina_erro_titulo=_PAGINAS_ERRO[erro.code][0],
-        )
-        return templates().TemplateResponse(
-            request,
-            "mercado_escolas.html",
-            contexto,
-            status_code=erro.status,
-            headers={"Cache-Control": CACHE_CONTROL_ERRO},
-        )
-
-    contexto.update(
-        contexto_escolas_mercado(
-            share=resposta_share,
-            caminho=caminho,
-            filtros_pagina=filtros_pagina,
-            montar_paginacao=montar_paginacao,
-            url_lista=url_lista,
-        )
+    # Validação antes do redirect: parâmetro inválido é `422`, nunca `301`.
+    # Só entram na query os parâmetros presentes e não-vazios (`offset=0` é a
+    # 1ª página canônica, sem `offset` — como em `web/paginacao.url`).
+    etapa_ref = _etapa_do_seletor(etapa)
+    validation.offset(offset)
+    consulta = urlencode(
+        [
+            (chave, valor)
+            for chave, valor in (
+                ("ano", ano),
+                ("etapa", etapa_ref if etapa and etapa.strip() else None),
+                ("offset", offset or None),
+            )
+            if valor is not None and str(valor) != ""
+        ]
     )
-    return templates().TemplateResponse(request, "mercado_escolas.html", contexto)
+    destino = f"{PREFIXO_WEB}/mercados/{co_municipio}"
+    return RedirectResponse(
+        url=f"{destino}?{consulta}#escolas" if consulta else f"{destino}#escolas",
+        status_code=301,
+    )
 
 
 def _contexto_comum_mercado(
@@ -1014,49 +992,34 @@ def _contexto_comum_mercado(
     anos: tuple[int, ...],
     ano: int | None,
     etapa: str,
-    caminho: str,
-    caminho_mercado: str,
-    ativo: str,
+    prefixo: str,
 ) -> dict[str, Any]:
-    """Contexto que o seletor e o subnav precisam nas duas rotas do mercado.
+    """Contexto que o seletor e o subnav precisam na tela do mercado.
 
     Vale para a página 200 e para a 404 de `ANO_FORA_DO_CONTRATO`: a 404 também
-    oferece outro ano/etapa e a navegação para a outra seção. Os links do
-    subnav levam `ano` e `etapa` do recorte atual (sem `offset`); um ano fora de
-    `APP_ANOS_DISPONIVEIS` não é propagado — o link usaria um recorte que a
-    outra rota recusaria do mesmo jeito.
+    oferece outro ano/etapa e a navegação. O `href_base` do formulário é a
+    rota de atalho (`/app/mercados`): ela resolve o município e repassa
+    `ano`/`etapa` em 303. O seletor oferece as 9 etapas do contrato e a lista
+    de municípios (com o atual selecionado); etapa sem linha em `mart_mercado`
+    é `404` com este mesmo seletor.
     """
-    filtros_subnav = {
-        "ano": str(ano if ano in anos else max(anos)),
-        "etapa": etapa,
-    }
     nome = _nome_municipio(co_municipio)
-    migalhas: list[dict[str, Any]] = [
-        {"rotulo": "Busca", "href": f"{PREFIXO_WEB}/"},
-    ]
-    if ativo == ESCOLAS:
-        # O município é link para a Visão geral; a tela atual fecha a trilha.
-        migalhas.append({"rotulo": nome, "href": caminho_mercado})
-        migalhas.append({"rotulo": ROTULO_ESCOLAS_MERCADO, "href": None})
-    else:
-        migalhas.append({"rotulo": nome, "href": None})
     return {
         "municipio": co_municipio,
         "municipio_nome": nome,
-        "migalhas": migalhas,
+        "migalhas": [
+            {"rotulo": "Busca", "href": f"{prefixo}/"},
+            {"rotulo": nome, "href": None},
+        ],
         "anos_disponiveis": list(anos),
         "ano_selecionado": ano if ano is not None else max(anos),
         "etapa_selecionada": etapa,
         "etapa_rotulo": rotulo_etapa(etapa),
         "etapas_disponiveis": ETAPAS_ROTULOS,
-        "href_base": caminho,
+        "municipios": municipios_mg(),
+        "href_base": f"{prefixo}/mercados",
         "sem_dados_ano": False,
-        "subnav_itens": itens_subnav(
-            caminho=caminho_mercado,
-            filtros=filtros_subnav,
-            ativo=ativo,
-            url_lista=url_lista,
-        ),
+        "subnav_itens": itens_subnav(prefixo=prefixo),
     }
 
 

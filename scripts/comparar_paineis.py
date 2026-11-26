@@ -68,6 +68,11 @@ FILHOS_KPIS = 4
 #: no esqueleto-alvo do spec. Ordem trocada, elemento faltando ou extra =
 #: falha. A chave usa `q=colegio` para que a página venha com linhas (sem
 #: critério não há consulta e a seção de resultados muda de forma).
+#:
+#: Esqueleto do DOM do mercado (card D1-E3, critério 1): filhos de `main`,
+#: do `div#mercado`, de cada `section.painel` (seletor, composição, movimento,
+#: cobertura, escolas) e do `form` do seletor — exatamente como no
+#: esqueleto-alvo da V3-M. `<h2>` e KPIs continuam no cânone `ESPERADO`.
 ESQUELETO = {
     "/app/?q=colegio": {
         "main": [
@@ -93,7 +98,48 @@ ESQUELETO = {
             "nav.paginacao",
             "dl.rodape-meta",
         ],
-    }
+    },
+    "/app/mercados/3106200": {
+        "main": [
+            "div.tela-topo",
+            "div#mercado",
+        ],
+        "mercado": [
+            "section.painel",
+            "div.kpis",
+            "section.painel#composicao",
+            "div.duas-col.duas-col--iguais",
+            "section.painel#escolas",
+            "dl.rodape-meta",
+            "footer.rodape-final",
+        ],
+        "seletor": [
+            "form",
+        ],
+        "form-mercado": [
+            "div.filtros.filtros--3",
+            "div.acoes-filtro",
+        ],
+        "composicao": [
+            "div.painel__cabecalho",
+            "ul.composicao#composicao-etapas",
+            "p.painel__nota#composicao-nota",
+        ],
+        "movimento": [
+            "div.painel__cabecalho",
+            "div#movimento-conteudo",
+        ],
+        "cobertura": [
+            "div.painel__cabecalho",
+            "div.nota-metodo",
+            "div.definicao",
+        ],
+        "escolas": [
+            "div.painel__cabecalho",
+            "div.tabela-rolagem",
+            "nav.paginacao#paginacao-share",
+        ],
+    },
 }
 
 COTEMIG = "31005371"
@@ -225,16 +271,49 @@ def _secoes_do_main(raiz: dict) -> tuple[dict | None, list[dict]]:
     return principal, secoes
 
 
+def _descendentes(no: dict) -> list[dict]:
+    pilha = [no]
+    saida = []
+    while pilha:
+        atual = pilha.pop()
+        saida.append(atual)
+        pilha.extend(atual["filhos"])
+    return saida
+
+
+def _por_id(raiz: dict, identidade: str) -> dict | None:
+    for no in _descendentes(raiz):
+        if no["attrs"].get("id") == identidade:
+            return no
+    return None
+
+
+def _primeiro_form(raiz: dict) -> dict | None:
+    for no in _descendentes(raiz):
+        if no["tag"] == "form":
+            return no
+    return None
+
+
 def conferir_esqueleto(caminho: str, html: str) -> list[str]:
-    """Filhos de `main`, de cada `section.painel` e do `form#form-busca`.
+    """Filhos de `main`, de cada `section.painel` e do `form` do seletor.
 
     Devolve a lista de divergências (vazia = confere com o ESQUELETO).
+    A busca confere `filtros`/`form-busca`/`resultados`; o mercado confere o
+    `div#mercado` (seletor, KPIs, composição, movimento, cobertura, escolas),
+    cada `section.painel` e o `form` do seletor.
     """
     esperado = ESQUELETO[caminho]
     parser = Esqueleto()
     parser.feed(html)
     parser.close()
-    principal, secoes = _secoes_do_main(parser.raiz)
+    if caminho == "/app/?q=colegio":
+        return _conferir_esqueleto_busca(parser.raiz, caminho, esperado)
+    return _conferir_esqueleto_mercado(parser.raiz, caminho, esperado)
+
+
+def _conferir_esqueleto_busca(raiz: dict, caminho: str, esperado: dict) -> list[str]:
+    principal, secoes = _secoes_do_main(raiz)
     reais = {"main": [], "filtros": [], "form-busca": [], "resultados": []}
     if principal is not None:
         reais["main"] = [_assinatura(f) for f in principal["filhos"]]
@@ -247,6 +326,66 @@ def conferir_esqueleto(caminho: str, html: str) -> list[str]:
                 formulario = filho
     if formulario is not None:
         reais["form-busca"] = [_assinatura(f) for f in formulario["filhos"]]
+    return _diferencas(caminho, esperado, reais)
+
+
+def _conferir_esqueleto_mercado(raiz: dict, caminho: str, esperado: dict) -> list[str]:
+    reais = {
+        "main": [],
+        "mercado": [],
+        "seletor": [],
+        "form-mercado": [],
+        "composicao": [],
+        "movimento": [],
+        "cobertura": [],
+        "escolas": [],
+    }
+    principal, _ = _secoes_do_main(raiz)
+    if principal is not None:
+        reais["main"] = [_assinatura(f) for f in principal["filhos"]]
+    mercado = _por_id(raiz, "mercado")
+    if mercado is None:
+        return [f"{caminho} [div#mercado]\n  esperado: presente\n  obtido:   ausente"]
+    reais["mercado"] = [_assinatura(f) for f in mercado["filhos"]]
+    secoes = [f for f in mercado["filhos"] if _casa(f, tag="section", classe="painel")]
+    seletor = next((s for s in secoes if "id" not in s["attrs"]), None)
+    composicao = _por_id(raiz, "composicao")
+    movimento = _por_id(raiz, "movimento")
+    escolas = _por_id(raiz, "escolas")
+    duas_col = next(
+        (
+            f
+            for f in mercado["filhos"]
+            if f["tag"] == "div" and "duas-col" in (f["attrs"].get("class") or "").split()
+        ),
+        None,
+    )
+    cobertura = None
+    if duas_col is not None:
+        paineis = [
+            f for f in duas_col["filhos"] if _casa(f, tag="section", classe="painel")
+        ]
+        cobertura = next(
+            (p for p in paineis if p is not movimento),
+            None,
+        )
+    if seletor is not None:
+        reais["seletor"] = [_assinatura(f) for f in seletor["filhos"]]
+        formulario = _primeiro_form(seletor)
+        if formulario is not None:
+            reais["form-mercado"] = [_assinatura(f) for f in formulario["filhos"]]
+    if composicao is not None:
+        reais["composicao"] = [_assinatura(f) for f in composicao["filhos"]]
+    if movimento is not None:
+        reais["movimento"] = [_assinatura(f) for f in movimento["filhos"]]
+    if cobertura is not None:
+        reais["cobertura"] = [_assinatura(f) for f in cobertura["filhos"]]
+    if escolas is not None:
+        reais["escolas"] = [_assinatura(f) for f in escolas["filhos"]]
+    return _diferencas(caminho, esperado, reais)
+
+
+def _diferencas(caminho: str, esperado: dict, reais: dict) -> list[str]:
     divergencias = []
     for chave, lista_esperada in esperado.items():
         if reais[chave] != lista_esperada:
@@ -271,6 +410,7 @@ def _fixture() -> tuple[Settings, FakeRepository]:
         market_row,
         municipio_row,
         school_row,
+        share_row,
     )
 
     settings = Settings(
@@ -322,6 +462,19 @@ def _fixture() -> tuple[Settings, FakeRepository]:
             for etapa in ("bas", "creche", "med")
         ],
         concentracao=[concentracao_row(nu_ano_censo=2025)],
+        # Três escolas no share de `bas`/2025: a `section#escolas` do mercado
+        # renderiza tabela + `nav.paginacao` (forma estável do esqueleto).
+        share=[
+            share_row(
+                nu_ano_censo=2025,
+                etapa="bas",
+                id_entidade=f"3100000{i}",
+                no_entidade=f"ESCOLA EXEMPLO {i}",
+                mat_entidade=float(100 - i),
+                share_privado_pct=1.0,
+            )
+            for i in range(3)
+        ],
     )
     return settings, repository
 
