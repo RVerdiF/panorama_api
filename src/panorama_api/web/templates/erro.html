@@ -3,35 +3,44 @@
 
 {% block titulo %}{{ titulo }} — Panorama Escola{% endblock %}
 
+{# Card D1-E5 (herança, D13): a tela de erro não tem contraparte no protótipo,
+   então herda o sistema — só componentes de `panorama.css`. O conteúdo e o
+   status HTTP não mudam; só o DOM. `tela-topo` traz o `h1` e o `tela-sub` (o
+   `detalhe`); o painel é o único `role="alert"` da página; o código HTTP vira
+   `dl.rodape-meta`. Onde não há componente, HTML semântico sem classe. #}
 {% block conteudo %}
-  <article class="painel painel--erro" role="alert" aria-live="polite">
-    <p class="codigo-erro">HTTP {{ status }}</p>
+  <div class="tela-topo">
     <h1>{{ titulo }}</h1>
-    <p class="subtitulo">{{ detalhe }}</p>
+    <p class="tela-sub">{{ detalhe }}</p>
+  </div>
 
-    {% if retry_after %}
-    <div class="aviso aviso--temporario">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
-      <p>
-        Tente novamente em alguns minutos (nova tentativa sugerida em {{ retry_after }} segundos).
-        Nada foi exibido parcialmente: a página inteira é recarregada quando a fonte voltar.
-      </p>
-    </div>
-    {% elif sugestao %}
+  <section class="painel painel--inicial" role="alert" aria-live="polite">
+    {% if retry_after or sugestao %}
     <div class="aviso">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
-      <p>{{ sugestao }}</p>
+      <p>
+        {%- if retry_after %}
+        Tente novamente em alguns minutos (nova tentativa sugerida em {{ retry_after }} segundos).
+        Nada foi exibido parcialmente: a página inteira é recarregada quando a fonte voltar.
+        {%- else %}
+        {{ sugestao }}
+        {%- endif %}
+      </p>
     </div>
     {% endif %}
 
     {% if acao %}
-    <p><a class="paginacao__link" href="{{ acao.href }}">{{ acao.rotulo }}</a></p>
+    <div class="acoes-filtro">
+      <a class="botao botao--primario" href="{{ acao.href }}">{{ acao.rotulo }}</a>
+    </div>
     {% endif %}
 
     {% if erros %}
     <section aria-labelledby="detalhes-erro">
-      <h2 id="detalhes-erro">O que precisa ser corrigido</h2>
-      <ul class="lista-regras">
+      <div class="painel__cabecalho">
+        <h2 id="detalhes-erro">O que precisa ser corrigido</h2>
+      </div>
+      <ul>
         {% for erro in erros %}
         <li>
           {% if erro.loc %}<code>{{ erro.loc | join('.') }}</code>: {% endif %}{{ erro.msg }}
@@ -41,11 +50,18 @@
     </section>
     {% endif %}
 
-    <p class="rodape-erro">
+    <p>
       Se o problema persistir, informe o código <code>{{ codigo }}</code> e o caminho
       <code>{{ instancia }}</code>.
     </p>
-  </article>
+
+    <dl class="rodape-meta" aria-label="Identificação do erro">
+      <div>
+        <dt>Código</dt>
+        <dd>HTTP {{ status }}</dd>
+      </div>
+    </dl>
+  </section>
 
   {{ rodape_final() }}
 {% endblock %}
