@@ -964,6 +964,8 @@ def mercado_escolas(
       no `Location` permanente (`301`, que o navegador pode cachear).
     """
     # Validação antes do redirect: parâmetro inválido é `422`, nunca `301`.
+    # Só entram na query os parâmetros presentes e não-vazios (`offset=0` é a
+    # 1ª página canônica, sem `offset` — como em `web/paginacao.url`).
     etapa_ref = _etapa_do_seletor(etapa)
     validation.offset(offset)
     consulta = urlencode(
@@ -972,7 +974,7 @@ def mercado_escolas(
             for chave, valor in (
                 ("ano", ano),
                 ("etapa", etapa_ref if etapa and etapa.strip() else None),
-                ("offset", offset),
+                ("offset", offset or None),
             )
             if valor is not None and str(valor) != ""
         ]

@@ -145,7 +145,7 @@
           <tbody>
             {% for linha in linhas_share %}
             <tr{% if linha.id_entidade %} id="escola-{{ linha.id_entidade }}"{% endif %}>
-              <td class="num sec">{{ linha.posicao }}.</td>
+              <td class="num">{{ linha.posicao }}.</td>
               <td>
                 {% if linha.id_entidade %}
                 <a class="nome-escola" href="{{ app_prefix }}/escolas/{{ linha.id_entidade }}">{{ linha.no_entidade | fmt_nulo }}</a>
