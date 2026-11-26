@@ -10,10 +10,10 @@ O que este teste protege:
   e o total não passa do teto;
 * cada `.woff2` é servido pelo `AssetRegistry` com hash e
   `Cache-Control: immutable` — nada de CDN;
-* cada `@font-face` **efetivo** (o último por família/peso, que é o que o
-  navegador usa) aponta para a URL com hash da fonte e declara
-  `font-display: swap` — o bloco herdado verbatim do protótipo usa URLs
-  relativas, sobrescritas pela seção `app-only`;
+* cada `@font-face` **efetivo** (o último por família/peso, na seção
+  `app-only` do `app.css`, que vem depois na cascata) aponta para a URL com
+  hash da fonte e declara `font-display: swap` — os arquivos vendorizados
+  do protótipo usam URLs relativas `../fonts/`, servidas em `/app/fonts/`;
 * o `<head>` faz `preload` do Inter 400 (a fonte do corpo), com `crossorigin`,
   e o HTML não referencia nenhuma origem externa.
 """
@@ -81,10 +81,14 @@ def test_subset_de_fontes_tem_tres_arquivos_e_cabe_em_200_kb():
     assert total <= TETO_FONTES_BYTES, f"{total} B > {TETO_FONTES_BYTES} B"
 
 
-def test_mono_do_prototipo_tem_arquivo_proprio(css_servido: str):
+def test_mono_do_prototipo_tem_arquivo_proprio():
     """O `--font-mono` do protótipo é o IBM Plex Mono, servido aqui."""
-    assert "IBM Plex Mono" in css_servido
-    regra = re.search(r"--font-mono:\s*([^;]+);", css_servido)
+    registro = assets()
+    servido = registro.get(registro.url("panorama.css").rsplit("/", 1)[-1])
+    assert servido is not None
+    css_vendorizado = servido.corpo.decode("utf-8")
+    assert "IBM Plex Mono" in css_vendorizado
+    regra = re.search(r"--font-mono:\s*([^;]+);", css_vendorizado)
     assert regra is not None
     assert "IBM Plex Mono" in regra.group(1)
 
@@ -111,8 +115,9 @@ def test_font_face_aponta_para_a_url_com_hash_e_usa_swap(css_servido: str):
     for bloco in blocos:
         assert "font-display: swap" in bloco, bloco
 
-    # URLs relativas só as do bloco herdado (verbatim do protótipo); as
-    # efetivas — últimas por família/peso — usam hash do próprio app.
+    # O `app.css` app-only só usa URLs com hash (as relativas `../fonts/`
+    # vivem nos arquivos vendorizados do protótipo, servidas em `/app/fonts/`).
+    # As efetivas por família/peso usam hash do próprio app.
     relativas = set(re.findall(r'url\("\.\./fonts/([a-z0-9-]+\.woff2)"\)', css_servido))
     assert relativas <= ARQUIVOS_ESPERADOS, relativas
 
@@ -134,6 +139,27 @@ def test_font_face_aponta_para_a_url_com_hash_e_usa_swap(css_servido: str):
     # As três famílias declaradas, com os pesos do protótipo.
     for familia in ("Source Serif 4", "Inter", "IBM Plex Mono"):
         assert f'font-family: "{familia}"' in css_servido, familia
+
+
+def test_fontes_no_caminho_relativo_do_prototipo_sem_404():
+    """O `panorama.css` vendorizado declara `../fonts/*.woff2` (NÃO editável).
+
+    A partir da URL do stylesheet isso resolve para `/app/fonts/*`: o
+    servidor atende os 6 arquivos ali, imutáveis, e dá 404 de endereço fora
+    da lista — sem esse caminho, o CSS vendorizado renderiza sem fonte.
+    """
+    app = create_app(settings=_settings(), repository=FakeRepository())
+    with TestClient(app) as cliente:
+        for nome in sorted(ARQUIVOS_ESPERADOS):
+            resposta = cliente.get(f"/app/fonts/{nome}")
+            assert resposta.status_code == 200, nome
+            assert resposta.headers["cache-control"] == (
+                "public, max-age=31536000, immutable"
+            )
+            assert resposta.headers["content-type"] == "font/woff2"
+            assert resposta.content == (FONTES / nome).read_bytes(), nome
+
+        assert cliente.get("/app/fonts/nao-existe.woff2").status_code == 404
 
 
 def test_head_faz_preload_do_inter_400_com_crossorigin():
