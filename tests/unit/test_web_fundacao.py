@@ -152,16 +152,21 @@ def test_metodologia_nao_tem_rotulo_de_metrica_com_evasao(client):
 
 def test_metodologia_renderiza_assets_com_hash_e_cache_imutavel(client):
     html = _html(client.get(METODOLOGIA))
-    caminho = re.search(r'href="(/app/static/[^"]+\.css)"', html)
+    caminhos = re.findall(r'href="(/app/static/[^"]+\.css)"', html)
 
-    assert caminho is not None, "link de CSS ausente no layout base"
-    url = caminho.group(1)
-    assert re.fullmatch(r"/app/static/[0-9a-f]{12}-app\.css", url), url
+    # D1-a: protótipo vendorizado antes do app-only, todos com hash.
+    assert caminhos is not None and len(caminhos) == 3, (
+        f"esperados 3 links de CSS no layout base, achei {caminhos}"
+    )
+    for url, nome in zip(
+        caminhos, ("panorama.css", "panorama-telas.css", "app.css")
+    ):
+        assert re.fullmatch(rf"/app/static/[0-9a-f]{{12}}-{re.escape(nome)}", url), url
 
-    asset = client.get(url)
-    assert asset.status_code == 200
-    assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
-    assert asset.headers["content-type"].startswith("text/css")
+        asset = client.get(url)
+        assert asset.status_code == 200, url
+        assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
+        assert asset.headers["content-type"].startswith("text/css")
 
 
 def test_asset_com_hash_errado_e_404_html(client):
