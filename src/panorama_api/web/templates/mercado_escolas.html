@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/macros.html" import rodape_final with context %}
 {% from "partials/mercado.html" import cabecalho_mercado, recorte_mercado, seletor_mercado with context %}
 {% from "partials/subnav.html" import subnav with context %}
 
@@ -14,7 +15,6 @@
 {% block titulo %}Escolas do mercado de {{ municipio_nome }} — Panorama Escola{% endblock %}
 
 {% block conteudo %}
-<div class="tela">
   <div class="tela-topo">
     {{ cabecalho_mercado(migalhas, municipio, municipio_nome) }}
     {{ subnav(subnav_itens, "Seções do mercado") }}
@@ -140,5 +140,6 @@
     {{ recorte_mercado(meta_share, "Recorte de mart_market_share") }}
   </section>
   {% endif %}
-</div>
+
+  {{ rodape_final() }}
 {% endblock %}

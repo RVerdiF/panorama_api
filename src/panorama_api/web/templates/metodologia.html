@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "partials/macros.html" import rodape_final with context %}
 
 {% block titulo %}Metodologia — Panorama Escola{% endblock %}
 
@@ -7,7 +8,6 @@
    de âncora do submenu da navbar (`#versao`, `#regras`, `#definicoes`,
    `#avisos`, `#universo`) não mudaram. #}
 {% block conteudo %}
-<div class="tela">
   <div class="tela-topo">
     <p class="trilha">
       <a href="{{ href_inicio }}">Início</a>
@@ -127,5 +127,6 @@
       {% endfor %}
     </dl>
   </section>
-</div>
+
+  {{ rodape_final() }}
 {% endblock %}

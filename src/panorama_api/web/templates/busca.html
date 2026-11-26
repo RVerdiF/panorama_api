@@ -1,12 +1,7 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import select_municipios with context %}
+{% from "partials/macros.html" import select_municipios, rodape_final with context %}
 
 {% block titulo %}Busca de escolas — Panorama Escola{% endblock %}
-
-{# A nota de ausência do rodapé fala de dado exibido: só faz sentido depois de
-   uma consulta. A 1ª visita ao `/app/` não mostra valor nenhum, então a nota
-   sairia como ruído (e "sem dado" numa tela sem dado nenhum). #}
-{% block rodape_nota %}{% if houve_consulta %}{{ super() }}{% endif %}{% endblock %}
 
 {#
   Busca de escolas (card V2 `t_cbd54a92`) na linguagem do protótipo: cabeçalho
@@ -22,7 +17,6 @@
   anunciar `descending` sobre "sem dado" seria falso (revisão, item 4).
 #}
 {% block conteudo %}
-<div class="tela">
   <div class="tela-topo">
     <p class="trilha">
       <a href="{{ href_inicio }}">Início</a>
@@ -246,13 +240,8 @@
     {% endif %}
   </section>
 
-  <footer class="rodape-final">
-    <p>
-      Fonte prevista: Censo Escolar da Educação Básica
-      (<abbr title="Instituto Nacional de Estudos e Pesquisas Educacionais Anísio Teixeira">INEP</abbr>),
-      recorte Minas Gerais. Nenhum valor ausente é trocado por zero.
-    </p>
-    <p><a href="{{ href_metodologia }}">Metodologia e definições</a></p>
-  </footer>
-</div>
+  {# O rodapé único da página (card V3-S0): a nota de ausência só faz sentido
+     depois de uma consulta — a 1ª visita não mostra valor nenhum, então a
+     nota sairia como ruído (e "sem dado" numa tela sem dado nenhum). #}
+  {{ rodape_final(houve_consulta) }}
 {% endblock %}
