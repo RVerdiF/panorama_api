@@ -36,6 +36,7 @@ from panorama_api.web.conteudo import MOTIVO_ALEM_DO_FIM, MOTIVO_SEM_PRIVADAS
 from panorama_api.web.mercado import barra_share
 from tests.unit.conftest import (
     FakeRepository,
+    concentracao_row,
     market_row,
     municipio_row,
     share_row,
@@ -97,6 +98,7 @@ def mercado_repo() -> FakeRepository:
     return FakeRepository(
         municipios=[municipio_row()],
         markets=mercados,
+        concentracao=[concentracao_row(nu_ano_censo=2025)],
         share=[
             share_row(
                 nu_ano_censo=2025,
