@@ -794,7 +794,7 @@ def test_atalho_sem_municipio_valido_responde_422_html(mercado_repo, params):
     html = _html(resposta, 422)
     assert "<h1>Escolha um município</h1>" in html
     assert "Para ver o mercado, selecione um município no formulário." in html
-    assert '<a class="paginacao__link" href="/">Voltar ao início</a>' in html
+    assert '<a class="botao botao--primario" href="/">Voltar ao início</a>' in html
     assert resposta.headers["cache-control"] == "no-store"
     assert "etag" not in resposta.headers
     assert mercado_repo.calls == []

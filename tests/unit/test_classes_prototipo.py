@@ -61,18 +61,10 @@ PENDENTES: dict[str, frozenset[str]] = {
     "partials/mercado.html": frozenset(),
     # Zera no card do indice de municipios (ordem 4).
     "mercados_indice.html": frozenset(),
-    # Zera no card do erro (ordem 5, heranca).
-    "erro.html": frozenset(
-        {
-            "aviso--temporario",
-            "codigo-erro",
-            "lista-regras",
-            "paginacao__link",
-            "painel--erro",
-            "rodape-erro",
-            "subtitulo",
-        }
-    ),
+    # Zera no card do erro (ordem 5, heranca). D1-E5 zerou: `erro.html` usa so
+    # `tela-topo`/`tela-sub`/`painel`/`aviso`/`acoes-filtro`/`rodape-meta` e
+    # HTML semantico sem classe no que nao tem componente.
+    "erro.html": frozenset(),
     # Zera no card da metodologia (ordem 5, heranca).
     "metodologia.html": frozenset(
         {"lista-definicoes", "lista-regras", "subtitulo"}
