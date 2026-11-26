@@ -60,9 +60,7 @@ PENDENTES: dict[str, frozenset[str]] = {
     # Zera no card do mercado (ordem 3).
     "partials/mercado.html": frozenset(),
     # Zera no card do indice de municipios (ordem 4).
-    "mercados_indice.html": frozenset(
-        {"campo--acao", "dica", "formulario", "subtitulo"}
-    ),
+    "mercados_indice.html": frozenset(),
     # Zera no card do erro (ordem 5, heranca).
     "erro.html": frozenset(
         {
