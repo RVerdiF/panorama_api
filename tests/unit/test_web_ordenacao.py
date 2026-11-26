@@ -238,13 +238,14 @@ def test_composicao_valores_formatados_e_sem_dado(mercado_html: str) -> None:
     """Matrícula com milhar + % com 1 casa; etapa sem valor vira `sem dado`.
 
     A fixture tem creche com 2.000 (13,3% do total `bas`) e med sem matrícula:
-    a barra de creche existe, a de med não — ausência nunca vira zero.
+    a barra de creche existe, a de med não — ausência nunca vira zero (`bas`
+    é o total oficial e fica fora do gráfico, decisão D9).
     """
     secao = mercado_html.split('id="composicao-etapas"')[-1].split("</ul>")[0]
 
     assert "2.000 <small>13,3%</small>" in secao
     assert '<span class="sem-dado">sem dado</span>' in secao
-    assert secao.count("comp-preenche") == 2
+    assert secao.count("comp-preenche") == 1
     assert "data-ordenavel" not in mercado_html
     assert "data-fixa" not in mercado_html
 

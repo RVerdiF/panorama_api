@@ -173,7 +173,7 @@ def test_mercado_nao_mostra_contagem_com_decimal_nas_celulas_de_contagem():
     assert not CONTAGEM_COM_DECIMAL.search(html), CONTAGEM_COM_DECIMAL.search(html)
     # As contagens aparecem como inteiros; o percentual mantém a casa.
     assert ">172.322<" in html
-    assert ">43 entraram<" in html
+    assert "43 entraram · 7 saíram" in html
     # O percentual do share está no ranking da própria página (2 casas, D1-E3).
     assert "8,70%" in html
 
