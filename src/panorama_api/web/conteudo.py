@@ -75,7 +75,7 @@ MOTIVO_SECAO_COMPETIDORES = (
 )
 
 #: Título da seção que virou rota própria na ficha (spec §2.2). O mesmo texto é o
-#: item do subnav e o `<h1>`/breadcrumb da rota `/app/escolas/{id}/concorrencia`.
+#: item do subnav e o `<h1>`/trilha da rota `/app/escolas/{id}/concorrencia`.
 TITULO_SECAO_CONCORRENCIA = "Indicadores e concorrência"
 #: Rótulo do item de volta no subnav de seções.
 ROTULO_VISAO_GERAL = "Visão geral"

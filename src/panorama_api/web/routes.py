@@ -1151,7 +1151,7 @@ def _nome_municipio(co_municipio: str) -> str:
 
     O ranking (`/escolas`) só consulta o share, e a resposta do `/v1` não traz
     o nome do município. A lista de apoio das telas resolve `<title>`,
-    subtítulo e breadcrumb sem consulta extra; código fora da lista continua
+    subtítulo e trilha sem consulta extra; código fora da lista continua
     identificado pelo próprio código, como antes.
     """
     return next(

@@ -811,7 +811,7 @@ def _campos_do_cabecalho(escola: Any) -> dict[str, Any]:
 def _migalhas(
     cabecalho: Mapping[str, Any], *, href_escola: str | None, ultimo: str | None
 ) -> list[dict[str, Any]]:
-    """Itens do breadcrumb: Escolas › município › escola [› seção atual].
+    """Itens da trilha: Escolas › município › escola [› seção atual].
 
     O município é link para o mercado, a escola é link para a Visão geral e o
     último item (a tela atual) não é link. Nome ausente continua ``sem dado``.

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "partials/breadcrumb.html" import breadcrumb with context %}
+{% from "partials/macros.html" import trilha, rodape_final with context %}
 
 {% block titulo %}
 {%- if duas -%}
@@ -22,11 +22,10 @@
   sólida × barra de contorno tracejado); o equivalente acessível é a tabela.
 #}
 {% block conteudo %}
-<div class="tela">
   {# Card V1 `t_423aa547`: a trilha e o título saem para `.tela-topo` e cada
      bloco de conteúdo vira `.painel` — a gramática das outras telas. #}
   <div class="tela-topo">
-    {{ breadcrumb(migalhas) }}
+    {{ trilha(migalhas) }}
     <h1>{{ titulo_secao }}</h1>
     {% if duas %}
     <p class="subtitulo">
@@ -375,5 +374,6 @@
     </dl>
   </section>
   {% endif %}
-</div>
+
+  {{ rodape_final() }}
 {% endblock %}

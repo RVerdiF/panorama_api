@@ -1,14 +1,9 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import select_municipios with context %}
+{% from "partials/macros.html" import select_municipios, rodape_final with context %}
 
 {% block titulo %}Mercados municipais — Panorama Escola{% endblock %}
 
-{# A página não exibe valor nenhum: a nota de ausência do rodapé sairia como
-   ruído (mesma regra da landing e da 1ª visita da busca, achado A3). #}
-{% block rodape_nota %}{% endblock %}
-
 {% block conteudo %}
-<div class="tela">
   <div class="tela-topo">
     <p class="trilha">
       <a href="{{ href_inicio }}">Início</a>
@@ -42,5 +37,8 @@
       </div>
     </form>
   </section>
-</div>
+
+  {# A página não exibe valor nenhum: sem a nota de ausência (mesma regra da
+     landing e da 1ª visita da busca, achado A3). #}
+  {{ rodape_final(False) }}
 {% endblock %}

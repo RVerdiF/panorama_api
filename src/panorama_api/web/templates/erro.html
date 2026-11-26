@@ -1,9 +1,9 @@
 {% extends "base.html" %}
+{% from "partials/macros.html" import rodape_final with context %}
 
 {% block titulo %}{{ titulo }} — Panorama Escola{% endblock %}
 
 {% block conteudo %}
-<div class="tela">
   <article class="painel painel--erro" role="alert" aria-live="polite">
     <p class="codigo-erro">HTTP {{ status }}</p>
     <h1>{{ titulo }}</h1>
@@ -46,5 +46,6 @@
       <code>{{ instancia }}</code>.
     </p>
   </article>
-</div>
+
+  {{ rodape_final() }}
 {% endblock %}

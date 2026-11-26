@@ -1,8 +1,8 @@
 {#
-  Cabeçalho comum das rotas da ficha: breadcrumb, título e identificação.
+  Cabeçalho comum das rotas da ficha: trilha, título e identificação.
 
   As duas rotas (`/app/escolas/{id}` e `/app/escolas/{id}/concorrencia`)
-  mostram o mesmo cabeçalho; o que muda é o breadcrumb (a seção atual) e o texto
+  mostram o mesmo cabeçalho; o que muda é a trilha (a seção atual) e o texto
   de fallback do título quando a fonte não traz o nome. Por isso os três são
   parâmetros — nenhuma tela reescreve a marcação da outra.
 
@@ -10,9 +10,9 @@
     {% from "partials/cabecalho_escola.html" import cabecalho_escola %}
     {{ cabecalho_escola(cabecalho, migalhas, sem_nome) }}
 #}
-{% from "partials/breadcrumb.html" import breadcrumb %}
+{% from "partials/macros.html" import trilha %}
 {% macro cabecalho_escola(cabecalho, migalhas, sem_nome) -%}
-{{ breadcrumb(migalhas) }}
+{{ trilha(migalhas) }}
 <h1>{% if cabecalho.no_entidade %}{{ cabecalho.no_entidade }}{% else %}{{ sem_nome }}{% endif %}</h1>
 <p class="tela-sub">
   Escola <code>{{ cabecalho.co_entidade }}</code> ·
