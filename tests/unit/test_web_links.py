@@ -3,8 +3,8 @@
 Cobre os critérios de aceite sobre o HTML renderizado de verdade
 (``TestClient`` + repositório fake, sem rede/BigQuery):
 
-* busca → ficha da escola (nome é o link) e busca → mercado municipal
-  (nome do município é o link);
+* busca → ficha da escola (nome é o link); o município é texto sem link
+  (D5) e o caminho ao mercado é o botão `formaction` do filtro;
 * mercado → ficha da escola no ranking de share e mercado → busca filtrada
   pelo próprio município (`/app/?co_municipio=...`);
 * escola → mercado municipal;
@@ -54,11 +54,11 @@ def _links_internos(html: str) -> list[str]:
 
 
 def _hrefs_das_linhas_de_busca(html: str) -> dict[str, str]:
-    """`{co_entidade: href}` a partir das células de código INEP da busca."""
+    """`{co_entidade: href}` a partir dos links de escola da busca (D5)."""
     return {
-        codigo: href
-        for href, codigo in re.findall(
-            r'<a href="(/app/escolas/[^"]+)">[^<]*</a>\s*</td>\s*<td><code>(\d+)</code>',
+        href.rsplit("/", 1)[-1]: href
+        for href in re.findall(
+            r'<a class="nome-escola" href="(/app/escolas/[^"]+)">',
             html,
         )
     }
@@ -106,25 +106,24 @@ def client_links(repo_links, settings):
 def test_busca_linka_o_nome_da_escola_para_a_ficha(client_links):
     html = _html(client_links.get(BUSCA, params={"q": "modelo"}))
 
-    assert f'<a href="{ESCOLA}">ESCOLA MODELO</a>' in html
+    assert f'<a class="nome-escola" href="{ESCOLA}">ESCOLA MODELO</a>' in html
 
 
-def test_busca_mantem_o_codigo_inep_em_code_sem_link(client_links):
+def test_busca_nao_exibe_o_codigo_inep_cru_nas_celulas(client_links):
+    """D5: sem o `<code>` INEP ao lado do nome; o código vive só no `href`."""
     html = _html(client_links.get(BUSCA, params={"q": "modelo"}))
 
-    # O código INEP continua texto (não é o link): o nome é que é clicável.
-    # Card V2: a tabela de 7 colunas não tem mais coluna própria de código — ele
-    # acompanha o nome na célula da escola, ainda em `<code>`.
-    assert "<code>31000001</code>" in html
-    assert f'<a href="{ESCOLA}"><code>' not in html
+    assert "<code>31000001</code>" not in html
+    assert f'href="{ESCOLA}"' in html
 
 
-def test_busca_linka_o_municipio_para_o_mercado(client_links):
+def test_busca_mostra_o_municipio_como_texto_sem_link(client_links):
+    """D5: município é texto, sem link para o mercado e sem código IBGE."""
     html = _html(client_links.get(BUSCA, params={"q": "modelo"}))
 
-    assert f'<a href="{MERCADO}">BELO HORIZONTE</a>' in html
-    # O código IBGE do município segue visível ao lado do link.
-    assert f'<code>{MUNICIPIO}</code>' in html
+    assert "BELO HORIZONTE" in html
+    assert f'<a href="{MERCADO}">' not in html
+    assert f"<code>{MUNICIPIO}</code>" not in html
 
 
 def test_busca_com_nome_nulo_mostra_sem_dado_dentro_do_link(client_links, repo_links):
@@ -133,7 +132,7 @@ def test_busca_com_nome_nulo_mostra_sem_dado_dentro_do_link(client_links, repo_l
     # Filtra por município: `q` casaria com o nome, que aqui é nulo.
     html = _html(client_links.get(BUSCA, params={"co_municipio": MUNICIPIO}))
 
-    assert f'<a href="{ESCOLA}">sem dado</a>' in html
+    assert f'<a class="nome-escola" href="{ESCOLA}">sem dado</a>' in html
 
 
 def test_busca_com_municipio_nulo_mostra_sem_dado_sem_link_de_mercado(
@@ -244,12 +243,16 @@ def test_todos_os_links_internos_das_telas_respondem_200(client_links):
     assert falhas == [], f"links internos quebrados: {falhas}"
 
 
-def test_a_busca_gera_link_de_escola_e_de_mercado_que_existem(client_links):
-    """Sanidade do crawl: ele precisa ter percorrido os dois tipos de destino."""
+def test_a_busca_gera_link_de_escola_que_existe(client_links):
+    """Sanidade do crawl: ele precisa ter percorrido a ficha linkada.
+
+    D5: a busca não linka mais para o mercado (município é texto); o destino
+    do crawl é só a ficha — o caminho ao mercado é o botão `formaction`.
+    """
     destinos = {
         destino
         for _, _, destino in _crawl(client_links, BUSCA + "?q=modelo")
     }
 
     assert ESCOLA in destinos
-    assert MERCADO in destinos
+    assert MERCADO not in destinos

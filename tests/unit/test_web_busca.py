@@ -82,6 +82,12 @@ def _get(client, path: str = BUSCA, **kwargs):
     return client.request("GET", path, **kwargs)
 
 
+def _tem_link(html: str, rel: str) -> bool:
+    """Link de paginação ativo (`<a rel="…">`); o lado indisponível é `span`
+    com `aria-disabled`, sem `href` (D5)."""
+    return re.search(rf'<a[^>]*rel="{rel}"', html) is not None
+
+
 def _carregar_script_gerador() -> ModuleType:
     caminho = REPO_ROOT / "scripts" / "gerar_municipios_mg.py"
     spec = importlib.util.spec_from_file_location("gerar_municipios_mg", caminho)
@@ -233,83 +239,58 @@ def test_busca_sem_resultado_responde_200_nenhuma_escola(client, repository):
     assert "nenhuma escola" in resposta.text.lower()
 
 
-# -- estado vazio: sugestões de próximo passo (C4) ---------------------------
+# -- estado vazio e chips (V3) -------------------------------------------------
+#
+# O estado vazio do protótipo é `div.estado-vazio` com o `h3` do recorte
+# (com critério) ou o da primeira visita (sem critério). Os filtros aplicados
+# aparecem como `span.chip` + o link "Limpar" — sem lista de sugestões.
 
 
-def test_estado_vazio_sugere_menos_letras(client, repository):
+def test_estado_vazio_com_criterio_mostra_o_recorte(client, repository):
     repository.schools = []
 
     html = _get(client, params={"q": "zzzxxyy"}).text
 
-    assert "Nenhuma escola encontrada" in html
-    assert "Use menos letras" in html
+    assert "<h3>Nenhuma escola para este recorte</h3>" in html
+    assert "Ajuste o nome" in html
 
 
-def test_estado_vazio_sem_termo_sugere_informar_o_nome(client, repository):
-    """Sem `q` a dica é informar o nome — não "menos letras" de nada."""
+def test_estado_vazio_sem_termo_mostra_o_recorte(client, repository):
     repository.schools = []
 
     html = _get(client, params={"co_municipio": "3106200"}).text
 
+    assert "<h3>Nenhuma escola para este recorte</h3>" in html
+
+
+def test_primeira_visita_mostra_que_nenhuma_escola_foi_listada(client):
+    html = _get(client).text
+
+    assert "<h3>Nenhuma escola listada ainda</h3>" in html
     assert "Informe o nome da escola" in html
-    assert "Use menos letras" not in html
+    assert "Nenhuma escola para este recorte" not in html
 
 
-def test_estado_vazio_oferece_busca_sem_o_filtro_de_municipio(client, repository):
-    """Com `q` + município, o link remove só o município."""
+def test_chips_mostram_os_filtros_aplicados(client, repository):
     repository.schools = []
 
     html = _get(
-        client, params={"q": "zzzxxyy", "co_municipio": "3106200"}
+        client,
+        params={"q": "zzzxxyy", "co_municipio": "3106200", "apenas_ativas": "true"},
     ).text
 
-    assert 'href="/app/?q=zzzxxyy"' in html
+    assert '<span class="chip">nome: <strong>zzzxxyy</strong></span>' in html
+    assert (
+        '<span class="chip">município: <strong>Belo Horizonte</strong></span>'
+    ) in html
+    assert '<span class="chip">só ativas</span>' in html
 
 
-def test_estado_vazio_nao_oferece_remover_municipio_sem_termo(client, repository):
-    """Sem `q`, remover o município cairia na busca sem critério (beco sem saída)."""
-    repository.schools = []
+def test_sem_filtro_nao_ha_chip_nem_limpar(client):
+    html = _get(client).text
 
-    html = _get(client, params={"co_municipio": "3106200"}).text
-
-    assert "sem o filtro de município" not in html
-    # A busca vazia continua sendo renderizada (200), não um link morto.
-    assert "Nenhuma escola encontrada" in html
-
-
-def test_estado_vazio_oferece_incluir_escolas_inativas(client, repository):
-    repository.schools = []
-
-    html = _get(
-        client, params={"q": "zzzxxyy", "co_municipio": "3106200", "apenas_ativas": "true"}
-    ).text
-
-    assert 'href="/app/?q=zzzxxyy&amp;co_municipio=3106200"' in html
-    assert "Incluir escolas inativas" in html
-
-
-def test_estado_vazio_sem_filtros_so_sugere_menos_letras(client, repository):
-    repository.schools = []
-
-    html = _get(client, params={"q": "zzzxxyy"}).text
-
-    assert "sem o filtro de município" not in html
-    assert "Incluir escolas inativas" not in html
-
-
-def test_sugestoes_do_vazio_apontam_para_paginas_que_respondem_200(client, repository):
-    """Todo link sugerido é uma página real da busca (não o `/v1` nem 422)."""
-    repository.schools = []
-
-    html = _get(
-        client, params={"q": "zzzxxyy", "co_municipio": "3106200", "apenas_ativas": "true"}
-    ).text
-    hrefs = re.findall(r'href="(/app/\?[^"]+)"', html)
-    assert hrefs
-
-    for href in hrefs:
-        destino = href.replace("&amp;", "&")
-        assert _get(client, path=destino).status_code == 200, destino
+    assert 'class="chip"' not in html
+    assert ">Limpar</a>" not in html
 
 
 # -- resultados, recorte e filtros -------------------------------------------
@@ -325,7 +306,7 @@ def test_busca_por_municipio_renderiza_a_escola_e_o_recorte_obrigatorio(
 
     assert resposta.status_code == 200
     assert "ESCOLA MODELO" in html
-    assert "31000001" in html
+    assert '<td><a class="nome-escola" href="/app/escolas/31000001">' in html
     # Regras da seção 1 do plano: ano, etapa, universo, fonte e avisos.
     assert "2025" in html
     assert "Educação básica (total)" in html
@@ -338,13 +319,11 @@ def test_busca_por_municipio_renderiza_a_escola_e_o_recorte_obrigatorio(
     assert not TEXTO_DE_TOTAL.search(html)
 
 
-def test_busca_por_municipio_mostra_codigo_inep_com_rotulo(
+def test_busca_mostra_so_o_rotulo_sem_o_codigo_inep(
     client, repository
 ):
-    """Dependência e situação com a leitura do código ("4 — Privada").
-
-    Rodada 1 da revisão, item 4: os códigos crus `4`/`1` ganham o rótulo da
-    ficha; sem matrícula no schema, a coluna não anuncia ordenação.
+    """Dependência e situação saem só com a leitura ("Privada"), sem o
+    código cru (D5); sem matrícula no schema, a coluna não anuncia ordenação.
     """
     repository.schools = [school_row()]
 
@@ -352,8 +331,10 @@ def test_busca_por_municipio_mostra_codigo_inep_com_rotulo(
     html = resposta.text
 
     assert resposta.status_code == 200
-    assert "4 — Privada" in html
-    assert "1 — Em atividade" in html
+    assert "Privada" in html
+    assert "4 — Privada" not in html
+    assert "Em atividade" in html
+    assert "1 — Em atividade" not in html
     assert "aria-sort" not in html
 
 
@@ -393,9 +374,7 @@ def test_select_de_municipio_usa_a_lista_versionada_de_853(client, repository):
     assert _consultas_de_escola(repository) == []
 
 
-def test_valor_ausente_sai_como_sem_dado_e_oferta_desconhecida(
-    client, repository
-):
+def test_valor_ausente_sai_como_sem_dado(client, repository):
     repository.schools = [
         school_row(
             no_entidade=None,
@@ -408,9 +387,9 @@ def test_valor_ausente_sai_como_sem_dado_e_oferta_desconhecida(
     html = _get(client, params={"co_municipio": "3106200"}).text
 
     assert "sem dado" in html
-    # A tabela de busca não tem mais coluna de oferta (card V2); quando a base
-    # não informa a oferta, o marcador em português acompanha o nome da escola.
-    assert "Oferta desconhecida" in html
+    # A tabela V3 não tem coluna de oferta nem marcador: a ausência aparece
+    # como "sem dado" nas células.
+    assert "Oferta desconhecida" not in html
     # E6: a flag interna não é exibida como texto; o leitor vê o português.
     assert "is_oferta_desconhecida" not in html
 
@@ -430,12 +409,16 @@ def test_busca_nao_usa_termos_geograficos_proibidos(client, repository):
 def test_proxima_so_aparece_quando_ha_mais_resultados(client, repository):
     repository.schools = _escolas(20)
     html = _get(client, params={"q": "modelo"}).text
-    assert "Próxima" not in html
+    assert not _tem_link(html, "next")
+    assert (
+        '<span class="botao botao--secundario" aria-disabled="true">Próxima</span>'
+        in html
+    )
     assert "Mostrando 1–20" in html
 
     repository.schools = _escolas(21)
     html = _get(client, params={"q": "modelo"}).text
-    assert "Próxima" in html
+    assert _tem_link(html, "next")
     assert "offset=20" in html
 
 
@@ -443,12 +426,12 @@ def test_anterior_so_aparece_com_offset_positivo(client, repository):
     repository.schools = _escolas(45)
 
     primeira = _get(client, params={"q": "modelo"}).text
-    assert "Anterior" not in primeira
+    assert not _tem_link(primeira, "prev")
 
     terceira = _get(client, params={"q": "modelo", "offset": 40}).text
-    assert "Anterior" in terceira
+    assert _tem_link(terceira, "prev")
     assert "offset=20" in terceira
-    assert "Próxima" not in terceira
+    assert not _tem_link(terceira, "next")
 
 
 def test_links_de_paginacao_preservam_os_filtros(client, repository):
@@ -468,7 +451,7 @@ def test_offset_no_teto_esconde_proxima_e_pede_para_refinar(client, repository):
 
     html = _get(client, params={"q": "modelo", "offset": 1000}).text
 
-    assert "Próxima" not in html
+    assert not _tem_link(html, "next")
     assert "refine a busca" in html.lower()
     assert "Mostrando 1001–1020" in html
 
@@ -478,7 +461,7 @@ def test_ultimo_offset_permitido_ainda_tem_proxima(client, repository):
 
     html = _get(client, params={"q": "modelo", "offset": 980}).text
 
-    assert "Próxima" in html
+    assert _tem_link(html, "next")
     assert "offset=1000" in html
     assert "refine a busca" not in html.lower()
 
@@ -501,19 +484,21 @@ def test_html_nunca_mostra_o_total_de_resultados(client, repository, params):
     assert "total de resultados" not in html.lower()
 
 
-# -- "Limpar filtros" (achado C3) --------------------------------------------
-
-#: O link precisa sair do formulário para a busca limpa, sem sobra de filtro.
+# -- "Limpar" (V3) -------------------------------------------------------------
+#
+# O link precisa sair para a busca limpa, sem sobra de filtro. No DOM do
+# protótipo ele é `a.botao.botao--secundario.botao--mini` dentro de
+# `div.chips`, com o texto curto "Limpar".
 LINK_LIMPAR = re.compile(
-    r'<a class="limpar-filtros" href="/app/">Limpar filtros</a>'
+    r'<a class="botao botao--secundario botao--mini" href="/app/">Limpar</a>'
 )
 
 
-def test_primeira_visita_nao_oferece_limpar_filtros(client):
+def test_primeira_visita_nao_oferece_limpar(client):
     """Sem filtro ativo o link seria uma ação sem efeito: não aparece."""
     html = _get(client).text
 
-    assert "Limpar filtros" not in html
+    assert ">Limpar</a>" not in html
 
 
 @pytest.mark.parametrize(
@@ -524,7 +509,7 @@ def test_primeira_visita_nao_oferece_limpar_filtros(client):
         {"apenas_ativas": "true"},
     ],
 )
-def test_limpar_filtros_aparece_com_filtro_ativo_e_aponta_para_a_busca(
+def test_limpar_aparece_com_filtro_ativo_e_aponta_para_a_busca(
     client, repository, params
 ):
     """Qualquer filtro ativo (nome, município ou situação) mostra a saída."""
@@ -535,19 +520,17 @@ def test_limpar_filtros_aparece_com_filtro_ativo_e_aponta_para_a_busca(
     assert LINK_LIMPAR.search(html)
 
 
-# -- macro do select de município (card `t_e075a6f6`, spec §6) ----------------
+# -- `select` do SSR + ilha JSON (V3/D7) --------------------------------------
 #
-# A macro `select_municipios` existe para a landing reaproveitar as 853 opções,
-# mas o card exige que o markup de `/app/` **não mude um byte**. O texto abaixo é
-# o select como estava inline em `busca.html` na `main` (0c32384), antes da
-# macro; ele é renderizado aqui pelo mesmo Jinja2 (autoescape ligado) e comparado
-# com o bloco extraído da página de verdade.
-MARKUP_ANTES = """<select id="co_municipio" name="co_municipio">
-        <option value="">Todos os municípios de MG</option>
-        {% for municipio in municipios %}
-        <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == filtros.co_municipio %} selected{% endif %}>{{ municipio.no_municipio }}</option>
-        {% endfor %}
-      </select>"""
+# O SSR emite o `select#municipio` com as 853 opções (vale sem JS); o
+# `app.js` o troca pela combobox no load, lendo a ilha `dados-municipios`
+# ([nome, codigo]) da mesma fonte.
+MARKUP_SELECT = """<select id="municipio" name="co_municipio">
+            <option value="">Todos os municípios de MG</option>
+            {% for municipio in municipios %}
+            <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == filtros.co_municipio %} selected{% endif %}>{{ municipio.no_municipio }}</option>
+            {% endfor %}
+          </select>"""
 
 
 def _select_de_municipio(html: str) -> str:
@@ -557,12 +540,12 @@ def _select_de_municipio(html: str) -> str:
     return html[inicio:fim]
 
 
-def _markup_da_main(co_municipio: str) -> str:
-    """Renderiza o select como a `main` o gerava, com o filtro selecionado."""
+def _markup_ssr(co_municipio: str) -> str:
+    """Renderiza o select como o SSR o gera, com o filtro selecionado."""
     from jinja2 import Environment
 
     ambiente = Environment(autoescape=True)
-    modelo = ambiente.from_string(MARKUP_ANTES)
+    modelo = ambiente.from_string(MARKUP_SELECT)
     return modelo.render(
         municipios=modulo_municipios.municipios_mg(),
         filtros={"co_municipio": co_municipio},
@@ -570,17 +553,17 @@ def _markup_da_main(co_municipio: str) -> str:
 
 
 @pytest.mark.parametrize("co_municipio", ["", "3106200", "3100104"])
-def test_select_de_municipio_sai_byte_a_byte_como_antes_da_macro(
+def test_select_do_ssr_sai_como_o_marcado_esperado(
     client, repository, co_municipio
 ):
     params = {"co_municipio": co_municipio} if co_municipio else {}
 
     html = _get(client, params=params).text
 
-    assert _select_de_municipio(html) == _markup_da_main(co_municipio)
+    assert _select_de_municipio(html) == _markup_ssr(co_municipio)
 
 
-def test_select_de_municipio_marca_uma_unica_opcao_como_selecionada(
+def test_select_do_ssr_marca_uma_unica_opcao_como_selecionada(
     client, repository
 ):
     """O `selected` vai na opção do filtro ativo, e em nenhuma outra."""
@@ -590,13 +573,57 @@ def test_select_de_municipio_marca_uma_unica_opcao_como_selecionada(
     assert '<option value="3106200" selected>Belo Horizonte</option>' in html
 
 
+def test_ilha_de_municipios_tem_853_pares_nome_codigo(client):
+    """A ilha `dados-municipios` carrega a mesma lista do `select` (D7)."""
+    html = _get(client).text
+
+    achado = re.search(
+        r'<script type="application/json" id="dados-municipios">(\[.*?\])</script>',
+        html,
+        re.DOTALL,
+    )
+    assert achado, "ilha JSON de municípios ausente"
+    pares = json.loads(achado.group(1))
+
+    assert len(pares) == 853
+    assert all(
+        len(par) == 2
+        and par[0].strip()
+        and re.fullmatch(r"^31\d{5}$", par[1])
+        for par in pares
+    )
+
+
+def test_cabecalho_tem_as_7_colunas_do_prototipo_sem_ordenacao(
+    client, repository
+):
+    """`thead th` = as 7 colunas, `th` simples sem `aria-sort` (D5)."""
+    repository.schools = [school_row()]
+
+    html = _get(client, params={"co_municipio": "3106200"}).text
+    cabecalho = html[html.index("<thead>") : html.index("</thead>")]
+    textos = [re.sub(r"\s+", " ", texto).strip() for texto in re.findall(r"<th[^>]*>(.*?)</th>", cabecalho)]
+
+    assert textos == [
+        "Escola",
+        "Município",
+        "Dependência",
+        "Matrícula",
+        "Share municipal",
+        "Variação anual",
+        "Situação",
+    ]
+    assert "aria-sort" not in cabecalho
+    assert "ordenavel" not in cabecalho
+
+
 @pytest.mark.parametrize(
     ("termo", "esperado"),
     [
         ("modelo", "ESCOLA MODELO"),
         # Termo sem resultado: a URL do hero responde 200 com o estado vazio,
         # exatamente como a busca já respondia.
-        ("magnum", "Nenhuma escola encontrada para esta busca."),
+        ("magnum", "Nenhuma escola para este recorte"),
     ],
 )
 def test_url_do_hero_responde_como_a_busca_de_sempre(

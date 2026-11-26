@@ -1,20 +1,21 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import select_municipios, rodape_final with context %}
+{% from "partials/macros.html" import rodape_final with context %}
 
 {% block titulo %}Busca de escolas — Panorama Escola{% endblock %}
 
 {#
-  Busca de escolas (card V2 `t_cbd54a92`) na linguagem do protótipo: cabeçalho
-  de tela, painel de filtros, painel de resultados com a tabela de 7 colunas e o
-  rodapé final. A orientação de produto e o bloco de recorte da consulta saíram;
-  a origem de cada número agora é a lista `rodape-meta` abaixo da tabela, que só
-  existe depois de uma consulta.
+  Busca de escolas (card V3 `t_9f384f60`): DOM do protótipo
+  `panorama-escola-busca.html` com dados SSR. Só entram os filtros que a
+  rota aceita (`q`, `co_municipio`, `apenas_ativas`); etapa, ano e situação
+  não têm parâmetro e ficam fora (D6). A tabela é paginada no servidor, por
+  isso os `th` são simples, sem ordenação (D5). Matrícula, share municipal e
+  variação anual não vêm no schema de busca (`School`): as células saem como
+  `sem dado`, nunca 0 nem número inventado.
 
-  Matrícula, share municipal e variação anual **não** vêm no schema de busca
-  (`School`): as células saem como `sem dado` com a mesma estrutura e classes das
-  colunas que têm valor — nunca 0 nem um número inventado. Sem dado para
-  ordenar, o `th` de Matrícula não anuncia ordenação (sem `aria-sort`/seta):
-  anunciar `descending` sobre "sem dado" seria falso (revisão, item 4).
+  O município é progressivo: o SSR emite o `select` com as 853 opções (vale
+  sem JS) e o `app.js` o troca pela combobox do protótipo no load, lendo a
+  ilha JSON `dados-municipios` ([nome, codigo]). O `input` visível não tem
+  `name`; quem é enviado é o `hidden`, preenchido pela escolha (D7).
 #}
 {% block conteudo %}
   <div class="tela-topo">
@@ -38,61 +39,71 @@
       </p>
     </div>
 
-    <form id="formulario-busca" class="formulario" method="get" action="{{ app_prefix }}/" role="search">
-      <div class="campo">
-        <label for="q">Nome da escola</label>
-        <input
-          type="search"
-          id="q"
-          name="q"
-          value="{{ filtros.q }}"
-          minlength="3"
-          maxlength="100"
-          autocomplete="off"
-          aria-describedby="q-dica">
-        <p class="dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
+    <form id="form-busca" method="get" action="{{ app_prefix }}/" novalidate>
+      <div class="filtros">
+        <div class="campo">
+          <label for="q">Nome da escola</label>
+          <input
+            type="search"
+            id="q"
+            name="q"
+            value="{{ filtros.q }}"
+            minlength="3"
+            maxlength="100"
+            autocomplete="off"
+            aria-describedby="q-dica">
+          <p class="campo__dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
+        </div>
+
+        <div class="campo">
+          <label for="municipio">Município</label>
+          <select id="municipio" name="co_municipio">
+            <option value="">Todos os municípios de MG</option>
+            {% for municipio in municipios %}
+            <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == filtros.co_municipio %} selected{% endif %}>{{ municipio.no_municipio }}</option>
+            {% endfor %}
+          </select>
+          <p class="campo__dica">{{ municipios | length }} municípios de MG — digite para filtrar.</p>
+          <script type="application/json" id="dados-municipios">{{ ilha_municipios | safe }}</script>
+        </div>
       </div>
 
-      <div class="campo">
-        <label for="co_municipio">Município</label>
-        {{ select_municipios("co_municipio", filtros.co_municipio) }}
+      <div class="filtros filtros--3">
+        <div class="campo campo--check">
+          <input
+            type="checkbox"
+            id="apenas-ativas"
+            name="apenas_ativas"
+            value="true"
+            {% if filtros.apenas_ativas %}checked{% endif %}>
+          <label for="apenas-ativas">Apenas escolas em atividade</label>
+        </div>
       </div>
 
-      <div class="campo campo--booleano">
-        <input
-          type="checkbox"
-          id="apenas_ativas"
-          name="apenas_ativas"
-          value="true"
-          {% if filtros.apenas_ativas %}checked{% endif %}>
-        <label for="apenas_ativas">Somente escolas ativas</label>
+      <div class="acoes-filtro">
+        <button type="submit" class="botao botao--primario">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+          Buscar escolas
+        </button>
+        <button type="submit" class="botao botao--secundario" id="ir-mercado" formaction="{{ app_prefix }}/mercados">Ver mercado do município</button>
       </div>
 
-      <div class="campo campo--acao">
-        <button type="submit" class="botao botao--primario">Buscar escolas</button>
+      <p class="retorno" id="retorno" role="status" aria-live="polite" hidden></p>
+      <div class="chips" id="chips">
         {% if filtros.q or filtros.co_municipio or filtros.apenas_ativas %}
-        {#- Saída do beco sem saída quando um filtro esconde o resultado: só
-            aparece com filtro ativo. Limpa tudo, inclusive o offset. -#}
-        <a class="limpar-filtros" href="{{ app_prefix }}/">Limpar filtros</a>
+        {% if filtros.q %}
+        <span class="chip">nome: <strong>{{ filtros.q }}</strong></span>
+        {% endif %}
+        {% if filtros.co_municipio %}
+        <span class="chip">município: <strong>{{ nome_municipio or filtros.co_municipio }}</strong></span>
+        {% endif %}
+        {% if filtros.apenas_ativas %}
+        <span class="chip">só ativas</span>
+        {% endif %}
+        <a class="botao botao--secundario botao--mini" href="{{ app_prefix }}/">Limpar</a>
         {% endif %}
       </div>
     </form>
-
-    {# Chips de filtro ativo: mostram **o que** está aplicado, não só o link de
-       limpar. Só existem com filtro aplicado. #}
-    {% if filtros.q or filtros.co_municipio or filtros.apenas_ativas %}
-    <ul class="chips" aria-label="Filtros aplicados">
-      {% if filtros.q %}
-      <li class="chip">nome: <strong>{{ filtros.q }}</strong></li>
-      {% endif %}
-      {% if filtros.co_municipio %}
-      <li class="chip">município: <strong>{{ filtros.co_municipio }}</strong></li>
-      {% endif %}
-      {% if filtros.apenas_ativas %}
-      <li class="chip">somente ativas</li>
-      {% endif %}
-    </ul>
-    {% endif %}
   </section>
 
   <section class="painel" aria-labelledby="titulo-resultados">
@@ -104,13 +115,12 @@
     </div>
 
     {% if resposta and escolas %}
-    <p class="paginacao__contagem">Mostrando {{ paginacao.mostrando }}.</p>
-    <div class="tabela-rolagem" role="region" aria-label="Escolas encontradas (tabela com rolagem)" tabindex="0">
+    <div class="tabela-rolagem">
       <table class="tabela" id="tabela-resultados">
-        <caption class="visualmente-oculto">Escolas encontradas nesta página</caption>
+        <caption id="caption-resultados">Escolas encontradas nesta página</caption>
         <thead>
           <tr>
-            <th scope="col" class="nome-escola">Escola</th>
+            <th scope="col">Escola</th>
             <th scope="col">Município</th>
             <th scope="col">Dependência</th>
             <th scope="col" class="num">Matrícula</th>
@@ -122,47 +132,24 @@
         <tbody>
           {% for escola in escolas %}
           <tr>
-            <td class="nome-escola">
-              {# O nome é o link da ficha; o código INEP continua em `<code>`. #}
-              {% if escola.co_entidade %}
-              <a href="{{ app_prefix }}/escolas/{{ escola.co_entidade }}">{{ escola.no_entidade | fmt_nulo }}</a>
-              <code>{{ escola.co_entidade }}</code>
-              {% else %}
-              {{ escola.no_entidade | fmt_nulo }}
-              {% endif %}
-              {% if escola.is_oferta_desconhecida %}<span class="nota">{{ texto_oferta_desconhecida }}</span>{% endif %}
-            </td>
-            <td>
-              {# Município leva ao mercado municipal; o código IBGE fica ao lado. #}
-              {% if escola.co_municipio %}
-              <a href="{{ app_prefix }}/mercados/{{ escola.co_municipio }}">{{ escola.no_municipio | fmt_nulo }}</a>
-              <code>{{ escola.co_municipio }}</code>
-              {% else %}
-              {{ escola.no_municipio | fmt_nulo }}
-              {% endif %}
-            </td>
-            {# Código INEP com a leitura ao lado ("4 — Privada"), igual à ficha. #}
-            <td class="num">{{ escola.tp_dependencia | fmt_nulo }} — {{ rotulo_dependencia(escola.tp_dependencia) }}</td>
-            {#- School não traz matrícula, share nem variação: `sem dado` na
-                mesma célula/estrutura, nunca 0 (AGENTS.md §6). -#}
-            <td class="num"><span class="sem-dado">sem dado</span></td>
-            <td class="num"><span class="sem-dado">sem dado</span></td>
-            <td class="num"><span class="sem-dado">sem dado</span></td>
-            <td>{{ escola.tp_situacao_funcionamento | fmt_nulo }} — {{ rotulo_situacao(escola.tp_situacao_funcionamento) }}</td>
+            {# O nome é o link da ficha; sem o código INEP ao lado (D5). #}
+            <td><a class="nome-escola" href="{{ app_prefix }}/escolas/{{ escola.co_entidade }}">{{ escola.no_entidade | fmt_nulo }}</a></td>
+            {# Município é texto, sem link e sem código; dependência e situação
+               saem só com o rótulo, sem o código INEP (D5). #}
+            <td>{{ escola.no_municipio | fmt_nulo }}</td>
+            <td>{{ rotulo_dependencia(escola.tp_dependencia) }}</td>
+            {#- `School` não traz matrícula, share nem variação: `sem dado` na
+                mesma célula com as classes do protótipo, nunca 0 (AGENTS.md §6). -#}
+            <td class="num metrica"><span class="sem-dado">sem dado</span></td>
+            <td class="num metrica"><span class="sem-dado">sem dado</span></td>
+            <td class="num metrica"><span class="sem-dado">sem dado</span></td>
+            <td>{{ rotulo_situacao(escola.tp_situacao_funcionamento) }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
 
-    <nav class="paginacao" aria-label="Paginação da busca">
-      {% if paginacao.url_anterior %}
-      <a class="paginacao__link" href="{{ paginacao.url_anterior }}" rel="prev">Anterior</a>
-      {% endif %}
-      {% if paginacao.url_proxima %}
-      <a class="paginacao__link" href="{{ paginacao.url_proxima }}" rel="next">Próxima</a>
-      {% endif %}
-    </nav>
     {% if paginacao.refinar %}
     <div class="aviso">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
@@ -172,6 +159,22 @@
       </p>
     </div>
     {% endif %}
+
+    <nav class="paginacao" aria-label="Paginação dos resultados">
+      <p class="paginacao__estado">Mostrando {{ paginacao.mostrando }}</p>
+      <div class="paginacao__botoes">
+        {% if paginacao.url_anterior %}
+        <a class="botao botao--secundario" href="{{ paginacao.url_anterior }}" rel="prev">Anterior</a>
+        {% else %}
+        <span class="botao botao--secundario" aria-disabled="true">Anterior</span>
+        {% endif %}
+        {% if paginacao.url_proxima %}
+        <a class="botao botao--secundario" href="{{ paginacao.url_proxima }}" rel="next">Próxima</a>
+        {% else %}
+        <span class="botao botao--secundario" aria-disabled="true">Próxima</span>
+        {% endif %}
+      </div>
+    </nav>
 
     {# Origem de cada número da tabela (autor e consulta). Só existe depois de
        uma consulta: sem consulta não há números a contextualizar. #}
@@ -203,11 +206,7 @@
         <dt>Avisos</dt>
         <dd>
           {% if avisos %}
-          <ul class="lista-regras">
-            {% for aviso in avisos %}
-            <li>{{ aviso }}</li>
-            {% endfor %}
-          </ul>
+          {{ avisos | join("; ") }}
           {% else %}
           nenhum aviso para esta consulta
           {% endif %}
@@ -217,19 +216,11 @@
     {% endif %}
 
     {% elif resposta %}
-    {#- Estado vazio de busca do protótipo (lupa + título + resumo): as sugestões
-        de próximo passo continuam dentro dele, como lista de ações. -#}
+    {#- Estado vazio do protótipo com critério e sem linha (lupa + título). -#}
     <div class="estado-vazio">
       <svg class="estado-vazio__icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
-      <h3>Nenhuma escola encontrada para esta busca.</h3>
-      <p>Ajuste o nome, o município ou os filtros — as sugestões abaixo abrem uma busca válida.</p>
-      <ul class="lista-regras">
-        {% for sugestao in sugestoes_vazio %}
-        <li>
-          {% if sugestao.href %}<a href="{{ sugestao.href }}">{{ sugestao.lead }}</a>{% else %}<strong>{{ sugestao.lead }}</strong>{% endif %} — {{ sugestao.motivo }}
-        </li>
-        {% endfor %}
-      </ul>
+      <h3>Nenhuma escola para este recorte</h3>
+      <p>Ajuste o nome, o município ou os filtros e tente novamente.</p>
     </div>
     {% else %}
     <div class="estado-vazio">
@@ -240,8 +231,5 @@
     {% endif %}
   </section>
 
-  {# O rodapé único da página (card V3-S0): a nota de ausência só faz sentido
-     depois de uma consulta — a 1ª visita não mostra valor nenhum, então a
-     nota sairia como ruído (e "sem dado" numa tela sem dado nenhum). #}
   {{ rodape_final(houve_consulta) }}
 {% endblock %}

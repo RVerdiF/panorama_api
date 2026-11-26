@@ -54,19 +54,7 @@ PENDENTES: dict[str, frozenset[str]] = {
     # mas a chave fica para travar que nada legado volta.
     "partials/breadcrumb.html": frozenset(),
     # Zera no card da busca (ordem 2).
-    "busca.html": frozenset(
-        {
-            "campo--acao",
-            "campo--booleano",
-            "dica",
-            "formulario",
-            "limpar-filtros",
-            "lista-regras",
-            "nota",
-            "paginacao__contagem",
-            "paginacao__link",
-        }
-    ),
+    "busca.html": frozenset(),
     # Zera no card do mercado (ordem 3).
     "mercado.html": frozenset(
         {
