@@ -1,37 +1,34 @@
-"""Regras das telas de mercado: Visão geral e Escolas do mercado (card NAV-3).
+"""Regras da tela de mercado: Visão geral + Escolas do mercado (card D1-E3).
 
 Tudo aqui é **puro**: recebe as respostas do contrato (as mesmas do `/v1`) e
 devolve o contexto do template. Nenhum acesso a dado — quem consulta é
 `web/dados.py`, chamado pela rota em `web/routes.py`.
 
-Duas rotas, uma consulta cara cada (spec §5.3):
+Uma rota, duas consultas (decisão D4 do plano):
 
-* `/app/mercados/{co_municipio}` — **Visão geral**: tamanho, composição,
-  cobertura e entrada/saída. Consulta `dados.mercado` mais o top-10 do share
-  (`dados.share_mercado` com `limit=10`, na etapa do recorte) para a tabela do
-  painel "Escolas do mercado por share" (card V2 `t_cbd54a92`, rodada 1,
-  item 2); a lista completa e paginada continua na rota abaixo.
-* `/app/mercados/{co_municipio}/escolas` — **Escolas do mercado**: o ranking de
-  share paginado. Consulta só `dados.share_mercado` (3 consultas, ~203,5 MB).
-
-O ranking saiu da abertura no card NAV-3 (a consulta `mart_market_share` é
-cara: ~181 MB) e voltou como top-10 no card V2, por exigência da especificação
-do protótipo; a paginação completa continua fora da abertura.
+* `/app/mercados/{co_municipio}` — **tamanho, composição**, cobertura,
+  entrada/saída e o ranking de share **paginado na própria página**
+  (`section#escolas`, 10 linhas por página). Consulta `dados.mercado` mais
+  `dados.share_mercado` (`limit=10`, na etapa do recorte, deslocado por
+  `offset`); `offset` fora de `0..1000` continua `422`.
+* `/app/mercados/{co_municipio}/escolas` não existe mais: virou **301** para
+  `/app/mercados/{co}?ano&etapa&offset#escolas` (o handler mora em
+  `web/routes.py`, sem contexto nem template).
 
 Decisões que moram neste módulo:
 
 1. **Sem concentração (HHI/C4) na tela.** Decisão D4 do plano: fora do MVP. Os
-   campos `concentracao` do contrato são consultados pelo `/v1` e não exibidos;
-   a Visão geral não os usa.
+   campos `concentracao` do contrato são consultados pelo `/v1` e não exibidos.
 2. **Concorrência é municipal.** A contagem vem de `n_escolas_privadas`/
    `n_escolas_ativas` do mesmo município e ano — vocabulário de raio/proximidade
-   não existe aqui (`docs/escopo-adiado-v1.md`). Essas duas contagens **não**
-   variam por etapa na mart (a escola ativa entra em todas), então a tela as
-   mostra uma única vez, como total do município; repeti-las em cada linha da
-   composição por etapa daria a impressão de nove totais distintos.
-3. **Ausência nunca vira zero.** `share_privado_pct`/`share_total_pct` nulos e
-   os campos de entrada/saída do primeiro ano da série saem como "sem dado"
-   com o motivo; escola ausente do share **não é** 0%.
+   não existe aqui (`docs/escopo-adiado-v1`). Essas duas contagens **não**
+   variam por etapa na mart e aparecem uma única vez, nos KPIs.
+3. **Ausência nunca vira zero.** `share_privado_pct` nulo e os campos de
+   entrada/saída do primeiro ano da série saem como "sem dado" com o motivo;
+   escola ausente do share **não é** 0%.
+4. **Composição são 5 etapas que somam** (decisão D9): Creche, Pré-escola,
+   anos iniciais e finais do fundamental e Ensino médio. EJA, especial,
+   profissional e o total `bas` ficam fora do gráfico (não somam).
 """
 
 from __future__ import annotations
@@ -57,54 +54,45 @@ from panorama_api.web.conteudo import (
 
 from panorama_api.web.filters import SEM_DADO, fmt_ano, fmt_contagem, fmt_nulo
 
-#: Identificador de cada seção do mercado no subnav (spec §2.2).
-VISAO_GERAL = "visao_geral"
-ESCOLAS = "escolas"
-
 #: Rótulo do item do subnav que leva ao ranking (spec §1).
 ROTULO_ESCOLAS_MERCADO = "Escolas do mercado"
 
-#: Colunas de cobertura de matrícula por etapa (`MarketItem.cobertura`).
-COBERTURA: tuple[tuple[str, str], ...] = (
-    ("Com linha de matrícula", "n_escolas_com_linha_matricula"),
-    ("Sem linha de matrícula", "n_escolas_mat_linha_missing"),
-    ("Linha com matrícula faltante", "n_escolas_mat_valor_missing"),
-    ("Sem matrícula em qualquer etapa", "n_escolas_mat_missing"),
-)
-
-#: Campos de entrada/saída: `null` no primeiro ano da série (sem baseline).
-MOVIMENTO: tuple[tuple[str, str], ...] = (
-    ("Escolas que entraram", "n_escolas_entraram"),
-    ("Escolas comparáveis (com baseline)", "n_escolas_ativas_com_baseline"),
-    ("Escolas que saíram", "n_escolas_sairam"),
-)
+#: Etapas que somam no gráfico de composição, nesta ordem (decisão D9).
+COMPOSICAO_ETAPAS: tuple[str, ...] = ("creche", "pre", "fund_ai", "fund_af", "med")
 
 
-def itens_subnav(
-    *,
-    caminho: str,
-    filtros: dict[str, str],
-    ativo: str,
-    url_lista: Any,
-) -> list[dict[str, Any]]:
-    """Itens do subnav do mercado — macro única, sem JS (spec §2.2).
+def itens_subnav(*, prefixo: str) -> list[dict[str, Any]]:
+    """Itens do subnav do mercado — literais do protótipo, sem JS.
 
-    Os dois links levam o recorte atual (`ano` e `etapa`) e **nunca** `offset`:
-    a página do ranking é a sua própria URL canônica, e trocar de seção recomeça
-    na primeira página. A rota ativa leva `aria-current="page"` (macro
+    As duas primeiras são âncoras da própria página (`#composicao` leva
+    `aria-current="page"`, como no protótipo); as duas últimas saem da tela
+    (índice de municípios e busca). Sem `offset`, sem params mortos e sem
+    classe: o protótipo não tem classe nesses links (macro
     `partials/subnav.html`).
     """
     return [
         {
             "rotulo": ROTULO_VISAO_GERAL,
-            "href": url_lista(caminho, filtros),
-            "ativo": ativo == VISAO_GERAL,
+            "href": "#composicao",
+            "ativo": True,
             "classe": "",
         },
         {
             "rotulo": ROTULO_ESCOLAS_MERCADO,
-            "href": url_lista(f"{caminho}/escolas", filtros),
-            "ativo": ativo == ESCOLAS,
+            "href": "#escolas",
+            "ativo": False,
+            "classe": "",
+        },
+        {
+            "rotulo": "← Índice de municípios",
+            "href": f"{prefixo}/mercados/",
+            "ativo": False,
+            "classe": "",
+        },
+        {
+            "rotulo": "Buscar escolas",
+            "href": f"{prefixo}/",
+            "ativo": False,
             "classe": "",
         },
     ]
@@ -115,7 +103,7 @@ def _linhas_por_etapa(items: Sequence[MarketItem]) -> list[dict[str, Any]]:
 
     `n_escolas_ativas`/`n_escolas_privadas` **não** entram aqui: a mart repete o
     total do município em todas as etapas e repeti-lo linha a linha sugere nove
-    números diferentes. O total aparece uma única vez no resumo da página
+    números diferentes. O total aparece uma única vez nos KPIs da página
     (`denominadores`), tirado da linha da etapa selecionada.
 
     `fixa` marca a linha que **não** é uma etapa do mercado: `bas` é o total
@@ -128,32 +116,89 @@ def _linhas_por_etapa(items: Sequence[MarketItem]) -> list[dict[str, Any]]:
             "etapa": item.etapa,
             "rotulo": rotulo_etapa(item.etapa),
             "fixa": item.etapa == ETAPA_PADRAO_MERCADO,
-            "n_escolas_publicas": item.n_escolas_publicas,
             "qt_mat_total": item.qt_mat_total,
             "qt_mat_publica": item.qt_mat_publica,
             "qt_mat_privada": item.qt_mat_privada,
             "pct_privada_no_total_pct": item.pct_privada_no_total_pct,
-            "movimento": [
-                {"rotulo": rotulo, "valor": getattr(item, campo)}
-                for rotulo, campo in MOVIMENTO
-            ],
-            "cobertura": [
-                {"rotulo": rotulo, "valor": item.cobertura.get(campo)}
-                for rotulo, campo in COBERTURA
-            ],
         }
         for item in items
     ]
 
 
-def _linha_da_etapa(linhas: Sequence[dict[str, Any]], etapa: str) -> dict[str, Any] | None:
-    """Linha da etapa selecionada (cobertura e movimento são de uma etapa)."""
-    return next((linha for linha in linhas if linha["etapa"] == etapa), None)
-
-
 def _item_da_etapa(items: Sequence[MarketItem], etapa: str) -> MarketItem | None:
     """Item de `mart_mercado` da etapa selecionada (fonte dos denominadores)."""
     return next((item for item in items if item.etapa == etapa), None)
+
+
+def composicao_do_mercado(
+    linhas: Sequence[dict[str, Any]], *, total_privado_bas: float | None
+) -> tuple[list[dict[str, Any]], float | None]:
+    """As 5 etapas que somam, com % do total privado e largura da barra.
+
+    `pct` é a fração do total privado do ano (`qt_mat_privada` da linha `bas`,
+    1 casa); `largura` é a fração do maior valor entre as 5 (1 casa, para
+    `data-largura` + `aplicarBarras`). Etapa sem valor sai com `None` nos três
+    campos: o template mostra `sem dado` e não desenha barra. A soma cobre só
+    as etapas presentes (`None` quando nenhuma tem valor — nunca `0`).
+    """
+    por_etapa = {linha["etapa"]: linha["qt_mat_privada"] for linha in linhas}
+    valores = [por_etapa.get(etapa) for etapa in COMPOSICAO_ETAPAS]
+    presentes = [v for v in valores if v is not None]
+    maximo = max(presentes) if presentes else None
+    itens = []
+    for etapa, valor in zip(COMPOSICAO_ETAPAS, valores):
+        if valor is None:
+            itens.append(
+                {
+                    "etapa": etapa,
+                    "rotulo": rotulo_etapa(etapa),
+                    "qt_mat_privada": None,
+                    "pct": None,
+                    "largura": None,
+                }
+            )
+            continue
+        itens.append(
+            {
+                "etapa": etapa,
+                "rotulo": rotulo_etapa(etapa),
+                "qt_mat_privada": valor,
+                "pct": (
+                    valor / total_privado_bas * 100 if total_privado_bas else None
+                ),
+                "largura": f"{valor / maximo * 100:.1f}" if maximo else None,
+            }
+        )
+    soma = sum(presentes) if presentes else None
+    return itens, soma
+
+
+def movimento_para_ranking(
+    *,
+    item: MarketItem | None,
+    privadas_ativas: int | float | None,
+    ano_ref: int,
+) -> dict[str, Any] | None:
+    """O cartão único do `ul.ranking` do movimento — ou `None` no 1º ano.
+
+    Entrada e saída comparam dois anos: quando os três campos são nulos (sem
+    baseline, o 1º ano da série), o bloco vira o `estado-vazio` do protótipo
+    em vez de mostrar zero. Fora isso, o cartão mostra as privadas ativas com
+    `entraram`/`saíram` da etapa selecionada.
+    """
+    if item is None or (
+        item.n_escolas_entraram is None
+        and item.n_escolas_ativas_com_baseline is None
+        and item.n_escolas_sairam is None
+    ):
+        return None
+    return {
+        "ativas": privadas_ativas,
+        "entraram": item.n_escolas_entraram,
+        "sairam": item.n_escolas_sairam,
+        "ano": ano_ref,
+        "ano_anterior": ano_ref - 1,
+    }
 
 
 def barra_share(pct: float | None) -> Markup | None:
@@ -188,7 +233,11 @@ def barra_share(pct: float | None) -> Markup | None:
 
 
 def _linhas_share(share: ShareResponse) -> list[dict[str, Any]]:
-    """Ranking do share na página, com a posição explícita (o contrato não tem `total`)."""
+    """Ranking do share na página, com a posição explícita (o contrato não tem `total`).
+
+    `share_privado_fmt` é o número com 2 casas no formato BR (`37,50`) para a
+    célula `td.num.metrica`; `None` vira `sem dado` no template, nunca `0%`.
+    """
     offset = share.page.offset
     return [
         {
@@ -197,8 +246,11 @@ def _linhas_share(share: ShareResponse) -> list[dict[str, Any]]:
             "no_entidade": item.no_entidade,
             "mat_entidade": item.mat_entidade,
             "share_privado_pct": item.share_privado_pct,
-            "share_total_pct": item.share_total_pct,
-            "is_abaixo_porte": item.is_abaixo_porte,
+            "share_privado_fmt": (
+                f"{item.share_privado_pct:.2f}".replace(".", ",")
+                if item.share_privado_pct is not None
+                else None
+            ),
             # Barra decorativa ao lado do número (o número não muda): `None`
             # quando o share é nulo, para a célula não ganhar um zero visual.
             "barra_share": barra_share(item.share_privado_pct),
@@ -254,39 +306,58 @@ def kpis_mercado(
     ]
 
 
-def contexto_visao_geral(*, mercado: MarketsResponse, etapa: str) -> dict[str, Any]:
-    """Contexto da **Visão geral** — tudo sai de `dados.mercado` (3 consultas).
+def contexto_visao_geral(
+    *, mercado: MarketsResponse, etapa: str, anos: Sequence[int]
+) -> dict[str, Any]:
+    """Contexto da tela — tudo sai de `dados.mercado` (3 consultas).
 
     `mercado` é consultado **sem** recorte de etapa: a composição por etapa é o
-    conteúdo da tela. A etapa selecionada vale para os blocos de cobertura e
-    entrada/saída e para os denominadores do resumo; a rota garante que ela
-    existe entre as etapas publicadas (etapa sem linha é `404` com seletor).
+    conteúdo da tela. A etapa selecionada vale para o movimento e para os
+    denominadores dos KPIs; a rota garante que ela existe entre as etapas
+    publicadas (etapa sem linha é `404` com seletor).
 
     Os denominadores vêm da linha da etapa em `mart_mercado` — os mesmos campos
     que o `/v1` usa no share quando a página de share volta vazia. Assim a
-    Visão geral não precisa da consulta de share para exibir o tamanho.
+    tela não precisa da consulta de share para exibir o tamanho.
     """
     itens = list(mercado.data.items)
     etapas = _linhas_por_etapa(itens)
     item = _item_da_etapa(itens, etapa)
+    # A rota só chama este contexto depois de resolver e validar o ano, então
+    # a meta sempre traz o ano de referência; o `max(anos)` é o mesmo padrão
+    # do seletor, para o tipo continuar `int` no `ano - 1` do movimento.
+    ano_ref = (
+        mercado.meta.ano_referencia
+        if mercado.meta.ano_referencia is not None
+        else max(anos)
+    )
+    denominadores = {
+        "n_escolas_privadas": item.n_escolas_privadas if item else None,
+        "n_escolas_ativas": item.n_escolas_ativas if item else None,
+        "qt_mat_privada": item.qt_mat_privada if item else None,
+        "qt_mat_total": item.qt_mat_total if item else None,
+    }
+    bas = _item_da_etapa(itens, ETAPA_PADRAO_MERCADO)
+    composicao, soma_etapas = composicao_do_mercado(
+        etapas,
+        total_privado_bas=bas.qt_mat_privada if bas else None,
+    )
 
     return {
         "mercado": mercado.data,
-        "ano_selecionado": mercado.meta.ano_referencia,
+        "ano_selecionado": ano_ref,
         "etapa_selecionada": etapa,
         "etapa_rotulo": rotulo_etapa(etapa),
-        "etapas": etapas,
-        # O seletor oferece só as etapas publicadas para este município/ano
-        # (linhas de `mart_mercado`), não as 9 do contrato: etapa sem linha
-        # seria um 404 anunciado na própria tela.
-        "etapas_disponiveis": {linha["etapa"]: linha["rotulo"] for linha in etapas},
-        "item_etapa": _linha_da_etapa(etapas, etapa),
-        "denominadores": {
-            "n_escolas_privadas": item.n_escolas_privadas if item else None,
-            "n_escolas_ativas": item.n_escolas_ativas if item else None,
-            "qt_mat_privada": item.qt_mat_privada if item else None,
-            "qt_mat_total": item.qt_mat_total if item else None,
-        },
+        "menor_ano": min(anos),
+        "composicao": composicao,
+        "soma_etapas": soma_etapas,
+        "total_privado_bas": bas.qt_mat_privada if bas else None,
+        "movimento": movimento_para_ranking(
+            item=item,
+            privadas_ativas=denominadores["n_escolas_privadas"],
+            ano_ref=ano_ref,
+        ),
+        "denominadores": denominadores,
         "motivo_entrada_saida": MOTIVO_ENTRADA_SAIDA,
         "definicao_concorrencia": DEFINICAO_CONCORRENCIA,
         "meta": {
@@ -369,32 +440,14 @@ def contexto_escolas_mercado(
     }
 
 
-def contexto_share_visao_geral(
-    *, share: ShareResponse
-) -> dict[str, Any]:
-    """As 10 primeiras linhas do share para a **Visão geral** (card V2).
-
-    A mesma leitura de `_linhas_share` do ranking (posição, nome com link da
-    ficha, matrícula e share privado com barra), limitada à consulta da rota
-    (`limit=10`, primeira página). A lista completa e paginada continua em
-    `/app/mercados/{co}/escolas`.
-    """
-    return {
-        "linhas_share": _linhas_share(share),
-        "texto_abaixo_porte": TEXTO_ABAIXO_PORTE,
-    }
-
-
 __all__ = [
-    "COBERTURA",
-    "ESCOLAS",
-    "MOVIMENTO",
+    "COMPOSICAO_ETAPAS",
     "ROTULO_ESCOLAS_MERCADO",
-    "VISAO_GERAL",
     "barra_share",
+    "composicao_do_mercado",
     "contexto_escolas_mercado",
-    "contexto_share_visao_geral",
     "contexto_visao_geral",
     "itens_subnav",
     "kpis_mercado",
+    "movimento_para_ranking",
 ]
