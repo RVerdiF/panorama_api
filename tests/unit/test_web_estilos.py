@@ -7,8 +7,8 @@ numéricos e vivem no arquivo:
 
 * borda de **controle** (input/select) com ≥3:1 sobre `#ffffff` — WCAG 1.4.11
   para o limite visual do controle, separada da borda decorativa de cartão;
-* `:hover` em `a`, `button` e `.paginacao__link` (affordance de ponteiro);
-* alvo de toque ≥44px em `.topo__nav a` e `.paginacao__link`;
+* `:hover` em `a` e `button` (affordance de ponteiro);
+* alvo de toque ≥44px nos campos e botões do formulário do SSR;
 * texto do painel do recorte da landing com ≥4,5:1 sobre o fundo `#eaf1f6`
   (card `t_437796c3`) — o painel não fica mais sobre o branco do cartão.
 
@@ -112,34 +112,37 @@ def test_hover_em_link_botao_e_paginacao():
 
     assert len(linhas_com_hover) >= 2
     for seletor in (
-        ".topo__nav a:hover",
+        ".menu a:hover",
         ".botao--secundario:hover",
-        ".paginacao__link:hover",
         ".subnav a:hover",
     ):
         assert seletor in css, f":hover ausente para {seletor}"
 
 
-def test_acao_do_formulario_so_vira_linha_com_o_link_limpar():
-    """Sem o link, a ação continua em coluna: o botão estica na largura da
-    célula. A linha vale só quando `.limpar-filtros` existe (busca com filtro),
-    senão o form do mercado — fora do escopo do card — muda de largura."""
+def test_acao_do_formulario_nao_troca_flex_direction_na_regra_base():
+    """O botão de busca estica na largura da célula em `campo--acao`.
+
+    A busca do protótipo não tem mais o link "Limpar filtros" dentro da célula
+    de ação (o limpar é um `a.botao` nos chips), então a regra `:has()` que
+    virava linha saiu no D1-E7. O que sobra é o invariante: a base não força
+    `row`, senão o botão deixa de esticar na coluna.
+    """
     base = _regra(".campo--acao")
     assert "flex-direction" not in base, (
         "`.campo--acao` não deve trocar flex-direction na regra base"
     )
 
-    linha = _regra(".campo--acao:has(.limpar-filtros)")
-    assert "flex-direction: row" in linha
 
+def test_alvos_de_toque_do_formulario_tem_44px():
+    """O formulário do SSR empilha campos e botão; ambos com alvo ≥44px.
 
-def test_alvos_de_toque_do_topo_e_da_paginacao_tem_44px():
-    for seletor in (".topo__nav a", ".paginacao__link"):
-        regra = _regra(seletor)
-        altura = re.search(r"min-height:\s*(\d+)px", regra)
-
-        assert "inline-flex" in regra, f"{seletor} precisa de display inline-flex"
-        assert altura is not None, f"{seletor} sem min-height explícito"
+    O `.paginacao__link` do SSR antigo saiu no D1-E7 — a paginação das telas
+    migradas é `nav.paginacao > .botao` (`.botao` já tem 46px no protótipo).
+    """
+    campos = _regra('.campo input[type="search"],\n.campo select')
+    for regra, alvo in ((campos, "campos"), (_regra(".formulario button"), "botão")):
+        altura = re.search(r"(?:min-)?height:\s*(\d+)px", regra)
+        assert altura is not None, f"{alvo} do formulário sem altura explícita"
         assert int(altura.group(1)) >= ALVO_MINIMO_PX
 
 
@@ -357,9 +360,9 @@ def test_paleta_de_acao_e_a_do_prototipo():
     assert re.search(r"--accent:\s*#1e5a4c", css)
     assert re.search(r"--bg:\s*#e6eae6", css)
     assert re.search(r"--surface:\s*#f8faf7", css)
-    # Ação primária e link de paginação herdam o acento; não existe um azul.
+    # Ação primária e link de navegação herdam o acento; não existe um azul.
     assert "var(--accent)" in _regra(".botao--primario")
-    assert "var(--accent)" in _regra(".paginacao__link")
+    assert "var(--ink-accent)" in _regra(".menu a[aria-current]")
     assert "#1f5f8b" not in css, "o azul da paleta antiga voltou"
 
 
@@ -389,26 +392,24 @@ def test_foco_visivel_usa_o_anel_do_prototipo():
     assert re.search(r"--focus-ring:\s*0 0 0 3px rgba\(30, 90, 76, 0\.30\)", css)
 
 
-# -- navbar com submenu nativo (card NAV-1 `t_d31ce632`, spec §2.1/§2.3) ------
+# -- navbar do protótipo (V3-S0): link do menu com alvo de toque -------------
 
 
-def test_summary_do_submenu_tem_alvo_de_44px():
-    """O `<summary>` é item de navegação como os links: alvo ≥44px (achado C6)."""
-    regra = _regra(".topo__submenu > summary")
+def test_menu_do_topo_declara_alvo_de_toque():
+    """A navbar é `.menu` do protótipo (V3-S0); o `<details>` do NAV-1 saiu.
+
+    O alvo é 40px no vendorizado — acima do mínimo AA da WCAG 2.5.8 (24px),
+    abaixo dos 44px que o card antigo pedia para o `.topo__nav a` do SSR
+    (seletor que o shell apagou). A divergência para 44px é decisão de design
+    do protótipo, registrada no handoff do D1-E7; o que este teste trava é o
+    link do menu continuar declarando altura própria.
+    """
+    regra = _regra(".menu a")
     altura = re.search(r"min-height:\s*(\d+)px", regra)
 
-    assert "inline-flex" in regra, "`.topo__submenu > summary` precisa de inline-flex"
-    assert altura is not None, "`.topo__submenu > summary` sem min-height explícito"
-    assert int(altura.group(1)) >= ALVO_MINIMO_PX
-
-
-def test_painel_do_submenu_fica_em_fluxo_e_nao_sobreposto():
-    """Spec §2.3: o painel empurra o conteúdo — nada de `position: absolute`."""
-    painel = _regra(".topo__painel")
-
-    assert "position: absolute" not in painel
-    assert "position" not in painel
-    assert "border-left: 1px solid var(--border)" in painel
+    assert "inline-flex" in regra, "`.menu a` precisa de display inline-flex"
+    assert altura is not None, "`.menu a` sem min-height explícito"
+    assert int(altura.group(1)) >= 24, "alvo de toque abaixo do mínimo AA (24px)"
 
 
 # -- destaque da linha alvo do ranking (card t_e120b83b) ---------------------

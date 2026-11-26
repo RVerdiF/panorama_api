@@ -27,6 +27,10 @@ from panorama_api.main import create_app
 #: Classes legadas que a tela de erro usava e que não existem em
 #: `panorama.css` (medido no plano §1.3). A trava de classes cobre o template
 #: cru; aqui a mesma lista vale para o HTML renderizado das três telas.
+#: `painel--erro`, `codigo-erro`, `aviso--temporario`, `lista-regras`,
+#: `paginacao__link` e `rodape-erro` saíram do app-only no D1-E7 (ninguém os
+#: usava depois do D1-E5); continuam na lista como sentinela — se voltarem ao
+#: HTML, o teste falha antes de a regra precisar existir.
 CLASSES_LEGADAS = (
     "painel--erro",
     "codigo-erro",
