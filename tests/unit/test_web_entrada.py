@@ -246,8 +246,9 @@ def test_busca_sem_consulta_orienta_sobre_o_produto(cliente: TestClient):
     assert "Minas Gerais" in html
     assert "INEP" in html
     # Os alvos do formulário continuam no lugar, para os fluxos que os usam.
-    assert 'id="formulario-busca"' in html
-    assert 'id="co_municipio"' in html
+    assert 'id="form-busca"' in html
+    assert 'id="municipio"' in html
+    assert 'id="dados-municipios"' in html
 
 
 def test_busca_sem_consulta_nao_mostra_sem_dado(cliente: TestClient):
