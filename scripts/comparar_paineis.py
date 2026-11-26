@@ -63,6 +63,39 @@ ESPERADO = {
 KPI_TELAS = frozenset({"/app/escolas/31005371", "/app/mercados/3106200"})
 FILHOS_KPIS = 4
 
+#: Esqueleto do DOM da busca (card V3 `t_9f384f60`, critério 1): filhos de
+#: `main`, de cada `section.painel` e do `form#form-busca`, exatamente como
+#: no esqueleto-alvo do spec. Ordem trocada, elemento faltando ou extra =
+#: falha. A chave usa `q=colegio` para que a página venha com linhas (sem
+#: critério não há consulta e a seção de resultados muda de forma).
+ESQUELETO = {
+    "/app/?q=colegio": {
+        "main": [
+            "div.tela-topo",
+            "section.painel.painel--inicial",
+            "section.painel",
+            "footer.rodape-final",
+        ],
+        "filtros": [
+            "div.painel__cabecalho",
+            "form#form-busca",
+        ],
+        "form-busca": [
+            "div.filtros",
+            "div.filtros.filtros--3",
+            "div.acoes-filtro",
+            "p.retorno#retorno",
+            "div.chips#chips",
+        ],
+        "resultados": [
+            "div.painel__cabecalho",
+            "div.tabela-rolagem",
+            "nav.paginacao",
+            "dl.rodape-meta",
+        ],
+    }
+}
+
 COTEMIG = "31005371"
 MUNICIPIO = "3106200"
 ANOS = (2021, 2022, 2023, 2024, 2025)
@@ -128,6 +161,103 @@ def analisar(html: str) -> tuple[list[str], list[int]]:
     return parser.h2s, parser.kpis_filhos
 
 
+class Esqueleto(HTMLParser):
+    """Árvore mínima (tag + atributos + filhos) para assinar filhos diretos.
+
+    Só elementos viram nó; texto é ignorado, porque o esqueleto compara
+    estrutura (tag, classes em ordem, `id`), nunca copy.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.raiz: dict = {"tag": "raiz", "attrs": {}, "filhos": []}
+        self._pilha: list[dict] = [self.raiz]
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        no: dict = {"tag": tag, "attrs": dict(attrs), "filhos": []}
+        self._pilha[-1]["filhos"].append(no)
+        self._pilha.append(no)
+
+    def handle_startendtag(
+        self, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
+        no: dict = {"tag": tag, "attrs": dict(attrs), "filhos": []}
+        self._pilha[-1]["filhos"].append(no)
+
+    def handle_endtag(self, tag: str) -> None:
+        for i in range(len(self._pilha) - 1, 0, -1):
+            if self._pilha[i]["tag"] == tag:
+                del self._pilha[i:]
+                break
+
+
+def _assinatura(no: dict) -> str:
+    """`tag.classes#id` (classes na ordem do HTML, `id` só quando há)."""
+    pedacos = [no["tag"]]
+    for classe in (no["attrs"].get("class") or "").split():
+        pedacos.append(f".{classe}")
+    identidade = no["attrs"].get("id")
+    if identidade:
+        pedacos.append(f"#{identidade}")
+    return "".join(pedacos)
+
+
+def _casa(no: dict, *, tag: str, classe: str | None = None) -> bool:
+    if no["tag"] != tag:
+        return False
+    return classe is None or classe in (no["attrs"].get("class") or "").split()
+
+
+def _secoes_do_main(raiz: dict) -> tuple[dict | None, list[dict]]:
+    principal = None
+    pilha = [raiz]
+    while pilha:
+        no = pilha.pop()
+        if _casa(no, tag="main"):
+            principal = no
+            break
+        pilha.extend(no["filhos"])
+    secoes = (
+        [f for f in principal["filhos"] if _casa(f, tag="section", classe="painel")]
+        if principal is not None
+        else []
+    )
+    return principal, secoes
+
+
+def conferir_esqueleto(caminho: str, html: str) -> list[str]:
+    """Filhos de `main`, de cada `section.painel` e do `form#form-busca`.
+
+    Devolve a lista de divergências (vazia = confere com o ESQUELETO).
+    """
+    esperado = ESQUELETO[caminho]
+    parser = Esqueleto()
+    parser.feed(html)
+    parser.close()
+    principal, secoes = _secoes_do_main(parser.raiz)
+    reais = {"main": [], "filtros": [], "form-busca": [], "resultados": []}
+    if principal is not None:
+        reais["main"] = [_assinatura(f) for f in principal["filhos"]]
+    formulario = None
+    if len(secoes) == 2:
+        reais["filtros"] = [_assinatura(f) for f in secoes[0]["filhos"]]
+        reais["resultados"] = [_assinatura(f) for f in secoes[1]["filhos"]]
+        for filho in secoes[0]["filhos"]:
+            if filho["tag"] == "form" and filho["attrs"].get("id") == "form-busca":
+                formulario = filho
+    if formulario is not None:
+        reais["form-busca"] = [_assinatura(f) for f in formulario["filhos"]]
+    divergencias = []
+    for chave, lista_esperada in esperado.items():
+        if reais[chave] != lista_esperada:
+            divergencias.append(
+                f"{caminho} [{chave}]\n"
+                f"  esperado: {lista_esperada}\n"
+                f"  obtido:   {reais[chave]}"
+            )
+    return divergencias
+
+
 def _fixture() -> tuple[Settings, FakeRepository]:
     """App hermético: `Settings` explícito + `FakeRepository` com a fixture."""
     from panorama_api.config import Settings
@@ -155,7 +285,9 @@ def _fixture() -> tuple[Settings, FakeRepository]:
     matriculas = {2021: 420, 2022: 455, 2023: 501, 2024: 540, 2025: 680}
     repository = FakeRepository(
         schools=[
-            school_row(co_entidade=COTEMIG, no_entidade="COL COTEMIG BARROCA")
+            school_row(co_entidade=COTEMIG, no_entidade="COL COTEMIG BARROCA"),
+            # Casa `q=colegio` do ESQUELETO (critério 1 do card da busca).
+            school_row(co_entidade="31009999", no_entidade="COLEGIO EXEMPLO"),
         ],
         history=[
             history_row(
@@ -202,7 +334,7 @@ def _buscar_hermetico() -> dict[str, str]:
     settings, repository = _fixture()
     paginas: dict[str, str] = {}
     with TestClient(create_app(settings=settings, repository=repository)) as cliente:
-        for caminho in ESPERADO:
+        for caminho in list(ESPERADO) + list(ESQUELETO):
             resposta = cliente.get(caminho)
             assert resposta.status_code == 200, f"{caminho}: {resposta.status_code}"
             tipo = resposta.headers.get("content-type", "")
@@ -213,7 +345,7 @@ def _buscar_hermetico() -> dict[str, str]:
 
 def _buscar_base(base: str) -> dict[str, str]:
     paginas: dict[str, str] = {}
-    for caminho in ESPERADO:
+    for caminho in list(ESPERADO) + list(ESQUELETO):
         url = base.rstrip("/") + caminho
         with urlopen(url, timeout=10) as resposta:  # noqa: S310 (base local)
             corpo = resposta.read().decode("utf-8")
@@ -259,6 +391,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             else:
                 print(f"OK {caminho} (div.kpis com {FILHOS_KPIS} filhos)")
+    for esqueleto_caminho in ESQUELETO:
+        divergencias = conferir_esqueleto(esqueleto_caminho, paginas[esqueleto_caminho])
+        for divergencia in divergencias:
+            falhas += 1
+            print(f"DIVERGÊNCIA {divergencia}")
+        if not divergencias:
+            print(f"OK {esqueleto_caminho} (esqueleto confere)")
     if falhas:
         print(f"\nFALHOU: {falhas} divergência(s)")
         return 1
