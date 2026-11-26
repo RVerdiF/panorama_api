@@ -40,7 +40,6 @@ from markupsafe import Markup
 
 from panorama_api.schemas.markets import MarketItem, MarketsResponse, ShareResponse
 from panorama_api.web.conteudo import (
-    DEFINICAO_CONCORRENCIA,
     ETAPA_PADRAO_MERCADO,
     MOTIVO_ALEM_DO_FIM,
     MOTIVO_ENTRADA_SAIDA,
@@ -359,7 +358,6 @@ def contexto_visao_geral(
         ),
         "denominadores": denominadores,
         "motivo_entrada_saida": MOTIVO_ENTRADA_SAIDA,
-        "definicao_concorrencia": DEFINICAO_CONCORRENCIA,
         "meta": {
             "ano_referencia": mercado.meta.ano_referencia,
             "etapa": rotulo_etapa(mercado.meta.etapa),

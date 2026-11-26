@@ -392,7 +392,9 @@ def test_escolas_teto_de_1000_esconde_proxima_e_pede_outra_etapa(mercado_repo):
 
     secao = html.split('id="titulo-escolas"')[-1]
     assert "Mostrando 1001–1010" in secao
-    assert "Próxima" not in secao
+    # Sem link de próxima (só o botão desabilitado) + aviso de teto.
+    assert 'rel="next"' not in secao
+    assert '<span class="botao botao--secundario" aria-disabled="true">Próxima</span>' in secao
     assert "Limite de paginação atingido" in secao
 
 
@@ -590,12 +592,6 @@ def test_mercado_nao_usa_termos_geograficos_proibidos(mercado_repo):
         assert termo not in html, termo
 
 
-def test_definicao_de_concorrencia_esta_na_tela(mercado_repo):
-    html = _html(_client(mercado_repo).get(MERCADO))
-
-    assert "no mesmo município e ano" in html
-
-
 def test_recorte_obrigatorio_ano_etapa_universo_fonte_e_avisos(mercado_repo):
     html = _html(_client(mercado_repo).get(MERCADO))
 
@@ -702,10 +698,13 @@ def test_custo_de_consultas_nao_muda_com_ancora_e_paginacao():
 
     repo.calls.clear()
     _html(cliente.get(MERCADO))
+    # O share reconfirma município + mercado no serviço: 2 chamadas cada.
     assert sorted(nome for nome, _ in repo.calls) == [
         "get_concentracao",
         "get_market",
+        "get_market",
         "get_market_share",
+        "get_municipio",
         "get_municipio",
     ]
 

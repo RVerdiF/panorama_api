@@ -173,7 +173,7 @@ def test_mercado_nao_mostra_contagem_com_decimal_nas_celulas_de_contagem():
     assert not CONTAGEM_COM_DECIMAL.search(html), CONTAGEM_COM_DECIMAL.search(html)
     # As contagens aparecem como inteiros; o percentual mantém a casa.
     assert ">172.322<" in html
-    assert ">43<" in html
+    assert ">43 entraram<" in html
     # O percentual do share está no ranking da própria página (2 casas, D1-E3).
     assert "8,70%" in html
 
@@ -276,14 +276,11 @@ def test_composicao_por_etapa_nao_repete_a_contagem_de_escolas():
 
     html = _html(_client(repo).get(MERCADO))
 
-    tabela = _tabela(html, "Tamanho do mercado por etapa")
-    assert "Escolas ativas" not in tabela
-    assert "Privadas ativas" not in tabela
-    # O total aparece uma única vez, em "Tamanho do mercado".
-    assert html.count("Escolas privadas ativas no município e ano") == 1
-    assert html.count("Escolas ativas no município e ano (todas as dependências)") == 1
-    # E a explicação de onde o total vive acompanha a tabela.
-    assert "aparecem uma única vez em" in html
+    composicao = html.split('id="composicao-etapas"')[-1].split("</ul>")[0]
+    assert "Escolas ativas" not in composicao
+    assert "Privadas ativas" not in composicao
+    # O total aparece uma única vez, no KPI — a composição só tem matrícula.
+    assert html.count('<p class="kpi__rotulo">Escolas privadas ativas</p>') == 1
 
 
 # -- E5: rótulos INEP completos ---------------------------------------------
