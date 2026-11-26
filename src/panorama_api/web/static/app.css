@@ -1061,14 +1061,9 @@ td .barra-share__trilho {
 }
 
 /* --- app-only: pilha da metodologia (card D1-E6) ---
-   A tela não tem contraparte no protótipo: ela herda os componentes, e os
-   que aparecem repetidos num mesmo painel (`div.definicao` das regras e das
-   definições, `div.aviso` dos avisos) não têm margem própria no CSS
-   vendorizado — no protótipo o vão vinha de `style=` inline, proibido aqui.
-   Mesmo valor do inline de cobertura do mercado (12px → `--space-3`).
-   `.nota-metodo` dos universos já traz `margin-top` do vendorizado. */
+   Tela sem contraparte no protótipo: os componentes repetidos num painel
+   (`div.definicao`, `div.aviso`) não têm margem própria — no protótipo o vão
+   vinha de `style=` inline, proibido aqui. Mesmo valor (12px). */
 #regras > .definicao + .definicao,
 #definicoes > .definicao + .definicao,
-#avisos > .aviso + .aviso {
-  margin-top: var(--space-3);
-}
+#avisos > .aviso + .aviso { margin-top: var(--space-3); }
