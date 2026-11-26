@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "partials/macros.html" import trilha, rodape_final with context %}
-{% from "partials/mercado.html" import recorte_mercado, seletor_mercado with context %}
+{% from "partials/mercado.html" import seletor_mercado with context %}
 {% from "partials/subnav.html" import subnav with context %}
 
-{# **Mercado municipal** (card V2 `t_cbd54a92`) na linguagem do protótipo:
-   cabeçalho de tela, painel de recorte (seletor sem `h2`), quatro KPIs e quatro
-   painéis — tamanho e composição por etapa (painel único), movimento de escolas,
-   cobertura e limites, e o top-10 do ranking de share (a lista completa e
-   paginada continua em `/app/mercados/{co}/escolas`). #}
+{# **Mercado municipal** (card D1-E3) no DOM do protótipo: cabeçalho de tela,
+   seletor de recorte (ano, etapa e município, sem `h2`), quatro KPIs e quatro
+   painéis — composição por etapa (barras), movimento de escolas, cobertura e
+   limites, e o ranking de share paginado na própria página (`#escolas`,
+   10 linhas, `?offset=`). #}
 
 {# O município no `<title>` é o que distingue abas de mercados diferentes. Sem
    nome na resposta, o código IBGE ocupa o lugar. #}
@@ -24,253 +24,198 @@
     {{ subnav(subnav_itens, "Seções do mercado") }}
   </div>
 
-  <section class="painel painel--inicial" aria-label="Contexto do mercado">
-    <p class="nota">
-      <a href="{{ app_prefix }}/?co_municipio={{ municipio }}">Ver escolas deste município</a>
-    </p>
-    {# O `action` é a rota atual: o recorte vale para as seções, mas o formulário
-       não leva `offset` (não é rota paginada). Sem `h2` — o painel é o seletor. #}
-    {{ seletor_mercado(href_base, anos_disponiveis, ano_selecionado, etapas_disponiveis, etapa_selecionada,
-                       "A composição abaixo cobre todas as etapas; a etapa escolhida vale para cobertura e entrada/saída.") }}
-  </section>
+  <div id="mercado">
+    <section class="painel" aria-label="Escolher ano, etapa e município">
+      {{ seletor_mercado(href_base, anos_disponiveis, ano_selecionado, etapas_disponiveis, etapa_selecionada, municipios, municipio) }}
+    </section>
 
-  {% if sem_dados_ano %}
-  <section class="painel painel--erro" aria-labelledby="sem-dados-ano">
-    <h2 id="sem-dados-ano">{{ pagina_erro_titulo }}</h2>
-    <div class="aviso aviso--temporario">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
-      <p>
-        {{ detalhe }} — o recorte escolhido não está publicado. Selecione outro ano
-        ou etapa acima; nada foi exibido parcialmente.
-      </p>
-    </div>
-    <p class="nota">Código de erro <code>{{ codigo }}</code>.</p>
-  </section>
-  {% else %}
-
-  <div class="kpis">
-    {% for kpi in kpis %}
-    <div class="kpi">
-      <p class="kpi__rotulo">{{ kpi.rotulo }}</p>
-      <p class="kpi__valor{% if kpi.classe %} {{ kpi.classe }}{% endif %}">{{ kpi.valor }}</p>
-      <p class="kpi__nota">{{ kpi.nota }}</p>
-    </div>
-    {% endfor %}
-  </div>
-
-  <section class="painel" id="composicao" aria-labelledby="titulo-composicao">
-    <div class="painel__cabecalho">
-      <h2 id="titulo-composicao">Tamanho e composição por etapa</h2>
-      <p class="painel__nota">
-        Matrícula privada por etapa em {{ ano_selecionado | fmt_ano }}. As
-        etapas somam o total privado; <em>Educação básica (total)</em> é o total
-        oficial do Censo, não a soma das subetapas.
-      </p>
-    </div>
-    <p class="subtitulo">
-      <strong>Concorrência:</strong> {{ definicao_concorrencia }}
-    </p>
-    <dl class="lista-definicoes">
-      <dt>Escolas privadas ativas no município e ano</dt>
-      <dd>{{ denominadores.n_escolas_privadas | fmt_contagem }}</dd>
-      <dt>Escolas ativas no município e ano (todas as dependências)</dt>
-      <dd>{{ denominadores.n_escolas_ativas | fmt_contagem }}</dd>
-      <dt>Matrícula privada observada — {{ etapa_rotulo }}</dt>
-      <dd>{{ denominadores.qt_mat_privada | fmt_contagem }}</dd>
-      <dt>Matrícula total observada — {{ etapa_rotulo }}</dt>
-      <dd>{{ denominadores.qt_mat_total | fmt_contagem }}</dd>
-    </dl>
-    <div class="aviso">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
-      <p>
-        A contagem de <strong>escolas ativas</strong> e de <strong>privadas
-        ativas</strong> do município não varia por etapa (na mart, a escola ativa
-        aparece em todas): os dois totais aparecem uma única vez em
-        <em>Tamanho e composição por etapa</em>, acima — repeti-los em cada linha
-        daria a impressão de nove números diferentes.
-      </p>
-    </div>
-    {% if etapas %}
-    <div class="tabela-rolagem" role="region" aria-label="Composição do mercado por etapa (tabela com rolagem)" tabindex="0">
-      {# Ordenável no cliente: as três colunas de matrícula. A coluna de etapa
-         não ordena — a ordem canônica do servidor é a leitura de referência. #}
-      <table class="tabela" data-ordenavel>
-        <caption>Tamanho do mercado por etapa — {{ ano_selecionado | fmt_ano }}</caption>
-        <thead>
-          <tr>
-            <th scope="col">Etapa</th>
-            <th scope="col" data-tipo="numero">Matrícula total</th>
-            <th scope="col" data-tipo="numero">Matrícula privada</th>
-            <th scope="col" data-tipo="numero">Privada no total</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for linha in etapas %}
-          <tr{% if linha.fixa %} data-fixa{% endif %}>
-            <th scope="row">{{ linha.rotulo }}</th>
-            <td data-valor="{{ linha.qt_mat_total | fmt_bruto }}">{{ linha.qt_mat_total | fmt_contagem }}</td>
-            <td data-valor="{{ linha.qt_mat_privada | fmt_bruto }}">{{ linha.qt_mat_privada | fmt_contagem }}</td>
-            <td data-valor="{{ linha.pct_privada_no_total_pct | fmt_bruto }}">{{ linha.pct_privada_no_total_pct | fmt_nulo }}{% if linha.pct_privada_no_total_pct is not none %}%{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {% else %}
-    <div class="nota-metodo"><p><strong>sem dado</strong> de composição para o recorte.</p></div>
-    {% endif %}
-  </section>
-
-  <div class="duas-col duas-col--iguais">
-    <section class="painel" aria-labelledby="movimento">
+    {% if sem_dados_ano %}
+    <section class="painel" aria-labelledby="sem-dados-ano">
       <div class="painel__cabecalho">
-        <h2 id="movimento">Movimento de escolas</h2>
-        <p class="painel__nota">
-          Entrada e saída de escolas — {{ etapa_rotulo }}. {{ motivo_entrada_saida }}
+        <h2 id="sem-dados-ano">{{ pagina_erro_titulo }}</h2>
+      </div>
+      <div class="estado-vazio">
+        <svg class="estado-vazio__icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16v.5"/></svg>
+        <h3>{{ pagina_erro_titulo }}</h3>
+        <p>
+          {{ detalhe }} — o recorte escolhido não está publicado. Selecione outro ano
+          ou etapa acima; nada foi exibido parcialmente.
         </p>
       </div>
-      {% if item_etapa %}
-      <div class="tabela-rolagem" role="region" aria-label="Entrada e saída de escolas (tabela com rolagem)" tabindex="0">
-        <table class="tabela">
-          <caption>Movimento de escolas na etapa {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Indicador</th>
-              <th scope="col">Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for celula in item_etapa.movimento %}
-            <tr>
-              <th scope="row">{{ celula.rotulo }}</th>
-              <td>{{ celula.valor | fmt_contagem }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% else %}
-      <div class="nota-metodo"><p><strong>sem dado</strong> de movimento para a etapa.</p></div>
-      {% endif %}
-    </section>
-
-    <section class="painel" aria-labelledby="cobertura">
-      <div class="painel__cabecalho">
-        <h2 id="cobertura">Cobertura e limites</h2>
-        <p class="painel__nota">Cobertura da matrícula — {{ etapa_rotulo }}.</p>
-      </div>
-      {% if item_etapa %}
-      <div class="tabela-rolagem" role="region" aria-label="Cobertura da matrícula (tabela com rolagem)" tabindex="0">
-        <table class="tabela">
-          <caption>Cobertura de matrícula na etapa {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
-          <thead>
-            <tr>
-              <th scope="col">Situação da escola</th>
-              <th scope="col">Escolas</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for celula in item_etapa.cobertura %}
-            <tr>
-              <th scope="row">{{ celula.rotulo }}</th>
-              <td>{{ celula.valor | fmt_contagem }}</td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% endif %}
-      <div class="nota-metodo">
-        <strong>Sem indicador de concentração.</strong> A medida de concentração
-        do mercado ficou fora do MVP: o recorte padrão não está decidido, e
-        publicá-la sem essa decisão seria vender um número ambíguo.
-      </div>
-      <div class="definicao">
-        <strong>Share</strong> = matrícula da escola dividida pela matrícula
-        privada total do município e ano. Escola sem matrícula no recorte não
-        aparece — nunca como 0%.
+      <div class="aviso">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+        <p>
+          Código de erro <code>{{ codigo }}</code>.
+        </p>
       </div>
     </section>
-  </div>
-
-  <section class="painel" id="escolas" aria-labelledby="titulo-escolas">
-    <div class="painel__cabecalho">
-      <h2 id="titulo-escolas">Escolas do mercado por share</h2>
-      <p class="painel__nota">
-        Escolas privadas ativas ordenadas por participação na matrícula privada.
-      </p>
-    </div>
-    {% if linhas_share %}
-    <p class="paginacao__contagem">Mostrando as {{ linhas_share | length }} primeiras.</p>
-    <div class="tabela-rolagem" role="region" aria-label="Escolas do mercado por share (tabela com rolagem)" tabindex="0">
-      <table class="tabela">
-        <caption>Ranking de participação privada — {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
-        <thead>
-          <tr><th class="num" scope="col">#</th><th scope="col">Escola</th><th class="num" scope="col">Matrícula</th><th class="num" scope="col">Share privado</th></tr>
-        </thead>
-        <tbody>
-          {% for linha in linhas_share %}
-          <tr{% if linha.id_entidade %} id="escola-{{ linha.id_entidade }}"{% endif %}>
-            <th class="num" scope="row">{{ linha.posicao }}.</th>
-            <td>
-              {% if linha.id_entidade %}
-              <a href="{{ app_prefix }}/escolas/{{ linha.id_entidade }}">{{ linha.no_entidade | fmt_nulo }}</a>
-              {% else %}
-              {{ linha.no_entidade | fmt_nulo }}
-              {% endif %}
-              {% if linha.is_abaixo_porte %}<span class="nota">{{ texto_abaixo_porte }}</span>{% endif %}
-            </td>
-            <td class="num">{{ linha.mat_entidade | fmt_contagem }}</td>
-            <td class="num metrica">{# O protótipo usa 4 colunas só de texto
-                  nesta tabela — sem barra (a barra vive no ranking da ficha). #}{{ linha.share_privado_pct | fmt_nulo }}{% if linha.share_privado_pct is not none %}%{% endif %}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    <nav class="paginacao" aria-label="Ranking completo do share">
-      <div class="paginacao__botoes">
-        <a class="botao botao--secundario" href="{{ href_base }}/escolas">Ver o ranking de share do município</a>
-      </div>
-    </nav>
     {% else %}
-    <div class="nota-metodo"><p><strong>sem dado</strong> de share para o recorte.</p></div>
+
+    <div class="kpis">
+      {% for kpi in kpis %}
+      <div class="kpi">
+        <p class="kpi__rotulo">{{ kpi.rotulo }}</p>
+        <p class="kpi__valor{% if kpi.classe %} {{ kpi.classe }}{% endif %}">{{ kpi.valor }}</p>
+        <p class="kpi__nota">{{ kpi.nota }}</p>
+      </div>
+      {% endfor %}
+    </div>
+
+    <section class="painel" id="composicao" aria-labelledby="titulo-composicao">
+      <div class="painel__cabecalho">
+        <h2 id="titulo-composicao">Tamanho e composição por etapa</h2>
+        <p class="painel__nota">
+          Matrícula privada por etapa em {{ ano_selecionado | fmt_ano }}. As
+          etapas somam o total privado; <em>Educação básica (total)</em> é o total
+          oficial do Censo, não a soma das subetapas.
+        </p>
+      </div>
+      <ul class="composicao" id="composicao-etapas">
+        {% for item in composicao %}
+        <li>
+          <div class="comp-linha"><span class="comp-nome">{{ item.rotulo }}</span><span class="comp-valor">{% if item.qt_mat_privada is not none %}{{ item.qt_mat_privada | fmt_contagem }}{% if item.pct is not none %} <small>{{ item.pct | fmt_nulo }}%</small>{% endif %}{% else %}<span class="sem-dado">sem dado</span>{% endif %}</span></div>
+          {% if item.largura is not none %}<span class="comp-trilho"><span class="comp-preenche" data-largura="{{ item.largura }}%"></span></span>{% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <p class="painel__nota" id="composicao-nota">Soma das etapas: {% if soma_etapas is not none %}{{ soma_etapas | fmt_contagem }}{% else %}<span class="sem-dado">sem dado</span>{% endif %} · total privado do ano: {% if total_privado_bas is not none %}{{ total_privado_bas | fmt_contagem }}{% else %}<span class="sem-dado">sem dado</span>{% endif %}</p>
+    </section>
+
+    <div class="duas-col duas-col--iguais">
+      <section class="painel" id="movimento" aria-labelledby="titulo-movimento">
+        <div class="painel__cabecalho">
+          <h2 id="titulo-movimento">Movimento de escolas</h2>
+          <p class="painel__nota">
+            Entrada e saída de escolas — {{ etapa_rotulo }}. {{ motivo_entrada_saida }}
+          </p>
+        </div>
+        <div id="movimento-conteudo">
+          {% if movimento %}
+          <ul class="ranking">
+            <li><div><p class="ranking__nome">Escolas privadas ativas</p><p class="ranking__meta">{{ movimento.ano_anterior }} → {{ movimento.ano }}</p></div><span class="mono">{{ movimento.ativas | fmt_contagem }} <small>{{ movimento.entraram | fmt_contagem }} entraram · {{ movimento.sairam | fmt_contagem }} saíram</small></span></li>
+          </ul>
+          {% else %}
+          <div class="estado-vazio">
+            <svg class="estado-vazio__icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16v.5"/></svg>
+            <h3>Sem dado no primeiro ano do recorte</h3>
+            <p>Entrada e saída de escolas comparam dois anos. Em {{ menor_ano }} não há ano anterior, então o bloco fica vazio em vez de mostrar zero.</p>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="painel" aria-labelledby="titulo-cobertura">
+        <div class="painel__cabecalho">
+          <h2 id="titulo-cobertura">Cobertura e limites</h2>
+        </div>
+        <div class="nota-metodo">
+          <strong>Sem indicador de concentração.</strong> A medida de concentração
+          do mercado ficou fora do MVP: o recorte padrão não está decidido, e
+          publicá-la sem essa decisão seria vender um número ambíguo.
+        </div>
+        <div class="definicao">
+          <strong>Share</strong> = matrícula da escola dividida pela matrícula
+          privada total do município e ano. Escola sem matrícula no recorte não
+          aparece — nunca como 0%.
+        </div>
+      </section>
+    </div>
+
+    <section class="painel" id="escolas" aria-labelledby="titulo-escolas">
+      <div class="painel__cabecalho">
+        <h2 id="titulo-escolas">Escolas do mercado por share</h2>
+        <p class="painel__nota">
+          Escolas privadas ativas ordenadas por participação na matrícula privada.
+        </p>
+      </div>
+      {% if alem_do_fim %}
+      <div class="nota-metodo"><p><strong>sem dado</strong> — {{ motivo_alem_do_fim }}</p></div>
+      <p>
+        <a class="botao botao--secundario" href="{{ url_primeira_pagina }}#escolas">Voltar à primeira página</a>
+      </p>
+      {% elif sem_privadas %}
+      <div class="nota-metodo"><p><strong>sem dado</strong> — {{ motivo_sem_privadas }}.</p></div>
+      {% else %}
+      <div class="tabela-rolagem" role="region" aria-label="Escolas do mercado por share (tabela com rolagem)" tabindex="0">
+        <table class="tabela">
+          <caption>Ranking de participação privada — {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
+          <thead>
+            <tr><th class="num" scope="col">#</th><th scope="col">Escola</th><th class="num" scope="col">Matrícula</th><th class="num" scope="col">Share privado</th></tr>
+          </thead>
+          <tbody>
+            {% for linha in linhas_share %}
+            <tr{% if linha.id_entidade %} id="escola-{{ linha.id_entidade }}"{% endif %}>
+              <td class="num sec">{{ linha.posicao }}.</td>
+              <td>
+                {% if linha.id_entidade %}
+                <a class="nome-escola" href="{{ app_prefix }}/escolas/{{ linha.id_entidade }}">{{ linha.no_entidade | fmt_nulo }}</a>
+                {% else %}
+                {{ linha.no_entidade | fmt_nulo }}
+                {% endif %}
+              </td>
+              <td class="num metrica">{{ linha.mat_entidade | fmt_contagem }}</td>
+              <td class="num metrica">{% if linha.share_privado_pct is not none %}{{ linha.share_privado_fmt }}%{% else %}<span class="sem-dado">sem dado</span>{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <nav class="paginacao" id="paginacao-share" aria-label="Paginação do ranking">
+        <p class="paginacao__estado">Mostrando {{ paginacao.mostrando }}</p>
+        <div class="paginacao__botoes">
+          {% if paginacao.url_anterior %}
+          <a class="botao botao--secundario" href="{{ paginacao.url_anterior }}#escolas" rel="prev">Anterior</a>
+          {% else %}
+          <span class="botao botao--secundario" aria-disabled="true">Anterior</span>
+          {% endif %}
+          {% if paginacao.url_proxima %}
+          <a class="botao botao--secundario" href="{{ paginacao.url_proxima }}#escolas" rel="next">Próxima</a>
+          {% else %}
+          <span class="botao botao--secundario" aria-disabled="true">Próxima</span>
+          {% endif %}
+        </div>
+      </nav>
+      {% if paginacao.refinar %}
+      <div class="aviso">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
+        <p>
+          Limite de paginação atingido. Escolha outra etapa para continuar a leitura.
+        </p>
+      </div>
+      {% endif %}
+      {% endif %}
+    </section>
+
+    <dl class="rodape-meta" aria-label="Origem dos números do mercado">
+      <div>
+        <dt>Ano de referência</dt>
+        <dd>{{ meta.ano_referencia | fmt_ano }}</dd>
+      </div>
+      <div>
+        <dt>Etapa</dt>
+        <dd>{{ meta.etapa }}</dd>
+      </div>
+      <div>
+        <dt>Universo</dt>
+        <dd><code>{{ meta.universo }}</code>{% if meta.universo_texto %} — {{ meta.universo_texto }}{% endif %}</dd>
+      </div>
+      <div>
+        <dt>Fonte</dt>
+        <dd>{{ meta.orgao }} · {{ meta.base }} · <code>{{ meta.tabela }}</code></dd>
+      </div>
+      <div>
+        <dt>Avisos</dt>
+        <dd>
+          {% if meta.avisos %}
+          {{ meta.avisos | map(attribute="texto") | join("; ") }}
+          {% else %}
+          nenhum aviso para este recorte
+          {% endif %}
+        </dd>
+      </div>
+    </dl>
     {% endif %}
-  </section>
 
-  <dl class="rodape-meta" aria-label="Origem dos números da composição">
-    <div>
-      <dt>Ano de referência</dt>
-      <dd>{{ meta.ano_referencia | fmt_ano }}</dd>
-    </div>
-    <div>
-      <dt>Etapa</dt>
-      <dd>{{ meta.etapa }}</dd>
-    </div>
-    <div>
-      <dt>Universo</dt>
-      <dd><code>{{ meta.universo }}</code>{% if meta.universo_texto %} — {{ meta.universo_texto }}{% endif %}</dd>
-    </div>
-    <div>
-      <dt>Fonte</dt>
-      <dd>{{ meta.orgao }} · {{ meta.base }} · <code>{{ meta.tabela }}</code></dd>
-    </div>
-    <div>
-      <dt>Avisos</dt>
-      <dd>
-        {% if meta.avisos %}
-        <ul class="lista-regras">
-          {% for aviso in meta.avisos %}
-          <li>{{ aviso.texto }}</li>
-          {% endfor %}
-        </ul>
-        {% else %}
-        nenhum aviso para este recorte
-        {% endif %}
-      </dd>
-    </div>
-  </dl>
-  {% endif %}
-
-  {{ rodape_final() }}
+    {{ rodape_final() }}
+  </div>
 {% endblock %}
