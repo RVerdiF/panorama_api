@@ -380,7 +380,7 @@ def test_escolas_primeira_pagina_tem_anterior_indisponivel(mercado_repo):
 
 
 def test_escolas_teto_de_1000_esconde_proxima_e_pede_outra_etapa(mercado_repo):
-    """Com `has_more` no teto, "Próxima" some e o aviso de teto aparece."""
+    """Com `has_more` no teto, "Próxima" some — sem aviso inventado (V6-P1)."""
     mercado_repo.share = [
         share_row(
             nu_ano_censo=2025,
@@ -394,10 +394,11 @@ def test_escolas_teto_de_1000_esconde_proxima_e_pede_outra_etapa(mercado_repo):
 
     secao = html.split('id="titulo-escolas"')[-1]
     assert "Mostrando 1001–1010" in secao
-    # Sem link de próxima (só o botão desabilitado) + aviso de teto.
+    # Sem link de próxima: só o botão desabilitado.
     assert 'rel="next"' not in secao
     assert '<span class="botao botao--secundario" aria-disabled="true">Próxima</span>' in secao
-    assert "Limite de paginação atingido" in secao
+    # O aviso `refinar` não existe no protótipo (M11) — não volta ao HTML.
+    assert "Limite de paginação atingido" not in secao
 
 
 def test_escolas_offset_alem_do_fim_nao_diz_que_o_mercado_nao_tem_privadas(
@@ -436,7 +437,7 @@ def test_escolas_linhas_tem_ancora_unica_por_inep(mercado_repo):
     """Cada linha tem `id="escola-<INEP>"`, sem repetir e sem `escola-None`."""
     html = _html(_client(mercado_repo).get(f"{MERCADO}?etapa=bas"))
 
-    corpo = html.split("<tbody>")[-1].split("</tbody>")[0]
+    corpo = html.split('id="corpo-share"')[-1].split("</tbody>")[0]
     linhas = re.findall(r"<tr\b[^>]*>.*?</tr>", corpo, re.DOTALL)
     assert len(linhas) == 10
     identificadores = []
@@ -549,7 +550,9 @@ def test_composicao_continua_sem_recorte_de_etapa(mercado_repo):
 def test_etapa_informada_vale_para_movimento_e_denominadores(mercado_repo):
     html = _html(_client(mercado_repo).get(f"{MERCADO}?etapa=med"))
 
-    assert "Entrada e saída de escolas — Ensino médio" in html
+    # A nota de movimento é literal do protótipo (V6-P1); o que muda com a
+    # etapa são os números: ativas, denominador de share e composição.
+    assert "Entrada e saída de escolas privadas ativas em relação ao ano anterior." in html
     assert ">30<" in html
     assert ">9.000<" in html
     # Os denominadores saem da linha da etapa em `mart_mercado`; o share do
@@ -578,13 +581,73 @@ def test_titulo_traz_o_municipio(mercado_repo):
 
 
 def test_nao_exibe_hhi_nem_c4_e_nao_consulta_concentracao_a_parte(mercado_repo):
+    """Só a nota-metodo cita HHI/C4 (para dizer que ficaram fora do MVP)."""
     html = _html(_client(mercado_repo).get(MERCADO))
 
-    assert "hhi" not in html.lower()
-    assert "C4" not in html
-    assert "HHI" not in html
+    nota = html.split('class="nota-metodo"')[-1].split("</div>")[0]
+    assert "HHI e C4 ficaram fora do MVP" in nota
+    # Fora da nota, nenhum indicador de concentração aparece na tela.
+    resto = html.replace(nota, "")
+    assert "HHI" not in resto
+    assert "C4" not in resto
+    assert "hhi" not in resto.lower()
     # `get_concentracao` só é chamado pelo serviço de `market` (não pela tela).
     assert len(_consultas(mercado_repo, "get_concentracao")) == 1
+
+
+# -- V6-P1: copy literal do protótipo e ids-hook -----------------------------
+
+
+def test_copy_literal_do_prototipo_e_ids_hook_do_mercado(mercado_repo):
+    """REGRA ZERO: notas, caption e dicas voltam ao literal; ids devolvidos.
+
+    Fonte: `panorama-design/panorama-escola-mercado.html:58,69,76,86,96,106-107,123`
+    (auditoria `auditoria-literal.md` §1.2, itens M1–M5, M8 e M11).
+    """
+    html = _html(_client(mercado_repo).get(MERCADO))
+
+    # M1 — nota da composição (design :86), sem a frase explicativa inventada.
+    assert "Matrícula privada por etapa no ano selecionado. As etapas somam o total privado." in html
+    # M2 — nota do movimento (design :96), sem reescrita parametrizada.
+    assert "Entrada e saída de escolas privadas ativas em relação ao ano anterior." in html
+    # M3 — nota-metodo (design :106-107): `HHI e C4` de volta ao texto.
+    assert (
+        "HHI e C4 ficaram fora do MVP: o recorte padrão não está decidido, e publicar "
+        "concentração sem essa decisão seria vender um número ambíguo."
+    ) in html
+    # M4 — caption do ranking (design :123), sem sufixo de etapa/ano.
+    assert '<caption id="caption-share">Ranking de participação privada</caption>' in html
+    # M5 — três dicas do seletor (design :58,69,76).
+    assert "Anos publicados do Censo no recorte." in html
+    assert "O recorte vale para as duas seções." in html
+    assert "Recorte de demonstração: um município." in html
+    # Paráfrases acrescentadas pelo app saem do HTML.
+    assert "A medida de concentração" not in html
+    assert "Educação básica (total) é o total oficial" not in html
+
+    # M8 — ids-hook do protótipo (design :81,123,127,130,133).
+    for identificador in (
+        "kpis-mercado",
+        "caption-share",
+        "corpo-share",
+        "paginacao-share",
+        "meta-mercado",
+    ):
+        assert f'id="{identificador}"' in html
+
+    # M11 — no teto de paginação, o aviso `refinar` (inventado) não aparece.
+    mercado_repo.share = [
+        share_row(
+            nu_ano_censo=2025,
+            etapa="bas",
+            id_entidade=f"31000{indice:05d}",
+            no_entidade=f"ESCOLA {indice}",
+        )
+        for indice in range(1100)
+    ]
+    teto = _html(_client(mercado_repo).get(f"{MERCADO}?offset=1000"))
+    assert "Mostrando 1001–1010" in teto
+    assert "Limite de paginação atingido" not in teto
 
 
 def test_mercado_nao_usa_termos_geograficos_proibidos(mercado_repo):
