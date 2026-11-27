@@ -95,7 +95,7 @@
         </p>
 
         <svg class="prancha__grafico" viewBox="0 0 480 212" role="img" aria-labelledby="grafico-prancha-desc">
-          <desc id="grafico-prancha-desc">{% if destaque_nome %}Série de matrícula de {{ destaque_nome }}: sem dado.{% else %}Série de matrícula: sem dado.{% endif %}</desc>
+          <desc id="grafico-prancha-desc">{{ serie_desc }}</desc>
           <line class="grade" x1="52" y1="25" x2="470" y2="25"/>
           <line class="grade" x1="52" y1="100" x2="470" y2="100"/>
           <line class="grade" x1="52" y1="175" x2="470" y2="175"/>

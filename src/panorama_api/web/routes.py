@@ -304,7 +304,7 @@ router_inicio = APIRouter(include_in_schema=False)
 #: Município da prancha da landing: Belo Horizonte, o mesmo do design e da
 #: marquise (card `t_e06e1ad5`). O nome vem de `municipios_mg()` (lista
 #: versionada, sem consulta ao repositório) — vale o mesmo que
-#: `get_municipio("3106200").no_municipio` sem custar a 4ª consulta.
+#: `get_municipio("3106200").no_municipio` a custo zero.
 CO_MUNICIPIO_LANDING = "3106200"
 #: Top-N do ranking da landing: a prancha é o 1º, as barras são os 5.
 TOP_LANDING = 5
@@ -321,17 +321,14 @@ def _nome_municipio_landing() -> str | None:
 def _linha_concentracao_privadas(
     linhas: list[dict[str, Any]],
 ) -> dict[str, Any] | None:
-    """Linha de concentração do recorte privado municipal (o C4 da landing).
+    """Linha de concentração do recorte privado das escolas (o C4 da landing).
 
     O C4 do contrato é exatamente "as 4 maiores somadas", então a linha
-    procurada é a do recorte de privadas no nível município. Sem ela, a
+    procurada é a do recorte `privado` no nível `escola`. Sem ela, a
     landing diz "sem dado" — nunca um C4 de outro recorte.
     """
     for linha in linhas:
-        if linha.get("recorte") == "privadas" and linha.get("nivel") == "municipio":
-            return linha
-    for linha in linhas:
-        if linha.get("recorte") == "privadas":
+        if linha.get("recorte") == "privado" and linha.get("nivel") == "escola":
             return linha
     return None
 
@@ -365,6 +362,76 @@ def _contar(valor: int | float | None) -> str:
     return str(valor)
 
 
+#: Abscissas da prancha para os 5 anos do recorte (o `viewBox` tem 480 de
+#: largura; os rótulos de ano usam as mesmas posições via `anos_svg`).
+_XS_PRANCHA = (84, 176, 268, 360, 452)
+#: Ordenadas do gráfico: do topo (25) à base (175) das linhas de grade.
+_Y_TOPO_PRANCHA = 25
+_Y_BASE_PRANCHA = 175
+
+
+def _serie_prancha(
+    linhas: list[dict[str, Any]],
+    *,
+    anos: list[int],
+    nome_destaque: str | None,
+) -> tuple[dict[str, Any] | None, str, str]:
+    """Série da prancha a partir do `get_school_history` da escola em destaque.
+
+    Devolve `(serie_dados, delta_texto, serie_desc)`: os pontos `(x, y)` na
+    escala do `viewBox`, a variação anual calculada da própria série (último
+    ano contra o anterior, via `texto_variacao`) e o texto do `<desc>`.
+    Qualquer ausência (sem destaque, sem linha, valor ausente ou nulo) vira
+    `(None, "sem dado no ano", ...)` — nunca ponto inventado, nunca `0`.
+    """
+    por_ano = {linha.get("nu_ano_censo"): linha for linha in linhas}
+    valores: list[float | None] = []
+    for ano in anos:
+        linha = por_ano.get(ano)
+        valor = linha.get("qt_mat_bas") if linha else None
+        if isinstance(valor, bool):
+            valor = None
+        valores.append(valor if valor is None else float(valor))
+    if nome_destaque:
+        desc = f"Série de matrícula de {nome_destaque}: "
+    else:
+        desc = "Série de matrícula: "
+    if any(valor is None for valor in valores):
+        return None, "sem dado no ano", desc + "sem dado."
+    assert all(valor is not None for valor in valores)
+    reais = [float(valor) for valor in valores]  # type: ignore[misc]
+    minimo, maximo = min(reais), max(reais)
+    if maximo == minimo:
+        ordenadas = [100.0 for _ in reais]
+    else:
+        amplitude = maximo - minimo
+        ordenadas = [
+            _Y_BASE_PRANCHA
+            - (valor - minimo) / amplitude * (_Y_BASE_PRANCHA - _Y_TOPO_PRANCHA)
+            for valor in reais
+        ]
+    if len(anos) == len(_XS_PRANCHA):
+        xs = list(_XS_PRANCHA)
+    elif len(anos) == 1:
+        xs = [268]
+    else:
+        passo = (_XS_PRANCHA[-1] - _XS_PRANCHA[0]) / (len(anos) - 1)
+        xs = [_XS_PRANCHA[0] + round(i * passo) for i in range(len(anos))]
+    pontos = [[x, round(y, 1)] for x, y in zip(xs, ordenadas)]
+    linha_path = "M " + " L ".join(f"{x},{y:.1f}" for x, y in pontos)
+    area_path = (
+        f"{linha_path} L {xs[-1]},{_Y_BASE_PRANCHA} L {xs[0]},{_Y_BASE_PRANCHA} Z"
+    )
+    anterior, ultimo = reais[-2], reais[-1]
+    variacao = (ultimo - anterior) / anterior * 100 if anterior else None
+    desc += ", ".join(f"{ano}={int(valor)}" for ano, valor in zip(anos, reais))
+    return (
+        {"area": area_path, "linha": linha_path, "pontos": pontos},
+        texto_variacao(variacao),
+        desc + ".",
+    )
+
+
 def _contexto_landing(
     *,
     ano_ref: int,
@@ -374,8 +441,11 @@ def _contexto_landing(
     barras: list[dict[str, Any]],
     total_privadas: int | float | None,
     c4_pct: float | None,
+    serie_dados: dict[str, Any] | None,
+    delta_texto: str,
+    serie_desc: str,
 ) -> dict[str, Any]:
-    """Monta o contexto da landing a partir das 3 consultas (ou do vazio).
+    """Monta o contexto da landing a partir das 4 consultas (ou do vazio).
 
     Ausência é `None` do início ao fim: o template formata com os filtros de
     `web/filters.py` (`None` vira "sem dado", nunca `0`).
@@ -395,13 +465,13 @@ def _contexto_landing(
         "total_contar": _contar(total_privadas),
         "c4_pct": c4_pct,
         "c4_contar": _contar(c4_pct),
-        # Série histórica e variação anual exigiriam `get_school_history` e
-        # `get_school_indicators` — fora do orçamento de 3 consultas da
-        # landing (card `t_e06e1ad5`). Sem dado explícito, sem recomputo.
-        "serie_dados": None,
-        "delta_texto": "sem dado no ano",
-        # A oferta por etapa também está fora do orçamento: a matriz usa o
+        # A série histórica e a variação anual vêm do `get_school_history`
+        # da escola em destaque (a 4ª consulta). Sem ela, "sem dado".
+        # A oferta por etapa continua fora do orçamento: a matriz usa o
         # estado "desconhecido" do próprio design (o "sem dado" da oferta).
+        "serie_dados": serie_dados,
+        "delta_texto": delta_texto,
+        "serie_desc": serie_desc,
         "proveniencia": f"Fonte: {FONTE_BASE} ({FONTE_ORGAO}) · {ano_ref}",
     }
 
@@ -419,15 +489,17 @@ def inicio(request: Request) -> Response:
     O HTML é o `<body>` de `panorama-escola-landing.html` (card `t_e42049c1`):
     copy, classes, `id`, `aria-*`, `data-reveal`, `data-od-id` — verbatim.
     Os valores que eram mock do protótipo (card `t_e06e1ad5`) agora vêm do
-    repositório, no máximo 3 consultas por render, todas do recorte fixo
+    repositório, no máximo 4 consultas por render, todas do recorte fixo
     (Belo Horizonte, maior ano de `APP_ANOS_DISPONIVEIS`, etapa padrão):
 
     1. `get_market_share(..., limit=5)` — escola em destaque (a 1ª) e as 5
        barras do ranking (nome + `mat_entidade` + `share_privado_pct`);
     2. `get_market(...)` — total de privadas (`n_escolas_privadas`, o "de N"
        da posição e o KPI de escolas);
-    3. `get_concentracao(...)` — `c4_pct` do recorte privado municipal (o KPI
-       "participação somada das 4 maiores escolas").
+    3. `get_concentracao(...)` — `c4_pct` do recorte privado das escolas (o KPI
+       "participação somada das 4 maiores escolas");
+    4. `get_school_history(...)` — série de matrícula da escola em destaque
+       (o gráfico da prancha e a variação anual, calculada da própria série).
 
     O nome do município vem de `municipios_mg()` (lista versionada, custo
     zero) e o resultado é cacheado em processo por `DATA_VERSION`. Se o
@@ -492,6 +564,24 @@ def inicio(request: Request) -> Response:
             linhas_market[0] if linhas_market else None,
         )
         linha_conc = _linha_concentracao_privadas(linhas_conc)
+        try:
+            co_destaque = (destaque or {}).get("id_entidade")
+            linhas_hist = (
+                repositorio.get_school_history(
+                    co_entidade=co_destaque,
+                    ano_inicio=anos[0],
+                    ano_fim=anos[-1],
+                )
+                if co_destaque
+                else []
+            )
+        except Exception:
+            linhas_hist = []
+        serie_dados, delta_texto, serie_desc = _serie_prancha(
+            linhas_hist,
+            anos=anos,
+            nome_destaque=(destaque or {}).get("no_entidade"),
+        )
         landing = _contexto_landing(
             ano_ref=ano_ref,
             anos=anos,
@@ -500,6 +590,9 @@ def inicio(request: Request) -> Response:
             barras=barras,
             total_privadas=(linha_market or {}).get("n_escolas_privadas"),
             c4_pct=(linha_conc or {}).get("c4_pct"),
+            serie_dados=serie_dados,
+            delta_texto=delta_texto,
+            serie_desc=serie_desc,
         )
         if linhas_share and linhas_market and linhas_conc:
             cache[chave] = landing

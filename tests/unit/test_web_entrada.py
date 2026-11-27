@@ -7,7 +7,8 @@ nenhuma rede/BigQuery):
   ``307`` → `/app/` saiu no card `t_386b791c`), `HEAD /` também responde ``200``,
   a página sai com gzip, ``ETag``/`private, no-cache` com ``304``, gera a linha
   `page_view` (prova em `test_web_observabilidade.py`), consulta o
-  repositório no máximo 3 vezes por render (recorte fixo, card `t_e06e1ad5`)
+  repositório no máximo 4 vezes por render (recorte fixo, card `t_e06e1ad5`
+  + série da prancha, card `t_cd53cdc1`)
   e um erro inesperado nela vira página HTML — e `/v1/*`/`/health`
   continuam intactos;
 * A2/A3 — `/app/` sem consulta orienta (o que é, recorte MG, anos de
@@ -228,12 +229,13 @@ def test_erro_inesperado_na_raiz_vira_pagina_html(
     assert "boom na landing" not in resposta.text
 
 
-def test_raiz_consulta_no_maximo_3_vezes_o_recorte_fixo(entrada_repo: FakeRepository):
-    """A landing consulta o repositório — no máximo 3 vezes por render.
+def test_raiz_consulta_no_maximo_4_vezes_o_recorte_fixo(entrada_repo: FakeRepository):
+    """A landing consulta o repositório — no máximo 4 vezes por render.
 
-    Card `t_e06e1ad5`: GET e HEAD compartilham o cache em processo (por
-    `DATA_VERSION`), então os dois juntos não passam de 3 consultas, todas
-    no recorte fixo (BH, maior ano, etapa padrão).
+    Card `t_e06e1ad5` + série da prancha (card `t_cd53cdc1`): GET e HEAD
+    compartilham o cache em processo (por `DATA_VERSION`), então os dois
+    juntos não passam de 4 consultas (3 do recorte fixo — BH, maior ano,
+    etapa padrão — e o histórico da escola em destaque).
     """
     repo = FakeRepository(
         municipios=[municipio_row()],
@@ -246,11 +248,12 @@ def test_raiz_consulta_no_maximo_3_vezes_o_recorte_fixo(entrada_repo: FakeReposi
         test_client.request("GET", INICIO)
         test_client.request("HEAD", INICIO)
 
-    assert 1 <= len(repo.calls) <= 3, repo.calls
+    assert 1 <= len(repo.calls) <= 4, repo.calls
     assert {nome for nome, _ in repo.calls} <= {
         "get_market_share",
         "get_market",
         "get_concentracao",
+        "get_school_history",
     }, repo.calls
 
 

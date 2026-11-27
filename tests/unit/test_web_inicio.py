@@ -8,15 +8,18 @@ landing (Belo Horizonte, maior ano de `APP_ANOS_DISPONIVEIS`, etapa padrão):
 
 * a escola em destaque e as 5 barras saem de um `get_market_share`;
 * a posição ("1º de N") e o KPI de escolas saem de um `get_market`;
-* o KPI "4 maiores" sai do `c4_pct` de um `get_concentracao`;
+* o KPI "4 maiores" sai do `c4_pct` de um `get_concentracao` (recorte
+  `privado`, nível `escola`);
+* a série da prancha e a variação anual saem do `get_school_history` da
+  escola em destaque (a variação é calculada da própria série);
 * o nome do município vem de `municipios_mg()` (lista versionada, sem custo);
-* série histórica e variação anual estão fora do orçamento de consultas —
-  saem como "sem dado" explícito, nunca recomputadas, nunca `0`.
+* sem histórico da escola em destaque, série e variação caem para "sem dado"
+  explícito — nunca ponto inventado, nunca `0`.
 
 Regras que este arquivo trava sobre o HTML renderizado de verdade
 (``TestClient`` com repositório fake, nenhuma rede/BigQuery):
 
-* no máximo 3 consultas ao repositório por render, com cache em processo
+* no máximo 4 consultas ao repositório por render, com cache em processo
   por `DATA_VERSION`;
 * falha do repositório mantém `/` em `200`, com "sem dado" nos blocos;
 * repositório vazio mostra "sem dado" — nunca `0`, nunca nome/valor mock.
@@ -42,9 +45,11 @@ from fastapi.testclient import TestClient
 
 from panorama_api.config import Settings
 from panorama_api.main import create_app
+from panorama_api.web.escola import texto_variacao
 from tests.unit.conftest import (
     FakeRepository,
     concentracao_row,
+    history_row,
     market_row,
     municipio_row,
     share_row,
@@ -98,11 +103,18 @@ def _pagina(
 
 
 def _repo_cheio() -> FakeRepository:
-    """Fake com o recorte da landing: top-5 de BH/2025, mercado e C4 reais."""
+    """Fake com o recorte da landing: top-5 de BH/2025, mercado, C4 e série reais."""
     return FakeRepository(
         municipios=[municipio_row()],
         markets=[market_row(nu_ano_censo=2025, etapa="bas")],
-        concentracao=[concentracao_row(nu_ano_censo=2025, etapa="bas")],
+        concentracao=[
+            concentracao_row(
+                nu_ano_censo=2025,
+                etapa="bas",
+                recorte="privado",
+                nivel="escola",
+            )
+        ],
         share=[
             share_row(
                 id_entidade=f"3100000{i}",
@@ -120,6 +132,20 @@ def _repo_cheio() -> FakeRepository:
                     ("Escola Epsilon", 530.0, 5.3),
                 ),
                 start=1,
+            )
+        ],
+        history=[
+            history_row(
+                co_entidade="31000001",
+                no_entidade="Escola Alfa",
+                co_municipio="3106200",
+                no_municipio="BELO HORIZONTE",
+                nu_ano_censo=ano,
+                qt_mat_bas=mat,
+            )
+            for ano, mat in zip(
+                ANOS,
+                (3527.0, 3521.0, 3512.0, 3591.0, 3456.0),
             )
         ],
     )
@@ -437,16 +463,23 @@ def test_links_internos_da_landing_resolvem_no_front():
 
 # -- contrato de consultas da landing (card `t_e06e1ad5`) ---------------------
 
-METODOS_LANDING = frozenset({"get_market_share", "get_market", "get_concentracao"})
+METODOS_LANDING = frozenset(
+    {"get_market_share", "get_market", "get_concentracao", "get_school_history"}
+)
 
 
-def test_inicio_consulta_no_maximo_3_vezes_por_render():
-    """A landing consulta o repositório — no máximo 3 vezes, só o recorte fixo."""
+def test_inicio_consulta_no_maximo_4_vezes_por_render():
+    """A landing consulta o repositório — no máximo 4 vezes, só o recorte fixo."""
     _, repo = _pagina(repo=_repo_cheio())
 
-    assert 1 <= len(repo.calls) <= 3, repo.calls
+    assert 1 <= len(repo.calls) <= 4, repo.calls
     assert {nome for nome, _ in repo.calls} <= METODOS_LANDING, repo.calls
-    for _, kwargs in repo.calls:
+    for nome, kwargs in repo.calls:
+        if nome == "get_school_history":
+            assert kwargs["co_entidade"] == "31000001", kwargs
+            assert kwargs["ano_inicio"] == ANOS[0], kwargs
+            assert kwargs["ano_fim"] == ANOS[-1], kwargs
+            continue
         assert kwargs["co_municipio"] == "3106200", kwargs
         assert kwargs["ano"] == ANOS[-1], kwargs
         assert kwargs["etapa"] == "bas", kwargs
@@ -465,7 +498,7 @@ def test_segundo_render_reaproveita_o_cache_por_data_version():
             )
             assert resposta.status_code == 200
 
-    assert 1 <= len(repo.calls) <= 3, repo.calls
+    assert 1 <= len(repo.calls) <= 4, repo.calls
 
 
 def test_falha_do_repositorio_mantem_200_com_sem_dado():
@@ -475,6 +508,7 @@ def test_falha_do_repositorio_mantem_200_com_sem_dado():
         "get_market_share": RuntimeError("bigquery fora"),
         "get_market": RuntimeError("bigquery fora"),
         "get_concentracao": RuntimeError("bigquery fora"),
+        "get_school_history": RuntimeError("bigquery fora"),
     }
     with TestClient(create_app(settings=_settings(), repository=repo)) as cliente:
         resposta = cliente.request(
@@ -485,3 +519,86 @@ def test_falha_do_repositorio_mantem_200_com_sem_dado():
     assert "sem dado" in resposta.text
     for mock in ("Monte Verde", "Rede Horizonte", "amostra", "ilustrativ"):
         assert mock not in resposta.text, mock
+
+
+# -- C4 do contrato e série da prancha (card `t_cd53cdc1`) --------------------
+
+
+def test_c4_usa_a_linha_privado_escola():
+    """O C4 é o `c4_pct` do recorte `privado` no nível `escola`."""
+    repo = _repo_cheio()
+    repo.concentracao = [
+        concentracao_row(
+            nu_ano_censo=2025,
+            etapa="bas",
+            recorte="privado",
+            nivel="escola",
+            c4_pct=7.22,
+        )
+    ]
+    html, _ = _pagina(repo=repo)
+
+    assert "7,2" in html
+
+
+def test_c4_cai_para_sem_dado_sem_a_linha_do_contrato():
+    """Sem a linha `privado`/`escola`, o C4 é 'sem dado' — nunca de outro recorte."""
+    repo = _repo_cheio()
+    repo.concentracao = [
+        concentracao_row(
+            nu_ano_censo=2025,
+            etapa="bas",
+            recorte="total",
+            nivel="escola",
+            c4_pct=99.9,
+        ),
+        concentracao_row(
+            nu_ano_censo=2025,
+            etapa="bas",
+            recorte="privadas",
+            nivel="municipio",
+            c4_pct=88.8,
+        ),
+    ]
+    html, _ = _pagina(repo=repo)
+    plano = _texto(html)
+
+    assert "sem dado" in plano
+    assert "99,9" not in html
+    assert "88,8" not in html
+
+
+def test_prancha_mostra_a_serie_do_historico():
+    """O SVG da prancha tem 1 ponto por ano, com os valores do histórico."""
+    html, repo = _pagina(repo=_repo_cheio())
+
+    assert html.count('<circle class="ponto') == 5
+    assert html.count("<circle") == 5
+    for ano, mat in zip(ANOS, (3527, 3521, 3512, 3591, 3456)):
+        assert f"{ano}={mat}" in html, (ano, mat)
+    history_calls = [kwargs for nome, kwargs in repo.calls if nome == "get_school_history"]
+    assert len(history_calls) == 1, repo.calls
+    desc = re.search(r'<desc id="grafico-prancha-desc">(.*?)</desc>', html, re.S)
+    assert desc is not None
+    assert "sem dado" not in desc.group(1)
+
+
+def test_variacao_da_prancha_vem_da_propria_serie():
+    """A variação é (último − anterior) / anterior, da série do histórico."""
+    html, _ = _pagina(repo=_repo_cheio())
+    esperado = texto_variacao((3456.0 - 3591.0) / 3591.0 * 100)
+
+    assert esperado in html
+    assert "+4,9%" not in html
+
+
+def test_prancha_sem_historico_cai_para_sem_dado():
+    """Sem histórico da escola em destaque: sem ponto e sem variação."""
+    repo = _repo_cheio()
+    repo.history = []
+    html, _ = _pagina(repo=repo)
+    plano = _texto(html)
+
+    assert "<circle" not in html
+    assert "sem dado no ano" in plano
+    assert "sem dado" in plano
