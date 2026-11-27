@@ -16,12 +16,9 @@
 <h1>{% if cabecalho.no_entidade %}{{ cabecalho.no_entidade }}{% else %}{{ sem_nome }}{% endif %}</h1>
 <p class="tela-sub">
   Escola <code>{{ cabecalho.co_entidade }}</code> ·
-  {# Município é link para o mercado municipal; o código IBGE fica ao lado. #}
-  {%- if cabecalho.co_municipio %}
-  <a href="{{ app_prefix }}/mercados/{{ cabecalho.co_municipio }}">{{ cabecalho.no_municipio | fmt_nulo }}</a>
-  {%- else %}
+  {# Município em texto: o caminho ao mercado já está na trilha e no subnav
+     (V4-L) — link aqui seria cru. #}
   {{ cabecalho.no_municipio | fmt_nulo }}
-  {%- endif %}
   (código IBGE <code>{{ cabecalho.co_municipio | fmt_nulo }}</code>)
 </p>
 {%- endmacro %}

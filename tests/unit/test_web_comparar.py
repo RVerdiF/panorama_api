@@ -439,7 +439,7 @@ def test_ficha_tem_o_link_para_comparar(client):
     html = _html(client.get(f"/app/escolas/{ESCOLA_A}"))
 
     assert (
-        f'<a href="/app/comparar?escolas={ESCOLA_A}">Comparar com outra escola</a>'
+        f'<a class="botao botao--secundario" href="/app/comparar?escolas={ESCOLA_A}">Comparar com outra escola</a>'
         in html
     )
 

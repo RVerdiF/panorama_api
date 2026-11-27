@@ -38,7 +38,7 @@
     {#- Entrada da comparação lado a lado: a ficha já tem o id e abre a página
         com um id, onde se busca a segunda escola sem JS. Parágrafo simples:
         o protótipo não tem painel nem bloco de definição aqui. -#}
-    <p><a href="{{ href_comparar }}">{{ rotulo_comparar }}</a></p>
+    <p><a class="botao botao--secundario" href="{{ href_comparar }}">{{ rotulo_comparar }}</a></p>
 
     <div class="kpis">
       {% for kpi in kpis %}
@@ -263,7 +263,7 @@
         {% if ranking.total %}de {{ ranking.total }} escolas privadas ativas no município{% else %}sem dado de contagem de escolas{% endif %}
       </p>
       <div class="paginacao__botoes">
-        <a class="botao botao--secundario" href="{{ app_prefix }}/mercados/{{ ranking.co_municipio }}/escolas">Ver todas no mercado</a>
+        <a class="botao botao--secundario" href="{{ app_prefix }}/mercados/{{ ranking.co_municipio }}#escolas">Ver todas no mercado</a>
       </div>
     </nav>
   </section>

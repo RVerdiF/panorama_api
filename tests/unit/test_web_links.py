@@ -189,11 +189,30 @@ def test_mercado_sem_share_nao_inventa_linha_nem_link(client_links, repo_links):
 # -- escola → mercado --------------------------------------------------------
 
 
-def test_escola_linka_o_municipio_para_o_mercado(client_links):
+def test_escola_municipio_e_texto_no_tela_sub_e_link_na_trilha(client_links):
+    """V4-L: `p.tela-sub` é texto (o protótipo não tem link ali); o caminho ao
+    mercado vive na trilha e no subnav (`a.subnav__saida`)."""
     html = _html(client_links.get(ESCOLA))
 
+    # Trilha linka o município para o mercado (critério 4 do card).
     assert f'<a href="{MERCADO}">BELO HORIZONTE</a>' in html
-    assert f"código IBGE <code>{MUNICIPIO}</code>" in html
+
+    # `p.tela-sub` mantém o nome e o IBGE, mas sem `<a>` (link cru removido).
+    tela_sub = re.search(
+        r'<p class="tela-sub">(.*?)</p>', html, flags=re.S
+    )
+    assert tela_sub is not None, "ficha sem `p.tela-sub`"
+    assert "<a" not in tela_sub.group(1)
+    assert "BELO HORIZONTE" in tela_sub.group(1)
+    assert f"código IBGE <code>{MUNICIPIO}</code>" in tela_sub.group(1)
+
+
+def test_escola_ver_todas_aponta_direto_para_a_ancora(client_links):
+    """V4-L: sem cadeia de redirect — o href já é `…/mercados/{co}#escolas`."""
+    html = _html(client_links.get(ESCOLA))
+
+    assert f'<a class="botao botao--secundario" href="{MERCADO}#escolas">Ver todas no mercado</a>' in html
+    assert f"{MERCADO}/escolas" not in html
 
 
 def test_escola_sem_municipio_nao_gera_link_quebrado(client_links, repo_links):
