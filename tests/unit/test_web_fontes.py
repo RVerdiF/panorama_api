@@ -195,13 +195,20 @@ def test_head_faz_preload_do_inter_400_com_crossorigin():
 
 
 def test_html_nao_referencia_origem_externa():
+    """Recurso externo é proibido; só o crédito da foto pode sair do domínio.
+
+    A foto é CC BY-SA 4.0 e a licença exige creditar autor, arquivo e licença
+    com link (plano `landing-d2.md` §9). `src`/`<link href>` continuam locais.
+    """
     app = create_app(settings=_settings(), repository=FakeRepository())
     with TestClient(app) as cliente:
         html = cliente.get(INICIO, headers={"Accept-Encoding": "identity"}).text
 
-    externos = [
-        url
-        for url in re.findall(r'(?:src|href)="([^"]*)"', html)
-        if url.startswith(("http://", "https://", "//"))
-    ]
-    assert externos == []
+    externos = re.findall(r'(?:src|href)="(https?://[^"]*|//[^"]*)"', html)
+    assert externos, "o crédito da foto tem de linkar a origem e a licença"
+    for url in externos:
+        assert url.startswith(
+            ("https://commons.wikimedia.org/", "https://creativecommons.org/")
+        ), url
+    assert not re.search(r'src="https?://', html)
+    assert not re.search(r'<link[^>]*href="https?://', html)

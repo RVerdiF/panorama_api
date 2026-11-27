@@ -115,7 +115,12 @@ def test_raiz_responde_a_landing_em_html(cliente: TestClient):
     # Não é mais redirect: o corpo é a página, não um `Location`.
     assert "location" not in resposta.headers
     html = resposta.text
-    assert "<h1>Escolas e mercados da educação básica em Minas Gerais</h1>" in html
+    # O `h1` do design tem três `span.hero__linha` (máscara); a copy é a mesma.
+    h1 = re.search(r"<h1\b[^>]*>(.*?)</h1>", html, re.S)
+    assert h1 is not None, "h1 ausente em `/`"
+    assert re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", h1.group(1))).strip() == (
+        "Escolas e mercados da educação básica em Minas Gerais"
+    )
     # A busca continua em `/app/`, e é para lá que a landing leva — desde o card
     # `t_e075a6f6` pelo formulário GET do hero, não por um link textual.
     assert re.search(r'<form class="hero__busca" method="get" action="/app/"', html)

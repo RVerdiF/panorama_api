@@ -54,9 +54,14 @@ from tests.unit.conftest import FakeRepository
 
 INICIO = "/"
 #: Os três stylesheets base na ordem da cascata (D1-a): protótipo vendorizado
-#: e o `app.css` app-only por último. `/` pode acrescentar um quarto, injetado
-#: pelo bloco `estilos_pagina` do `base.html` — as demais telas não.
+#: e o `app.css` app-only por último. `/` acrescenta um quarto — o
+#: `landing.css`, injetado pelo bloco `estilos_pagina` do `base.html` — e as
+#: demais telas não.
 CSS_ORDEM = ("panorama.css", "panorama-telas.css", "app.css")
+#: A cascata de `/` (plano `landing-d2.md` §7): o quarto stylesheet entra entre
+#: o protótipo e o app-only, para o recorte da landing vencer sem depender de
+#: ordem implícita.
+CSS_ORDEM_LANDING = ("panorama.css", "panorama-telas.css", "landing.css", "app.css")
 
 #: Telas que **não** são a landing: continuam com os três stylesheets e com o
 #: teto anterior. Todas respondem 200 com o repositório fake vazio.
@@ -90,6 +95,8 @@ REFERENCIA = re.compile(r'(?:src|href)="([^"]*)"')
 ESTILO = re.compile(r"<link[^>]*rel=\"stylesheet\"[^>]*>")
 SCRIPT = re.compile(r"<script\b[^>]*>\s*</script>")
 ASSET_JS = re.compile(r'src="/app/static/[0-9a-f]{12}-app\.js" defer')
+#: Tag `<img …>` inteira (o porte permite exatamente uma, a foto da banda).
+IMAGEM_TAG = re.compile(r"<img\b[^>]*>")
 
 
 def _settings() -> Settings:
@@ -209,17 +216,29 @@ def test_landing_carrega_so_o_app_js_local(html_da_landing: bytes):
     scripts = SCRIPT.findall(html)
     assert len(scripts) == 1, f"esperado 1 script, achei {len(scripts)}"
     assert ASSET_JS.search(scripts[0]), scripts[0]
-    assert "<img" not in html.lower()
     assert "<iframe" not in html.lower()
 
+    # Exatamente uma imagem: a foto da banda, local, com hash, fora do caminho
+    # crítico e com dimensões declaradas (P4). O design trazia a foto em `<img>`
+    # sem orçamento; o porte fixa o contrato aqui.
+    imagens = IMAGEM_TAG.findall(html)
+    assert len(imagens) == 1, f"esperado 1 `<img>`, achei {len(imagens)}"
+    img = imagens[0]
+    assert re.search(rf'src="/app/static/[0-9a-f]{{12}}-{re.escape(IMAGEM)}"', img), img
+    assert 'loading="lazy"' in img, img
+    assert 'decoding="async"' in img, img
+    assert f'width="{IMAGEM_LARGURA}"' in img and f'height="{IMAGEM_ALTURA}"' in img, img
+    alt = re.search(r'alt="([^"]*)"', img)
+    assert alt is not None and alt.group(1).strip(), img
 
-def test_landing_tem_os_tres_stylesheets_versionados_em_ordem(html_da_landing: bytes):
+
+def test_landing_tem_os_quatro_stylesheets_versionados_em_ordem(html_da_landing: bytes):
     html = html_da_landing.decode("utf-8")
     estilos = ESTILO.findall(html)
 
-    assert len(estilos) == 3, f"esperados 3 stylesheets, achei {len(estilos)}"
-    # Protótipo vendorizado antes do app-only: a cascata decide o efetivo.
-    for tag, nome in zip(estilos, CSS_ORDEM):
+    assert len(estilos) == 4, f"esperados 4 stylesheets, achei {len(estilos)}"
+    # Protótipo antes do recorte da landing, e o app-only fechando a cascata.
+    for tag, nome in zip(estilos, CSS_ORDEM_LANDING):
         esperado = re.compile(
             rf'href="/app/static/[0-9a-f]{{12}}-{re.escape(nome)}"'
         )
@@ -227,12 +246,24 @@ def test_landing_tem_os_tres_stylesheets_versionados_em_ordem(html_da_landing: b
 
 
 def test_landing_nao_referencia_origem_externa(html_da_landing: bytes):
+    """Recurso externo é proibido; `<a href>` externo só no crédito da foto.
+
+    A foto do Commons é CC BY-SA 4.0 e a licença exige o link para o arquivo e
+    para a licença (plano §9). Por isso a única origem externa admitida é o
+    crédito — e nenhuma delas em `src`.
+    """
     html = html_da_landing.decode("utf-8")
     externos = [
         url for url in REFERENCIA.findall(html) if url.startswith(("http://", "https://", "//"))
     ]
 
-    assert externos == []
+    assert externos, "o crédito da foto tem de linkar a origem e a licença"
+    for url in externos:
+        assert url.startswith(
+            ("https://commons.wikimedia.org/", "https://creativecommons.org/")
+        ), url
+    assert "src=\"http" not in html
+    assert "href=\"http" not in "".join(ESTILO.findall(html))
 
 
 def test_css_sem_import_e_url_externa():
@@ -241,7 +272,7 @@ def test_css_sem_import_e_url_externa():
 
     registro = assets()
     todas_urls: list[tuple[str, str]] = []
-    for nome in CSS_ORDEM:
+    for nome in CSS_ORDEM_LANDING:
         asset = registro.get(registro.url(nome).rsplit("/", 1)[-1])
         assert asset is not None, f"asset ausente no registro: {nome}"
         css = asset.corpo.decode("utf-8")

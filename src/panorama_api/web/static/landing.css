@@ -1,0 +1,405 @@
+/* ============================================================================
+   Landing `/` — camada visual (card `t_3f09d837`). Recorte c' do
+   `landing.css` de design, sha256
+   5d55d4908367a64abc4ced45f53f9240785c95c7812b4e9b192a7eccd5bbef82.
+
+   Só o que a tela usa (plano `landing-d2.md` §4): sem `.lnav`, rodapé próprio,
+   `body.land`, leituras, faixa de números e série SVG. Carregado só em `/`,
+   entre `panorama-telas.css` e `app.css` (bloco `estilos_pagina`).
+
+   Movimento só em CSS (D2-2). Fora de `prefers-reduced-motion: no-preference`
+   e do `@supports` da timeline, nada se move e nada se esconde: a página fica
+   completa, com e sem JS. Sem `style=`: atrasos por `:nth-child`.
+   ========================================================================= */
+
+/* ---------------- hero ---------------- */
+.hero {
+  position: relative;
+  display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+  gap: clamp(32px, 5vw, 76px);
+  align-items: center;
+  padding: clamp(48px, 7vw, 104px) 0 clamp(40px, 5vw, 72px);
+}
+
+/* regra de pauta: fios verticais, como papel de livro-caixa */
+.hero::before {
+  content: ""; position: absolute; inset: 0;
+  background-image: repeating-linear-gradient(90deg,
+    color-mix(in oklab, var(--fg) 7%, transparent) 0 1px, transparent 1px 104px);
+  opacity: .55; pointer-events: none;
+  mask-image: linear-gradient(180deg, transparent, black 22%, black 78%, transparent);
+}
+.hero > * { position: relative; }
+
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 10px;
+  margin: 0 0 22px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: .13em; text-transform: uppercase; color: var(--muted-strong);
+}
+.eyebrow::before {
+  content: ""; width: 26px; height: 1px; background: currentColor; opacity: .6;
+}
+
+.hero__titulo {
+  margin: 0; max-width: 15ch;
+  font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(44px, 5.4vw, 78px);
+  line-height: 1.02; letter-spacing: -.032em;
+  color: var(--fg);
+}
+/* A linha é a janela da máscara: `overflow: hidden` na `.hero__linha`, e o
+   `span` interno sobe. O estado base (fora da media query) é visível. */
+.hero__linha { display: block; overflow: hidden; padding-block-end: .1em; margin-block-end: -.1em; }
+
+.hero__lead {
+  margin: 26px 0 0; max-width: 46ch;
+  font-size: clamp(17px, 1.35vw, 19px); line-height: 1.62; color: var(--fg-2);
+}
+
+.hero__meta {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0;
+  margin: 34px 0 0; padding: 0; list-style: none;
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .04em;
+  color: var(--muted-strong);
+}
+.hero__meta li { display: flex; align-items: center; }
+.hero__meta li + li::before {
+  content: ""; width: 1px; height: 11px; margin: 0 14px;
+  background: var(--border); display: inline-block;
+}
+
+/* ---------------- busca do hero ---------------- */
+/* O formulário de busca (card `t_e075a6f6`) substitui os dois CTAs do design,
+   com os mesmos controles e rotas. Só o invólucro e o grupo de ações ficam
+   aqui: os campos são o `.campo` do protótipo, já ajustado no `app.css`. */
+.hero__busca {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  margin: 1.5rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .08);
+}
+.hero__busca .hero__acoes {
+  display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem;
+}
+.hero__acoes .botao { min-height: 50px; padding: 0 24px; font-size: var(--text-base); }
+
+/* ---------------- prancha (cartão de dados) ---------------- */
+/* A prancha do design trazia a série de uma escola; aqui carrega o recorte
+   publicado (municípios, anos, etapas) — os três números derivados de antes. */
+.prancha {
+  margin: 0; position: relative;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgba(22, 33, 29, .06),
+              0 26px 54px -34px rgba(22, 33, 29, .55);
+  overflow: hidden;
+  transition: transform var(--motion-base) var(--ease-standard),
+              box-shadow var(--motion-base) var(--ease-standard);
+}
+.prancha:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 1px 2px rgba(22, 33, 29, .06),
+              0 34px 64px -34px rgba(22, 33, 29, .5);
+}
+.prancha__fita {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 11px 18px;
+  background: color-mix(in oklab, var(--fg) 93%, var(--accent));
+  color: color-mix(in oklab, var(--surface) 84%, var(--bg));
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+}
+/* O título da fita é o `<h2>` da seção (`id="recorte-titulo"`): herda a caixa
+   do `b` do design, sem margem nem peso de título grande. */
+.prancha__fita h2 {
+  margin: 0; font-family: inherit; font-size: inherit; font-weight: 500;
+  letter-spacing: inherit; line-height: 1.4; color: var(--surface);
+}
+.prancha__fita i {
+  display: inline-flex; align-items: center; gap: 7px; font-style: normal;
+  color: color-mix(in oklab, var(--surface) 70%, var(--bg));
+}
+.prancha__fita i::before {
+  content: ""; width: 6px; height: 6px; border-radius: 50%;
+  background: color-mix(in oklab, var(--accent) 45%, white);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 26%, transparent);
+}
+
+.prancha__base {
+  display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+}
+.prancha__base div { padding: 14px 18px; }
+.prancha__base div + div { border-left: 1px solid var(--border-soft); }
+.prancha__base dt {
+  font-family: var(--font-mono); font-size: 9px; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--muted-strong);
+}
+.prancha__base dd {
+  margin: 3px 0 0; font-size: 15px; font-weight: 600; color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.prancha__nota {
+  margin: 0; padding: 9px 18px 11px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--muted-strong);
+  letter-spacing: .02em; border-top: 1px solid var(--border-soft);
+  background: color-mix(in oklab, var(--surface) 70%, var(--bg));
+}
+
+/* ---------------- seções ---------------- */
+.secao { padding: clamp(56px, 9vw, 112px) 0 0; }
+.secao__cabecalho {
+  display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+  gap: clamp(24px, 5vw, 72px); align-items: end;
+  margin-bottom: clamp(28px, 4vw, 46px);
+}
+.secao__cabecalho h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(30px, 3.6vw, 46px); line-height: 1.08; letter-spacing: -.026em;
+  max-width: 22ch;
+}
+.secao__texto {
+  margin: 0; font-size: var(--text-lg); line-height: 1.62; color: var(--fg-2); max-width: 56ch;
+}
+
+/* ---------------- capítulos ---------------- */
+/* Cada capítulo é uma linha inteira clicável: o `::after` do link estica a área
+   de clique sobre o cartão, e o foco permanece no link (nome acessível curto). */
+.capitulos { border-top: 2px solid var(--fg); }
+.capitulo {
+  position: relative;
+  display: grid; grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: var(--space-5); align-items: center;
+  padding: 26px 16px 26px 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg);
+  transition: background var(--motion-base) var(--ease-standard),
+              padding-inline-start var(--motion-base) var(--ease-standard);
+}
+.capitulo::before {
+  content: ""; position: absolute; inset-inline-start: 0; top: -1px;
+  width: 100%; height: 1px; background: var(--accent);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform .55s var(--ease-standard);
+}
+.capitulo:hover { background: color-mix(in oklab, var(--surface) 78%, transparent); padding-inline-start: 18px; }
+.capitulo:hover::before { transform: scaleX(1); }
+
+.capitulo__num {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em;
+  color: var(--muted-strong); transition: color var(--motion-fast) var(--ease-standard);
+}
+.capitulo:hover .capitulo__num { color: var(--accent); }
+.capitulo h3 {
+  margin: 0; font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(24px, 2.4vw, 32px); letter-spacing: -.02em; line-height: 1.15;
+}
+.capitulo p {
+  margin: 6px 0 0; max-width: 68ch;
+  font-size: var(--text-sm); line-height: 1.55; color: var(--fg-2);
+}
+.capitulo__ir {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--muted-strong);
+  white-space: nowrap; border-radius: var(--radius-sm);
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+.capitulo__ir::after { content: ""; position: absolute; inset: 0; }
+.capitulo__ir svg { width: 15px; height: 15px; transition: transform var(--motion-base) var(--ease-standard); }
+.capitulo:hover .capitulo__ir { color: var(--ink-accent); }
+.capitulo:hover .capitulo__ir svg { transform: translateX(4px); }
+.capitulo__ir:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+/* ---------------- banda fotográfica ---------------- */
+.banda {
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
+  gap: clamp(24px, 4vw, 56px); align-items: center;
+  padding: clamp(56px, 8vw, 104px) 0 0;
+  margin: 0;
+}
+.banda__moldura {
+  position: relative; overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-warm);
+  aspect-ratio: 16 / 9;
+  box-shadow: var(--elev-raised);
+}
+.banda__moldura img {
+  width: 100%; height: 112%; object-fit: cover; display: block;
+  filter: grayscale(1) contrast(1.05) brightness(1.02);
+  transform: translateY(0);
+}
+.banda__moldura::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: color-mix(in oklab, var(--accent) 82%, var(--fg));
+  mix-blend-mode: color; opacity: .34;
+}
+.banda__moldura::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: linear-gradient(180deg, transparent 55%, rgba(22, 33, 29, .22));
+}
+.banda figcaption h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(24px, 2.8vw, 34px); line-height: 1.24; letter-spacing: -.022em;
+  color: var(--fg); text-wrap: balance;
+}
+.banda figcaption p { margin: 14px 0 0; font-size: var(--text-base); line-height: 1.62; color: var(--fg-2); }
+.banda__credito {
+  margin: 12px 0 0 !important; font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: .02em; color: var(--muted-strong) !important; line-height: 1.6;
+}
+.banda__credito a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---------------- método (painel de tinta) ---------------- */
+.metodo {
+  margin-top: clamp(56px, 9vw, 112px);
+  background: color-mix(in oklab, var(--fg) 94%, var(--accent));
+  color: color-mix(in oklab, var(--surface) 88%, var(--bg));
+  border-radius: var(--radius-lg);
+  padding: clamp(30px, 4.5vw, 56px) clamp(24px, 4vw, 52px) 0;
+  overflow: hidden;
+  position: relative;
+}
+.metodo::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: repeating-linear-gradient(90deg,
+    rgba(255, 255, 255, .045) 0 1px, transparent 1px 96px);
+}
+.metodo__cabecalho {
+  position: relative;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-8); align-items: end;
+  padding-bottom: 30px; border-bottom: 1px solid rgba(255, 255, 255, .16);
+}
+.metodo .eyebrow { color: color-mix(in oklab, var(--surface) 55%, var(--bg)); margin-bottom: 14px; }
+.metodo h2 {
+  margin: 0; font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(28px, 3.2vw, 42px); line-height: 1.1; letter-spacing: -.024em;
+  color: var(--surface); max-width: 18ch;
+}
+.metodo__intro {
+  margin: 0; font-size: var(--text-base); line-height: 1.65;
+  color: color-mix(in oklab, var(--surface) 72%, var(--bg)); max-width: 48ch;
+}
+.metodo__intro a { color: var(--surface); text-decoration: underline; text-underline-offset: 3px; }
+
+/* marquise: nomes de municípios reais, decorativos para leitores de tela */
+.marquee {
+  position: relative;
+  margin: 0 calc(-1 * clamp(24px, 4vw, 52px));
+  padding: 14px 0;
+  border-top: 1px solid rgba(255, 255, 255, .12);
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, black 8%, black 92%, transparent);
+}
+.marquee__trilha { display: flex; width: max-content; gap: 0; }
+.marquee__trilha span {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: color-mix(in oklab, var(--surface) 46%, var(--bg));
+  padding: 0 18px; white-space: nowrap;
+}
+.marquee__trilha span::after { content: "·"; margin-left: 34px; opacity: .55; }
+
+/* ---------------- movimento ---------------- */
+/* Tudo o que se move vive aqui: sem `no-preference` não existe `animation` e o
+   estado base é o final. Nenhum `infinite` (WCAG 2.2.2): o pulso roda uma vez. */
+@media (prefers-reduced-motion: no-preference) {
+  .hero__linha > span {
+    display: block; transform: translateY(112%);
+    animation: linha-sobe 1s cubic-bezier(.16, 1, .3, 1) both;
+  }
+  .hero__linha:nth-child(1) > span { animation-delay: 60ms; }
+  .hero__linha:nth-child(2) > span { animation-delay: 160ms; }
+  .hero__linha:nth-child(3) > span { animation-delay: 260ms; }
+
+  .hero__lead, .hero__busca, .hero__meta, .prancha {
+    animation: entra .9s cubic-bezier(.16, 1, .3, 1) both;
+  }
+  .prancha { animation-delay: 260ms; }
+  .hero__lead { animation-delay: 360ms; }
+  .hero__busca { animation-delay: 440ms; }
+  .hero__meta { animation-delay: 520ms; }
+
+  .prancha__fita i::before { animation: pulso 2.8s ease-in-out; }
+
+  /* Revelação, paralaxe e marquise: só onde o navegador tem a timeline de
+     rolagem. Sem `@supports`, nada é animado e nada fica escondido. */
+  @supports (animation-timeline: view()) {
+    .capitulo, .banda {
+      animation: revela 1ms linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 40%;
+    }
+    .banda__moldura img {
+      animation: paralaxe 1ms linear both;
+      animation-timeline: view();
+      animation-range: cover 0% cover 100%;
+    }
+    .marquee__trilha {
+      animation: desliza 1ms linear both;
+      animation-timeline: view();
+      animation-range: entry 0% exit 100%;
+    }
+  }
+}
+
+@keyframes linha-sobe { from { transform: translateY(112%); } }
+@keyframes entra { from { opacity: 0; transform: translateY(14px); } }
+@keyframes revela { from { opacity: 0; transform: translateY(18px); } }
+@keyframes pulso { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }
+@keyframes paralaxe { from { transform: translateY(-26px); } to { transform: translateY(26px); } }
+@keyframes desliza { from { transform: translateX(0); } to { transform: translateX(-45%); } }
+
+/* ---------------- responsivo (o design é desktop-first) ---------------- */
+@media (min-width: 48rem) {
+  /* Pílula em dois blocos: campos, depois botões (o desenho de SSR que já
+     valia em `/`). A dica do nome não cabe na linha e sai daqui. */
+  .hero__busca {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 0.5rem 0.9rem;
+    padding: 0.9rem 2.5rem;
+    border-radius: 999px;
+  }
+  .hero__busca .hero__acoes {
+    grid-column: 1 / -1;
+    display: flex; flex-wrap: wrap; gap: 0.75rem;
+  }
+  .hero__busca .campo__dica { display: none; }
+}
+
+@media (max-width: 1040px) {
+  .hero { grid-template-columns: minmax(0, 1fr); gap: 44px; }
+  .prancha { max-width: 560px; }
+  .banda { grid-template-columns: minmax(0, 1fr); }
+  .metodo__cabecalho { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+}
+
+@media (max-width: 860px) {
+  .secao__cabecalho { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
+}
+
+@media (max-width: 620px) {
+  .prancha__fita { padding: 10px 14px; font-size: 9px; letter-spacing: .06em; }
+  .prancha__fita i { display: none; }
+  .hero { padding-top: 40px; }
+  .hero__titulo { font-size: clamp(38px, 11vw, 52px); max-width: 14ch; }
+  .hero__meta { flex-direction: column; align-items: flex-start; gap: 5px; font-size: 10px; }
+  .hero__meta li + li::before { display: none; }
+  .prancha__base div { padding: 10px 12px; }
+  .prancha__base dd { font-size: 13px; }
+  .capitulo { grid-template-columns: 38px minmax(0, 1fr); gap: 12px var(--space-3); padding: 20px 6px; }
+  .capitulo__ir { grid-column: 2; justify-self: start; margin-top: 4px; }
+  .capitulo:hover { padding-inline-start: 6px; }
+  .secao { padding-top: 56px; }
+  .metodo { padding: 28px 18px 0; }
+  .marquee { margin-inline: -18px; }
+  .banda figcaption h2 { font-size: 23px; }
+}

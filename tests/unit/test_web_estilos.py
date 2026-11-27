@@ -32,18 +32,24 @@ CSS = (
 
 #: CSS vendorizado do protótipo (D1-a): fonte dos tokens e das regras de base.
 #: Os invariantes visuais valem para a página renderizada, que é a união dos
-#: três stylesheets linkados no `base.html` — por isso as leituras abaixo usam
-#: o CSS total, não só o app-only.
+#: stylesheets linkados no `base.html` — por isso as leituras abaixo usam o
+#: CSS total, não só o app-only.
 PROTOTIPO = CSS.parent / "prototipo" / "panorama.css"
 PROTOTIPO_TELAS = CSS.parent / "prototipo" / "panorama-telas.css"
+#: Camada visual da landing (D2-E3), o quarto stylesheet — carregado só em `/`.
+#: Entra na união porque `.hero`, `.prancha`, `.capitulos` e `.metodo` só
+#: existem lá: sem ele os invariantes da landing seriam medidos no vazio.
+LANDING = CSS.parent / "landing.css"
 
 
 def _css_total() -> str:
-    """Os três stylesheets na ordem da cascata: protótipo, telas, app-only."""
+    """Os stylesheets na ordem da cascata: protótipo, telas, landing, app-only."""
     return (
         PROTOTIPO.read_text(encoding="utf-8")
         + "\n"
         + PROTOTIPO_TELAS.read_text(encoding="utf-8")
+        + "\n"
+        + LANDING.read_text(encoding="utf-8")
         + "\n"
         + CSS.read_text(encoding="utf-8")
     )
@@ -146,11 +152,11 @@ def test_alvos_de_toque_do_formulario_tem_44px():
         assert int(altura.group(1)) >= ALVO_MINIMO_PX
 
 
-# -- hero da landing e painel do recorte (card t_437796c3) --------------------
+# -- prancha do recorte (card t_437796c3; porte em D2-E3) --------------------
 
-#: Fundo do painel do recorte: `--surface-warm` do protótipo. O texto do painel
-#: não fica sobre o branco do cartão — o contraste tem de ser medido no painel.
-FUNDO_PAINEL = "--surface-warm"
+#: Fundo do cartão da prancha: `--surface` do protótipo (o design usa o
+#: cartão branco, não o tint do painel antigo). O texto da prancha é `--fg`.
+FUNDO_PAINEL = "--surface"
 
 #: WCAG 1.4.3 para texto normal (o card pede 4,5:1, não os 3:1 de elemento).
 CONTRASTE_TEXTO_MINIMO = 4.5
@@ -163,7 +169,7 @@ def _cor_do_token(nome: str) -> str:
     return tokens[nome]
 
 
-def test_texto_do_painel_do_recorte_tem_contraste_de_4_5_para_1():
+def test_texto_da_prancha_tem_contraste_de_4_5_para_1():
     css = _css_total()
     texto = re.search(r"--fg:\s*(#[0-9a-fA-F]{6})", css)
     assert texto is not None
@@ -172,42 +178,43 @@ def test_texto_do_painel_do_recorte_tem_contraste_de_4_5_para_1():
     assert _contraste(texto.group(1), fundo) >= CONTRASTE_TEXTO_MINIMO
 
 
-def test_painel_do_recorte_usa_o_fundo_e_o_raio_da_spec():
-    css = _css_total()
-    painel = _regra(".hero .recorte")
+def test_prancha_usa_o_fundo_e_o_raio_da_spec():
+    painel = _regra(".prancha")
 
-    # Fundo pelo token, não por hex solto: um só lugar decide a cor do painel.
-    assert "background: var(--surface-warm)" in painel
-    # 16 px é o raio desta peça do SSR (o protótipo vai até `--radius-lg`).
-    assert "border-radius: 16px" in painel
+    # Fundo e raio pelos tokens do protótipo, não por hex solto.
+    assert "background: var(--surface)" in painel
+    assert "border-radius: var(--radius-lg)" in painel
 
 
-def test_rotulos_e_fonte_do_painel_usam_o_texto_secundario():
-    for seletor in (".recorte__rotulo", ".recorte__fonte"):
+def test_rotulos_e_nota_da_prancha_usam_o_texto_secundario():
+    for seletor in (".prancha__base dt", ".prancha__nota"):
         assert "var(--muted-strong)" in _regra(seletor), seletor
 
 
-def test_hero_empilha_antes_de_48rem_e_vira_duas_colunas_depois():
+def test_hero_e_desktop_first_com_uma_coluna_abaixo_de_1040px():
+    """O design novo é desktop-first: 1 coluna ≤ 1040px, 2 colunas acima.
+
+    A regra base declara as duas colunas (`1.12fr .88fr`) e o breakpoint de
+    1040px empilha — o inverso do SSR antigo, que subia de 1 para 2 colunas
+    em 48rem.
+    """
     base = _regra(".hero")
     assert "display: grid" in base
-    # Abaixo do breakpoint é uma coluna: nada de `1.1fr 0.9fr` na regra base.
-    assert "display: flex" not in base
-    assert "1.1fr" not in base
+    assert "1.12fr" in base and ".88fr" in base
 
     css = _css_total()
-    bloco = re.search(r"@media \(min-width: 48rem\)\s*\{(.*?)\n\}", css, re.S)
-    assert bloco is not None, "breakpoint do hero ausente"
-    assert ".hero" in bloco.group(1)
-    assert "1.1fr 0.9fr" in bloco.group(1)
+    bloco = re.search(r"@media \(max-width: 1040px\)\s*\{(.*?)\n\}", css, re.S)
+    assert bloco is not None, "breakpoint de 1040px ausente"
+    assert re.search(r"\.hero\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\)", bloco.group(1))
 
 
 def test_nenhum_outline_none_sem_indicador_visivel():
-    """Todo `outline: none` do protótipo anda com um indicador visível.
+    """Todo `outline: none` do CSS anda com um indicador visível.
 
-    O protótipo zera o `outline` só onde o anel de foco (`--focus-ring`) assume
-    no `:focus-visible`; no gráfico da série o foco vai para o retângulo de
-    captura (`.grafico__captura`). Remover o contorno sem substituto quebra o
-    foco visível — este teste impede a regressão.
+    O protótipo e a landing zeram o `outline` só onde o anel de foco
+    (`--focus-ring`) assume no `:focus-visible`; no gráfico da série o foco vai
+    para o retângulo de captura (`.grafico__captura`). Remover o contorno sem
+    substituto quebra o foco visível — este teste impede a regressão.
     """
     css = _css_total()
     blocos = re.findall(r"([^{}]*)\{([^{}]*)\}", css)
@@ -229,7 +236,7 @@ def test_nenhum_outline_none_sem_indicador_visivel():
 # -- busca no hero da landing (card t_e075a6f6, spec §6/§8) -------------------
 
 #: Seletor composto dos controles da barra do hero, como está no arquivo.
-CAMPOS_DO_HERO = '.hero__campo input[type="search"],\n.hero__campo select'
+CAMPOS_DO_HERO = '.campo input[type="search"],\n.campo select'
 
 
 def _cor_da_variavel(nome: str) -> str:
@@ -278,13 +285,13 @@ def test_campos_e_botoes_da_busca_do_hero_tem_alvo_de_44px():
     botao = _regra(".botao")
 
     for regra, alvo in ((campos, "campos"), (botao, "botões")):
-        altura = re.search(r"min-height:\s*(\d+)px", regra)
+        altura = re.search(r"(?:min-)?height:\s*(\d+)px", regra)
         assert altura is not None, f"{alvo} da busca do hero sem min-height"
         assert int(altura.group(1)) >= ALVO_MINIMO_PX
 
     # Largura: os campos ocupam 100% da coluna e os botões, a do `.hero__acoes`.
     assert "width: 100%" in campos
-    assert "grid-template-columns: minmax(0, 1fr)" in _regra(".hero__acoes")
+    assert "grid-template-columns: minmax(0, 1fr)" in _regra(".hero__busca .hero__acoes")
 
 
 def test_barra_do_hero_empilha_com_raio_16px_e_vira_pilula_em_48rem():
@@ -294,7 +301,7 @@ def test_barra_do_hero_empilha_com_raio_16px_e_vira_pilula_em_48rem():
     # Empilhada abaixo de 48rem: uma coluna, raio de 16 px e sombra da peça.
     assert "grid-template-columns: minmax(0, 1fr)" in base
     assert "border-radius: 16px" in base
-    assert "box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08)" in base
+    assert "box-shadow: 0 1px 3px rgba(0, 0, 0, .08)" in base
     # Pílula a partir de 48rem: o raio de 999 px vive dentro do breakpoint.
     pilula = css.index("border-radius: 999px")
     assert css.rindex("@media (min-width: 48rem)", 0, pilula) >= 0
@@ -313,22 +320,25 @@ def test_foco_visivel_continua_valendo_para_os_botoes():
 # -- escala tipográfica do protótipo (card V1 `t_423aa547`) -------------------
 
 def test_h1_usa_a_escala_do_prototipo():
-    """`h1` com `clamp()`; a landing chega ao `--text-3xl` do protótipo.
+    """O `h1` da landing usa a escala do design novo (D2-7): `.hero__titulo`.
 
-    O teto é o token da escala (card V1 manda medir o CSS, não o olho). O
-    mínimo mantém o título legível a 390 px.
+    O token `--text-4xl` (76 px) era o teto do SSR antigo e o comentário V1
+    ("76 px é outdoor") ficou superado pelo design do dono. O contrato agora é
+    o `clamp(44px, 5.4vw, 78px)` do protótipo, e o mínimo de 44 px mantém o
+    título legível a 390 px.
     """
     css = _css_total()
     base = _regra("h1")
-    hero = _regra(".hero h1")
+    hero = _regra(".hero__titulo")
 
-    assert "clamp(" in base and "clamp(" in hero
+    assert "clamp(" in base
     assert "28px" in base, base
-    assert "var(--text-3xl)" in hero, hero
+    assert hero.count("clamp(") >= 1
+    assert "clamp(44px, 5.4vw, 78px)" in hero, hero
+    assert "line-height: 1.02" in hero, hero
 
-    # A escala existe e é a do protótipo.
+    # A escala do protótipo continua existindo no `:root` vendorizado.
     assert re.search(r"--text-3xl:\s*54px", css)
-    assert re.search(r"--text-4xl:\s*76px", css)
     assert re.search(r"--leading-tight:\s*1\.08", css)
     assert re.search(r"--tracking-display:\s*-0\.014em", css)
 

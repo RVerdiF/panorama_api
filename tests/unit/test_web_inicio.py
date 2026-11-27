@@ -37,7 +37,7 @@ ANOS = (2021, 2022, 2023, 2024, 2025)
 ANOS_CSV = ",".join(str(ano) for ano in ANOS)
 INICIO = "/"
 
-VALOR = re.compile(r'<dd class="recorte__valor">([^<]*)</dd>')
+VALOR = re.compile(r"<dd>([^<]*)</dd>")
 
 
 def _settings(*, anos: str = ANOS_CSV) -> Settings:
@@ -87,18 +87,16 @@ def test_painel_do_recorte_mostra_os_numeros_reais_do_produto():
     assert "Fonte: Censo Escolar da Educação Básica (INEP)." in html
 
 
-def test_painel_e_uma_secao_com_h2_e_lista_de_definicoes():
+def test_painel_e_a_prancha_com_h2_e_lista_de_definicoes():
+    """A prancha do design é a seção do recorte: `h2` na fita e `dl` no corpo."""
     html, _ = _pagina()
 
-    assert re.search(
-        r'<section class="recorte" aria-labelledby="recorte-titulo">', html
-    )
+    assert re.search(r'<figure class="prancha" aria-labelledby="recorte-titulo">', html)
     assert '<h2 id="recorte-titulo">Recorte dos dados</h2>' in html
-    assert re.search(r"<dl class=\"recorte__lista\">", html)
-    # Um `dt` por número: o termo vem antes do valor no `dl`, e o CSS inverte
-    # apenas a ordem visual (número grande em cima do rótulo).
-    assert html.count('class="recorte__rotulo"') == 3
-    assert html.count('class="recorte__valor"') == 3
+    assert re.search(r'<dl class="prancha__base">', html)
+    # Um `dt` por número, na ordem em que o `dl` os apresenta.
+    assert html.count("<dt>") == 3
+    assert html.count("<dd>") == 3
 
 
 def test_anos_continuos_viram_faixa_e_anos_com_buraco_viram_lista():
@@ -150,30 +148,37 @@ def test_template_nao_carrega_numero_literal_do_painel():
 
 
 def _hero(html: str) -> str:
-    """Marcação da hero: a `<section class="hero">` com o painel aninhado dentro."""
-    inicio = html.index('<section class="hero">')
-    fim_do_painel = html.index("</section>", inicio) + len("</section>")
-    fim = html.index("</section>", fim_do_painel) + len("</section>")
+    """Marcação da hero: a `<section class="hero">` com a prancha aninhada dentro."""
+    inicio = html.index('<section class="hero"')
+    fim_da_prancha = html.index("</figure>", inicio) + len("</figure>")
+    fim = html.index("</section>", fim_da_prancha) + len("</section>")
     return html[inicio:fim]
 
 
 def test_hierarquia_de_titulos_do_hero():
-    """Um `<h1>`; o painel abre nível com `<h2>`, sem pular nível dentro da hero."""
+    """Um `<h1>`; a prancha abre nível com `<h2>`, sem pular nível na hero."""
     html, _ = _pagina()
     hero = _hero(html)
 
     assert hero.count("<h1") == 1
     assert hero.index("<h1") < hero.index("<h2")
     assert hero.count("<h2") == 1
-    # Nada de `<h3>` na hero: as seções abaixo dela (card L4) é que abrem nível.
+    # Nada de `<h3>` na hero: os capítulos abaixo dela é que abrem nível.
     assert "<h3" not in hero
     assert html.count("<h1") == 1
 
 
 def test_hero_mostra_a_copy_do_h1_e_do_subtitulo():
+    """A copy é a mesma; o `h1` agora tem três `span.hero__linha` (máscara)."""
     html, _ = _pagina()
 
-    assert "<h1>Escolas e mercados da educação básica em Minas Gerais</h1>" in html
+    h1 = re.search(r"<h1\b[^>]*>(.*?)</h1>", html, re.S)
+    assert h1 is not None, "h1 ausente em `/`"
+    texto_h1 = re.sub(r"<[^>]+>", " ", h1.group(1))
+    assert _texto(texto_h1).strip() == (
+        "Escolas e mercados da educação básica em Minas Gerais"
+    )
+    assert html.count("hero__linha") == 3
     assert (
         "Matrículas, oferta por etapa, rendimento e participação de mercado das "
         "escolas" in html
@@ -315,16 +320,18 @@ def test_links_da_landing_resolvem_no_front():
     """`#q` aponta para um alvo real e as duas rotas de apoio respondem 200."""
     html, _ = _pagina()
 
-    assert '<a href="#q">Buscar uma escola</a>' in html
+    # Os capítulos do design: o link carrega classe, então o alvo é o `href` e o
+    # texto, não a tag inteira.
+    for href, texto in (
+        ("#q", "Buscar uma escola"),
+        ("/app/metodologia", "Ler a metodologia"),
+        ("/app/mercados/3106200", "Ver o mercado de Belo Horizonte"),
+    ):
+        assert re.search(
+            rf'<a\b[^>]*href="{re.escape(href)}"[^>]*>\s*{re.escape(texto)}', html
+        ), (href, texto)
     assert 'id="q"' in html
-    assert '<a href="/app/metodologia">Ler a metodologia</a>' in html
-    assert (
-        '<a href="/app/metodologia">Como os números são calculados</a>' in html
-    )
-    assert (
-        '<a href="/app/mercados/3106200">Ver o mercado de Belo Horizonte</a>'
-        in html
-    )
+    assert '<a href="/app/metodologia">Como os números são calculados</a>' in html
 
     # O exemplo de mercado é um código que existe na lista versionada — a
     # landing não pode apontar para um município inventado.

@@ -1,17 +1,18 @@
 """Classes literais de template cobertas pelo CSS do protótipo (plano §3, item 5).
 
 Toda classe literal em `class="…"` nos templates precisa estar em
-`classes(panorama.css ∪ panorama-telas.css) ∪ PENDENTES[template]`
+`classes(panorama.css ∪ panorama-telas.css ∪ landing.css) ∪ PENDENTES[template]`
 (V3-D14). `PENDENTES` só encolhe: quando um card de tela migra o template,
 a entrada correspondente vai a `∅` no mesmo PR (§4.1).
 
-Depois do card D1-E7 (`t_3c44a260`) sobram **duas** telas escaladas ao dono
-(P7): `inicio.html` (landing) e `comparar.html`. Elas esperam a referência de
-design; até ela chegar, são as únicas com classes fora do protótipo. A trava
-`test_pendentes_so_as_duas_telas_escaladas` falha se qualquer outra entrada
-voltar, e `test_app_only_nao_declara_classe_orfa` (abaixo) impede que o
-CSS app-only acumule seletor que nenhum template, partial, módulo Python ou
-`static/app.js` usa.
+Depois do card D2-E3 (`t_3f09d837`) sobra **uma** tela escalada ao dono (P7):
+`comparar.html`. A landing saiu da lista porque porta a camada visual do
+protótipo para `static/landing.css`, carregado só em `/` — por isso esse
+arquivo entra na união de classes cobertas e também na varredura de órfão
+(como o `app.css`). A trava `test_pendentes_so_as_telas_escaladas` falha se
+qualquer outra entrada voltar, e `test_app_only_nao_declara_classe_orfa`
+(abaixo) impede que o CSS app-only e o da landing acumulem seletor que nenhum
+template, partial, módulo Python ou `static/app.js` usa.
 
 Extração (igual à medição do plano §1.3):
 
@@ -37,6 +38,10 @@ TEMPLATES = (
 WEB = TEMPLATES.parent
 APP_CSS = WEB / "static" / "app.css"
 APP_JS = WEB / "static" / "app.js"
+#: Stylesheet da landing (D2-E3): camada visual carregada só em `/`. Entra na
+#: união de classes cobertas porque é dele que a landing tira as classes do
+#: design — e entra na varredura de órfão pelo mesmo motivo que o `app.css`.
+LANDING_CSS = WEB / "static" / "landing.css"
 PROTOTIPO_CSS = (
     TEMPLATES.parent / "static" / "prototipo" / "panorama.css"
 )
@@ -84,26 +89,10 @@ PENDENTES: dict[str, frozenset[str]] = {
     # D1-E7 zerou as macros mortas (`recorte`) e trocou o `nao-se-aplica` por
     # `div.definicao` em `bloco_nao_se_aplica`.
     "partials/macros.html": frozenset(),
-    # Por ultimo: landing so recebe o shell, aguarda referencia do dono (P7).
-    "inicio.html": frozenset(
-        {
-            "dica",
-            "encontra",
-            "hero",
-            "hero__acoes",
-            "hero__busca",
-            "hero__campo",
-            "hero__texto",
-            "recorte",
-            "recorte__fonte",
-            "recorte__item",
-            "recorte__lista",
-            "recorte__rotulo",
-            "recorte__valor",
-            "secao",
-            "subtitulo",
-        }
-    ),
+    # D2-E3 (t_3f09d837) zerou: a landing porta a camada visual do protótipo e
+    # as classes agora vivem em `static/landing.css`. A chave fica para travar
+    # que nada legado (`.subtitulo`, `.encontra`, `.recorte`) volta.
+    "inicio.html": frozenset(),
     # Por ultimo: comparar so recebe o shell, aguarda referencia do dono.
     "comparar.html": frozenset(
         {
@@ -123,7 +112,7 @@ PENDENTES: dict[str, frozenset[str]] = {
 }
 
 #: As unicas telas que podem ter classe fora do prototipo (P7 aberta).
-TELAS_ESCALADAS = frozenset({"inicio.html", "comparar.html"})
+TELAS_ESCALADAS = frozenset({"comparar.html"})
 
 
 def _classes_do_valor(valor: str) -> set[str]:
@@ -145,9 +134,9 @@ def _classes_do_template(caminho: Path) -> set[str]:
 
 
 def _classes_do_prototipo() -> set[str]:
-    """Conjunto de seletores de classe dos dois CSS do prototipo."""
+    """Conjunto de seletores de classe dos CSS do prototipo e da landing."""
     classes: set[str] = set()
-    for css in (PROTOTIPO_CSS, PROTOTIPO_TELAS_CSS):
+    for css in (PROTOTIPO_CSS, PROTOTIPO_TELAS_CSS, LANDING_CSS):
         classes.update(
             sel[1:] for sel in SELETOR_CLASSE.findall(css.read_text(encoding="utf-8"))
         )
@@ -217,25 +206,27 @@ def _classes_usadas_no_html_renderizado() -> set[str]:
 
 
 def _classes_do_app_css() -> dict[str, set[str]]:
-    """Seletores de classe declarados no app-only, por seletor → origens.
+    """Seletores de classe declarados no app-only **e no `landing.css`**.
 
-    Só o seletor conta: declaração (`propriedade: valor`) e comentário ficam
-    de fora, então `url("{{asset:…}}")` e a prosa das seções não viram
-    "classe declarada".
+    O `landing.css` é o quarto stylesheet, carregado só em `/` (D2-E3): os
+    seletores dele também precisam de uso, e a checagem é a mesma. Só o seletor
+    conta: declaração (`propriedade: valor`) e comentário ficam de fora, então
+    `url("{{asset:…}}")` e a prosa das seções não viram "classe declarada".
     """
-    texto = APP_CSS.read_text(encoding="utf-8")
-    sem_comentario = re.sub(
-        r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), texto, flags=re.S
-    )
     declaradas: dict[str, set[str]] = {}
-    for linha in sem_comentario.splitlines():
-        limpa = linha.strip()
-        if not limpa:
-            continue
-        if re.match(r"^[a-zA-Z-]+\s*:", limpa):  # declaração
-            continue
-        for nome in SELETOR_CLASSE.findall(limpa):
-            declaradas.setdefault(nome[1:], set()).add(limpa)
+    for arquivo in (APP_CSS, LANDING_CSS):
+        texto = arquivo.read_text(encoding="utf-8")
+        sem_comentario = re.sub(
+            r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), texto, flags=re.S
+        )
+        for linha in sem_comentario.splitlines():
+            limpa = linha.strip()
+            if not limpa:
+                continue
+            if re.match(r"^[a-zA-Z-]+\s*:", limpa):  # declaração
+                continue
+            for nome in SELETOR_CLASSE.findall(limpa):
+                declaradas.setdefault(nome[1:], set()).add(limpa)
     return declaradas
 
 
@@ -256,7 +247,7 @@ def test_breadcrumb_ausente_continua_declarado_com_conjunto_vazio():
 
 
 def test_pendentes_so_as_duas_telas_escaladas():
-    """Trava final do D1-E7: só landing e comparar seguem fora do protótipo.
+    """Trava do P7: só `comparar.html` segue fora do protótipo.
 
     Qualquer entrada com classe volta a falhar aqui, antes do HTML quebrar
     em tela — é o teste que substitui o grep de "legado = 0".
@@ -297,12 +288,15 @@ def test_toda_classe_literal_esta_no_prototipo_ou_em_pendentes():
 
 
 def test_app_only_nao_declara_classe_orfa():
-    """Nenhum seletor do app-only fica sem uso (card D1-E7, critério 3).
+    """Nenhum seletor do app-only nem do `landing.css` fica sem uso.
 
     Uso = `class="…"` em template ou partial, classe citada no `app.js`, ou
     markup montado por módulo Python do front. Classe ambígua por construção
     (`<div class="{{ item.classe }}">` do subnav) entra por este último
     caminho, não por exceção no teste.
+
+    D2-E3 (`t_3f09d837`): a varredura cobre também o `landing.css`, o quarto
+    stylesheet — sem isso um recorte do design com regra morta passaria.
     """
     usadas = set()
     for html in sorted(TEMPLATES.rglob("*.html")):
@@ -311,6 +305,6 @@ def test_app_only_nao_declara_classe_orfa():
 
     orfas = sorted(set(_classes_do_app_css()) - usadas)
     assert not orfas, (
-        "seletor app-only sem uso em template, partial, módulo Python ou app.js: "
-        + ", ".join(f".{nome}" for nome in orfas)
+        "seletor do app-only ou da landing sem uso em template, partial, "
+        "módulo Python ou app.js: " + ", ".join(f".{nome}" for nome in orfas)
     )

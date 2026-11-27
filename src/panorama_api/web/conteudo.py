@@ -186,6 +186,28 @@ EXPLICACAO_METODOLOGIA_INCOMPARAVEL = (
 #: subetapas (`docs/api-v1.md`).
 ETAPA_PADRAO_MERCADO = "bas"
 
+#: Municípios da marquise da landing, por código IBGE (plano `landing-d2.md`
+#: §5). São nomes reais da lista versionada — o template nunca escreve o nome,
+#: e um teste garante que todo código existe em `municipios_mg()`. Nada de
+#: número: a marquise é decorativa (`aria-hidden`) e não afirma dado nenhum.
+MARQUISE_MUNICIPIOS: tuple[str, ...] = (
+    "3106200",  # Belo Horizonte
+    "3170206",  # Uberlândia
+    "3136702",  # Juiz de Fora
+    "3118601",  # Contagem
+    "3106705",  # Betim
+    "3143302",  # Montes Claros
+    "3170107",  # Uberaba
+    "3127701",  # Governador Valadares
+    "3131307",  # Ipatinga
+    "3167202",  # Sete Lagoas
+    "3122306",  # Divinópolis
+    "3157807",  # Santa Luzia
+    "3151800",  # Poços de Caldas
+    "3170701",  # Varginha
+    "3148004",  # Patos de Minas
+)
+
 #: Nome de exibição de cada etapa. `bas` é o total oficial, não a soma das
 #: subetapas (`docs/api-v1.md`).
 ETAPAS_ROTULOS: dict[Etapa, str] = {
@@ -308,6 +330,7 @@ __all__ = [
     "MOTIVO_SEM_ANO_COMUM",
     "MOTIVO_SEM_COMPARACAO",
     "MOTIVO_SEM_PRIVADAS",
+    "MARQUISE_MUNICIPIOS",
     "NAO_SE_APLICA",
     "NOTA_GRUPO_ETAPAS",
     "NOTA_GRUPO_MODALIDADES",
