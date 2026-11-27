@@ -19,11 +19,11 @@
 {# Shell do design (card `t_e42049c1`): a landing usa a navbar `.lnav` e o
    rodapé `.rodape` do protótipo, não o shell do app. O corpo é literalmente
    o `<body>` de `panorama-escola-landing.html`, com adaptações só onde o
-   card manda: links para as rotas do app, sem a faixa de protótipo, sem o
-   `<script>` do protótipo (entra o vendorizado acima) e sem `style=` inline
-   (a CSP é `style-src 'self'`; os 40 valores vivem como `:nth-child()` no
-   `landing.css`, na mesma ordem). Copy, classes, `id`, `aria-*`,
-   `data-reveal`, `data-od-id` — tudo verbatim. #}
+   card manda: links para as rotas do app, sem faixa de protótipo, sem a tag
+   de script do protótipo (entra o vendorizado acima) e sem atributo de
+   estilo inline (a CSP é `style-src 'self'`; os 40 valores vivem como
+   `:nth-child()` no `landing.css`, na mesma ordem). Copy, classes, `id`,
+   `aria-*`, `data-reveal`, `data-od-id` — tudo verbatim. #}
 {% block atributos_corpo %} class="land"{% endblock %}
 
 {% block pagina %}

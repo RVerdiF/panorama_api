@@ -1,43 +1,47 @@
-"""Hero da landing `/` e painel do recorte — card `t_437796c3` (spec §4, §5, §8).
+"""Landing `/` literal ao protótipo — card `t_e42049c1` (Regra Zero).
 
-O painel da coluna direita substitui a foto da referência visual por três
-números que saem do **código e da config**, nunca de literal no template:
+O protótipo (`panorama-escola-landing.html`) é a especificação: copy, ordem,
+classes, `id`, `aria-*`, `data-reveal`, `data-od-id` — tudo verbatim. Este
+arquivo trava o literal sobre o HTML renderizado de verdade (``TestClient``
+com repositório fake, nenhuma rede/BigQuery) e que `/` continua sem consultar
+o repositório (os números do design são literais do protótipo).
 
-* municípios de MG — `len(municipios_mg())`, a lista IBGE versionada;
-* anos publicados — `settings.anos_disponiveis` (`APP_ANOS_DISPONIVEIS`), em
-  faixa quando a lista é contínua e separados por vírgula quando tem buraco;
-* etapas e modalidades — chaves de `ETAPAS_ROTULOS` **sem** `"bas"`, que é o
-  total oficial do Censo e não uma etapa do mercado.
+O que saiu com o porte literal (e por quê cada remoção tem substituto aqui):
 
-Nada aqui toca rede ou BigQuery: o HTML vem do `TestClient` com repositório fake
-vazio e os testes conferem que `GET /` continua com **0** chamadas ao
-repositório. Não existe contagem de escolas porque `COUNT(*)` é proibido
-(`repositories/bigquery/pagination.py:1-5`), e por isso não há o que consultar.
+* painel do recorte derivado (`recorte_*`) — o design mostra os literais do
+  protótipo; a asserção equivalente é a copy literal abaixo;
+* barra de busca do hero (`form.hero__busca`) — o protótipo tem zero `<form>`
+  e zero `<input>`; a asserção equivalente é `test_zero_form_e_input`;
+* proibição de números ilustrativos — revogada pela Regra Zero: os literais
+  do design entram, e a asserção equivalente é a presença deles.
 """
 
 from __future__ import annotations
 
 import re
 
-import pytest
 from fastapi.testclient import TestClient
 
 from panorama_api.config import Settings
 from panorama_api.main import create_app
-from panorama_api.web import routes as web_routes
-from panorama_api.web.municipios import Municipio, municipios_mg
-from tests.unit.conftest import (
-    FakeRepository,
-    market_row,
-    municipio_row,
-    share_row,
-)
+from tests.unit.conftest import FakeRepository
 
 ANOS = (2021, 2022, 2023, 2024, 2025)
 ANOS_CSV = ",".join(str(ano) for ano in ANOS)
 INICIO = "/"
 
-VALOR = re.compile(r"<dd>([^<]*)</dd>")
+#: Os 8 ganchos de observação do design (`landing.js` usa `data-od-id` só
+#: como marcador; o que importa é estarem todos no DOM).
+DATA_OD_IDS = (
+    "nav-abrir-prototipo",
+    "hero-cta",
+    "capitulo-busca",
+    "capitulo-mercado",
+    "capitulo-rede",
+    "leitura-ranking",
+    "leitura-oferta",
+    "fecho-cta",
+)
 
 
 def _settings(*, anos: str = ANOS_CSV) -> Settings:
@@ -67,282 +71,250 @@ def _pagina(*, anos: str = ANOS_CSV) -> tuple[str, FakeRepository]:
     return resposta.text, repo
 
 
-def _valores(html: str) -> list[str]:
-    """Os três números do painel, na ordem em que a página os apresenta."""
-    return VALOR.findall(html)
+def _texto(html: str) -> str:
+    """HTML com os espaços normalizados (o template quebra linha no meio das frases)."""
+    return re.sub(r"\s+", " ", html)
 
 
-def test_painel_do_recorte_mostra_os_numeros_reais_do_produto():
-    html, _ = _pagina()
-
-    # 853 vem da lista versionada, não de um literal no template.
-    assert len(municipios_mg()) == 853
-    assert _valores(html) == ["853", "2021–2025", "8"]
-    for rotulo in (
-        "municípios de Minas Gerais",
-        "anos do Censo Escolar publicados",
-        "etapas e modalidades no mercado",
-    ):
-        assert rotulo in html
-    assert "Fonte: Censo Escolar da Educação Básica (INEP)." in html
+# -- copy literal do protótipo (critério 1) ----------------------------------
 
 
-def test_painel_e_a_prancha_com_h2_e_lista_de_definicoes():
-    """A prancha do design é a seção do recorte: `h2` na fita e `dl` no corpo."""
-    html, _ = _pagina()
-
-    assert re.search(r'<figure class="prancha" aria-labelledby="recorte-titulo">', html)
-    assert '<h2 id="recorte-titulo">Recorte dos dados</h2>' in html
-    assert re.search(r'<dl class="prancha__base">', html)
-    # Um `dt` por número, na ordem em que o `dl` os apresenta.
-    assert html.count("<dt>") == 3
-    assert html.count("<dd>") == 3
-
-
-def test_anos_continuos_viram_faixa_e_anos_com_buraco_viram_lista():
-    continuos, _ = _pagina(anos="2021,2022,2023,2024,2025")
-    assert _valores(continuos)[1] == "2021–2025"
-
-    com_buraco, _ = _pagina(anos="2021,2023")
-    assert _valores(com_buraco)[1] == "2021, 2023"
-    # A faixa prometeria um ano não publicado: nada de "2021–2023".
-    assert "2021–2023" not in com_buraco
-
-
-def test_painel_muda_quando_a_fonte_muda(monkeypatch: pytest.MonkeyPatch):
-    """O painel é derivado, não decorado: trocar a fonte muda a página."""
-    monkeypatch.setattr(
-        web_routes,
-        "municipios_mg",
-        lambda: (
-            Municipio(co_municipio="3106200", no_municipio="Belo Horizonte"),
-            Municipio(co_municipio="3100104", no_municipio="Abadia dos Dourados"),
-        ),
-    )
-    monkeypatch.setattr(
-        web_routes,
-        "ETAPAS_ROTULOS",
-        {"bas": "Educação básica (total)", "med": "Ensino médio"},
-    )
-
-    html, _ = _pagina()
-
-    assert _valores(html) == ["2", "2021–2025", "1"]
-
-
-def test_inicio_nao_consulta_o_repositorio():
-    """Contar escolas exigiria `COUNT(*)`; o painel não faz nenhuma consulta."""
-    _, repo = _pagina()
-
-    assert repo.calls == []
-
-
-def test_template_nao_carrega_numero_literal_do_painel():
-    """Os números saem do código e da config — o template só tem a marcação."""
-    fonte = (web_routes.TEMPLATES_DIR / "inicio.html").read_text(encoding="utf-8")
-
-    assert "853" not in fonte
-    assert "2021" not in fonte
-    for variavel in ("recorte_municipios", "recorte_anos", "recorte_etapas"):
-        assert "{{ " + variavel + " }}" in fonte
-
-
-def _hero(html: str) -> str:
-    """Marcação da hero: a `<section class="hero">` com a prancha aninhada dentro."""
-    inicio = html.index('<section class="hero"')
-    fim_da_prancha = html.index("</figure>", inicio) + len("</figure>")
-    fim = html.index("</section>", fim_da_prancha) + len("</section>")
-    return html[inicio:fim]
-
-
-def test_hierarquia_de_titulos_do_hero():
-    """Um `<h1>`; a prancha abre nível com `<h2>`, sem pular nível na hero."""
-    html, _ = _pagina()
-    hero = _hero(html)
-
-    assert hero.count("<h1") == 1
-    assert hero.index("<h1") < hero.index("<h2")
-    assert hero.count("<h2") == 1
-    # Nada de `<h3>` na hero: os capítulos abaixo dela é que abrem nível.
-    assert "<h3" not in hero
-    assert html.count("<h1") == 1
-
-
-def test_hero_mostra_a_copy_do_h1_e_do_subtitulo():
-    """A copy é a mesma; o `h1` agora tem três `span.hero__linha` (máscara)."""
+def test_h1_e_a_copy_literal_do_prototipo():
     html, _ = _pagina()
 
     h1 = re.search(r"<h1\b[^>]*>(.*?)</h1>", html, re.S)
     assert h1 is not None, "h1 ausente em `/`"
     texto_h1 = re.sub(r"<[^>]+>", " ", h1.group(1))
     assert _texto(texto_h1).strip() == (
-        "Escolas e mercados da educação básica em Minas Gerais"
+        "O mercado escolar de Minas, lido por dentro."
     )
+    assert "<em>lido por dentro.</em>" in h1.group(1)
     assert html.count("hero__linha") == 3
-    assert (
-        "Matrículas, oferta por etapa, rendimento e participação de mercado das "
-        "escolas" in html
+
+
+def test_lead_do_hero_e_literal():
+    html, _ = _pagina()
+
+    lead = re.search(r'<p class="hero__lead"[^>]*>(.*?)</p>', html, re.S)
+    assert lead is not None, "lead do hero ausente em `/`"
+    texto_lead = re.sub(r"<[^>]+>", " ", lead.group(1))
+    texto_lead = re.sub(r"\s+([.,;:])", r"\1", texto_lead)
+    assert _texto(texto_lead).strip() == (
+        "Matrícula, participação e concorrência em 853 municípios. "
+        "Cinco anos de Censo Escolar organizados para responder uma pergunta "
+        "por vez — com a ressalva de cada número visível ao lado dele."
     )
-    assert "a partir do Censo Escolar da Educação Básica (INEP)." in html
+    assert "<strong>853 municípios</strong>" in lead.group(1)
 
 
-# -- busca no hero (card `t_e075a6f6`, spec §6) ------------------------------
-
-FORMULARIO = re.compile(r'<form class="hero__busca"[^>]*>.*?</form>', re.S)
-
-
-def _formulario(html: str) -> str:
-    """Marcação do `<form>` da barra de busca do hero."""
-    achado = FORMULARIO.search(html)
-    assert achado is not None, "barra de busca do hero ausente em `/`"
-    return achado.group(0)
-
-
-def test_hero_tem_form_get_para_a_busca_com_os_parametros_de_app():
-    """O hero não inventa rota: envia o mesmo GET de `/app/` (`q`, município)."""
-    html, repo = _pagina()
-    form = _formulario(html)
-
-    assert 'method="get"' in form
-    assert 'action="/app/"' in form
-    assert 'role="search"' in form
-    assert 'aria-label="Buscar escolas ou mercado municipal"' in form
-    # Nome da escola: rótulo visível, limite do contrato e dica associada.
-    assert '<label for="q">Nome da escola</label>' in form
-    assert re.search(
-        r'<input\s+type="search"\s+id="q"\s+name="q"\s+minlength="3"\s+maxlength="100"',
-        form,
-    )
-    assert 'aria-describedby="q-dica"' in form
-    assert 'id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>' in form
-    # Município: a mesma lista versionada da busca, com a opção "todos".
-    assert '<label for="co_municipio">Município</label>' in form
-    assert '<select id="co_municipio" name="co_municipio">' in form
-    assert '<option value="">Todos os municípios de MG</option>' in form
-    assert form.count('<option value="31') == len(municipios_mg()) == 853
-    # Sem campo de ano (o ano não filtra a busca) e sem `apenas_ativas`.
-    assert 'name="ano"' not in form
-    assert "apenas_ativas" not in form
-    # O select do hero é markup de apoio de tela: nenhuma consulta ao repositório.
-    assert repo.calls == []
-
-
-def test_hero_tem_os_dois_botoes_e_o_segundo_vai_ao_mercado():
-    html, _ = _pagina()
-    form = _formulario(html)
-
-    assert ">Buscar escolas</button>" in form
-    assert ">Ver mercado do município</button>" in form
-    # O atalho do mercado é um `<button formaction>` com `formnovalidate`: o
-    # `minlength` do nome não pode barrar a ida ao mercado.
-    assert 'formaction="/app/mercados"' in form
-    assert "formnovalidate" in form
-    # Os dois são submit; só o de mercado declara `formaction`/`formnovalidate`.
-    assert form.count('type="submit"') == 2
-    secundario = form[form.index("botao--secundario") : form.index("formnovalidate")]
-    assert 'formaction="/app/mercados"' in secundario
-    primario = form[form.index("botao--primario") : form.index("botao--secundario")]
-    assert "formaction" not in primario
-    assert "formnovalidate" not in primario
-
-
-def test_hero_mantem_um_unico_h1_e_o_alvo_do_ancora_do_campo_de_nome():
-    """O `#q` do campo é o alvo dos links "buscar uma escola" (L4)."""
-    html, _ = _pagina()
-
-    assert html.count("<h1") == 1
-    assert 'id="q"' in _formulario(html)
-
-
-# -- conteúdo da landing (card `t_2c2e564b`, spec §5) ------------------------
-
-
-def _texto(html: str) -> str:
-    """HTML com os espaços normalizados.
-
-    O template quebra linha no meio das frases: o que importa é a frase, não o
-    ``\\n`` do HTML.
-    """
-    return re.sub(r"\s+", " ", html)
-
-
-def test_landing_tem_as_tres_secoes_de_conteudo():
-    html, _ = _pagina()
-
-    assert '<h2 id="encontra-titulo">O que você encontra</h2>' in html
-    assert '<h2 id="fonte-titulo">De onde vêm os dados</h2>' in html
-    assert '<h2 id="publico-titulo">Para quem é</h2>' in html
-    # Os três itens da primeira seção abrem nível com `<h3>`.
-    for item in ("Ficha da escola", "Mercado municipal", "Metodologia"):
-        assert f"<h3>{item}</h3>" in html
-
-
-def test_copy_dos_itens_e_das_secoes_e_a_do_5():
+def test_copy_das_secoes_e_literal():
     plano = _texto(_pagina()[0])
 
     for frase in (
-        "Série de matrículas, oferta por etapa e rendimento. Nas escolas "
-        "privadas ativas, também a posição da escola no município.",
-        "Tamanho do mercado, composição por etapa e participação das escolas "
-        "privadas, ano a ano.",
-        "De onde vem cada número, o que cada indicador mede e quais são os "
-        "limites de leitura.",
-        "Os números vêm do Censo Escolar da Educação Básica, levantamento "
-        "anual do INEP que cobre todas as escolas do país. O Panorama Escola "
-        "recorta Minas Gerais e publica os anos 2021–2025. Quando um dado não "
-        "existe na base, a tela mostra “sem dado”, e nunca zero.",
-        "Para quem acompanha a educação básica privada em Minas Gerais: gestão "
-        "e expansão de redes, direção de escolas e análise de mercado. O "
-        "Panorama não exibe dado individual de aluno.",
+        "Três entradas, nenhuma ordem obrigatória.",
+        "O instrumento foi desenhado para ser percorrido nos dois sentidos: "
+        "do município para as escolas, da escola para o mercado em volta. "
+        "Cada tela carrega o recorte que a trouxe.",
+        "Filtre por nome, município, etapa e situação; ordene a tabela pelo "
+        "que importa e abra a ficha sem perder o recorte.",
+        "Tamanho, composição por etapa e ranking de participação do privado, "
+        "ano a ano, no município escolhido.",
+        "Quatro unidades lidas em conjunto: matrícula somada, participação "
+        "no município e cobertura de etapas de cada uma.",
+        "Cada número carrega a própria ressalva.",
+        "Sem dado não é zero.",
+        "Não existe um mercado escolar mineiro. Existem 853 mercados "
+        "municipais — e cada um tem o seu líder.",
+        "O que o Panorama se recusa a fazer.",
+        "Quatro decisões de leitura que valem mais do que qualquer gráfico: "
+        "elas definem quando um número pode ser dito e quando a resposta "
+        "honesta é “sem dado”.",
+        "Não estima onde o dado não existe.",
+        "Não soma o que não soma.",
+        "Não chama retenção de evasão.",
+        "Não compara estados.",
+        "Comece pelo município. Ou pela escola que você já tem em mente.",
+        "Cinco telas navegáveis, sem backend. Leva menos de dois minutos "
+        "para chegar ao primeiro número.",
     ):
         assert frase in plano, frase
 
 
-def test_hierarquia_de_titulos_da_landing_nao_pula_nivel():
+def test_numeros_e_leituras_do_design_estao_na_pagina():
+    html, _ = _pagina()
+
+    for literal in (
+        "1.140",
+        "+4,9% no ano",
+        "Prancha 01 · Belo Horizonte",
+        "Colégio Monte Verde",
+        "1º de 30",
+        "11,0%",
+        "8,3%",
+        "21,6",
+        "Rede Horizonte",
+        "Ranking municipal",
+        "Oferta por etapa",
+        "amostra ilustrativa",
+    ):
+        assert literal in html, literal
+    assert html.count('class="barras__valor"') == 5
+    assert html.count('class="matriz__linha"') == 7
+
+
+# -- estrutura do design (critérios 2, 5, 6, 7, 8) ----------------------------
+
+
+def test_data_reveal_presente_28_vezes():
+    html, _ = _pagina()
+
+    assert html.count("data-reveal") == 28
+
+
+def test_contadores_e_observadores_do_design():
+    html, _ = _pagina()
+
+    assert html.count("data-contar") == 5
+    for alvo in ('data-contar="1140"', 'data-contar="853"', 'data-contar="5"',
+                 'data-contar="30"', 'data-contar="21.6"'):
+        assert alvo in html, alvo
+    assert 'data-decimais="1"' in html
+    assert html.count("data-observar") == 2
+
+
+def test_data_od_ids_do_design():
+    html, _ = _pagina()
+
+    for gancho in DATA_OD_IDS:
+        assert f'data-od-id="{gancho}"' in html, gancho
+
+
+def test_zero_form_e_input_na_landing():
+    """O protótipo não tem `<form>` nem `<input>`: a busca do hero saiu."""
+    html, _ = _pagina()
+
+    assert not re.search(r"<form\b", html)
+    assert not re.search(r"<input\b", html)
+
+
+def test_navbar_e_a_lnav_do_design():
+    html, _ = _pagina()
+
+    assert 'class="lnav"' in html
+    assert '<header class="lnav" id="nav" data-compacto="false">' in html
+    assert '<a class="marca" href="/"' in html
+    assert '<nav class="lnav__links" aria-label="Seções da página">' in html
+    for ancora in ("#instrumento", "#capitulos", "#metodo"):
+        assert f'href="{ancora}"' in html
+    assert 'class="lnav__cta"' in html
+    assert 'id="progresso"' in html
+    # A navbar do app não aparece em `/` (fica nas outras telas).
+    assert 'class="topo"' not in html
+    assert "Navegação principal" not in html
+
+
+def test_rodape_e_o_rodape_do_design():
+    html, _ = _pagina()
+
+    assert 'class="rodape"' in html
+    assert 'class="rodape__nota"' in html
+    assert 'aria-label="Links do rodapé"' in html
+    # O rodapé do app não aparece em `/` (fica nas outras telas).
+    assert "rodape-final" not in html
+    # Sem a faixa de protótipo (diz "números ilustrativos", falso no app).
+    assert "faixa-prototipo" not in html
+
+
+def test_zero_style_inline_na_landing():
+    """Os 40 `style=` do protótipo viraram `:nth-child()` no `landing.css`."""
+    html, _ = _pagina()
+
+    assert not re.search(r"\sstyle\s*=", html)
+
+
+def test_sem_script_do_prototipo_e_com_o_vendorizado():
+    html, _ = _pagina()
+
+    assert "assets/js/" not in html
+    assert html.count("<script") == 2
+    assert re.search(r'<script src="/app/static/[0-9a-f]{12}-landing\.js" defer>', html)
+
+
+def test_shell_do_design_sem_shell_do_app():
+    html, _ = _pagina()
+
+    assert '<body class="land">' in html
+    assert '<main class="envoltorio" id="conteudo">' in html
+    assert html.count("<h1") == 1
+    # Marcas do shell antigo que não existem no protótipo.
+    assert "id=\"q\"" not in html
+    assert "Recorte dos dados" not in html
+
+
+def test_hierarquia_de_titulos_nao_pula_nivel():
     html, _ = _pagina()
     niveis = [int(nivel) for nivel in re.findall(r"<h([1-6])[ >]", html)]
 
     assert niveis.count(1) == 1
     assert niveis[0] == 1
-    # Descer de h3 para h2 é legítimo (nova seção); subir de h1 para h3 não é.
     for anterior, seguinte in zip(niveis, niveis[1:]):
         assert seguinte - anterior <= 1, niveis
 
 
-def test_secao_de_fonte_usa_os_anos_da_config_nao_um_literal():
-    plano = _texto(_pagina(anos="2024,2025")[0])
-
-    assert "publica os anos 2024–2025." in plano
-    assert "2021" not in plano
+# -- links e rotas (só rotas do app, sem origem nova) --------------------------
 
 
-def test_links_da_landing_resolvem_no_front():
-    """`#q` aponta para um alvo real e as duas rotas de apoio respondem 200."""
+def test_ctas_do_hero_e_do_fecho_apontam_para_o_app():
     html, _ = _pagina()
 
-    # Os capítulos do design: o link carrega classe, então o alvo é o `href` e o
-    # texto, não a tag inteira.
-    for href, texto in (
-        ("#q", "Buscar uma escola"),
-        ("/app/metodologia", "Ler a metodologia"),
-        ("/app/mercados/3106200", "Ver o mercado de Belo Horizonte"),
-    ):
-        assert re.search(
-            rf'<a\b[^>]*href="{re.escape(href)}"[^>]*>\s*{re.escape(texto)}', html
-        ), (href, texto)
-    assert 'id="q"' in html
-    assert '<a href="/app/metodologia">Como os números são calculados</a>' in html
+    assert 'href="/app/" data-od-id="hero-cta"' in html
+    assert 'href="/app/escolas/31005371"' in html
+    assert 'href="/app/" data-od-id="fecho-cta"' in html
+    assert 'href="/">Ver o sumário das telas</a>' in html
 
-    # O exemplo de mercado é um código que existe na lista versionada — a
-    # landing não pode apontar para um município inventado.
+
+def test_capitulos_apontam_para_as_rotas_do_app():
+    html, _ = _pagina()
+
+    assert 'href="/app/" data-od-id="capitulo-busca"' in html
+    assert 'href="/app/mercados/3106200" data-od-id="capitulo-mercado"' in html
+    # Sem rota de redes no app: o terceiro capítulo cai na metodologia.
+    assert 'href="/app/metodologia" data-od-id="capitulo-rede"' in html
+
+
+def test_rodape_aponta_para_as_rotas_do_app():
+    html, _ = _pagina()
+
+    for href in ("/app/", "/app/mercados/", "/app/mercados/3106200",
+                 "/app/metodologia", 'href="/">Sumário</a>'):
+        assert href in html, href
+
+
+def test_marquise_duplica_a_sequencia_e_e_decorativa():
+    html, _ = _pagina()
+
+    abertura = re.search(r'<div class="marquee[^"]*"[^>]*>', html)
+    assert abertura is not None, "marquise ausente em `/`"
+    assert 'aria-hidden="true"' in abertura.group(0)
+    corpo = html[abertura.end() : html.index("</section>", abertura.end())]
+    nomes = re.findall(r"<span>([^<]+)</span>", corpo)
+    assert nomes, "marquise sem município"
+    assert len(nomes) % 2 == 0
+    metade = len(nomes) // 2
+    assert nomes[:metade] == nomes[metade:], "marquee do design repete a sequência 2×"
+    assert not re.search(r"\d", "".join(nomes)), nomes
+
+
+def test_links_internos_da_landing_resolvem_no_front():
+    from panorama_api.web.municipios import municipios_mg
+    from tests.unit.conftest import market_row, municipio_row, share_row
+
     municipios = {m.co_municipio: m.no_municipio for m in municipios_mg()}
     assert municipios["3106200"] == "Belo Horizonte"
 
     repo = FakeRepository(
         municipios=[municipio_row()],
-        markets=[
-            market_row(nu_ano_censo=ano, etapa="bas") for ano in ANOS
-        ],
+        markets=[market_row(nu_ano_censo=ano, etapa="bas") for ano in ANOS],
         share=[share_row(nu_ano_censo=ano) for ano in ANOS],
     )
     app = create_app(settings=_settings(), repository=repo)
@@ -350,7 +322,6 @@ def test_links_da_landing_resolvem_no_front():
         landing = cliente.request(
             "GET", INICIO, headers={"Accept-Encoding": "identity", "Accept": "text/html"}
         )
-        # A landing continua sem consultar o repositório (spec §7).
         assert repo.calls == []
         metodologia = cliente.request(
             "GET", "/app/metodologia", headers={"Accept-Encoding": "identity"}
@@ -362,3 +333,10 @@ def test_links_da_landing_resolvem_no_front():
     assert landing.status_code == 200
     assert metodologia.status_code == 200
     assert mercado.status_code == 200
+
+
+def test_inicio_nao_consulta_o_repositorio():
+    """A landing é literal do protótipo: nenhuma consulta ao repositório."""
+    _, repo = _pagina()
+
+    assert repo.calls == []

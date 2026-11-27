@@ -50,7 +50,7 @@ MUNICIPIO = "3106200"
 MERCADO = f"{PREFIXO_WEB}/mercados/{MUNICIPIO}"
 ESCOLA = f"{PREFIXO_WEB}/escolas/31000001"
 TITULO_INICIO = (
-    "Panorama Escola — escolas e mercados da educação básica em Minas Gerais"
+    "Panorama Escola — inteligência de mercado educacional em Minas Gerais"
 )
 
 
@@ -115,15 +115,16 @@ def test_raiz_responde_a_landing_em_html(cliente: TestClient):
     # Não é mais redirect: o corpo é a página, não um `Location`.
     assert "location" not in resposta.headers
     html = resposta.text
-    # O `h1` do design tem três `span.hero__linha` (máscara); a copy é a mesma.
+    # O `h1` do design tem três `span.hero__linha` (máscara do título).
     h1 = re.search(r"<h1\b[^>]*>(.*?)</h1>", html, re.S)
     assert h1 is not None, "h1 ausente em `/`"
     assert re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", h1.group(1))).strip() == (
-        "Escolas e mercados da educação básica em Minas Gerais"
+        "O mercado escolar de Minas, lido por dentro."
     )
-    # A busca continua em `/app/`, e é para lá que a landing leva — desde o card
-    # `t_e075a6f6` pelo formulário GET do hero, não por um link textual.
-    assert re.search(r'<form class="hero__busca" method="get" action="/app/"', html)
+    # A busca continua em `/app/`, e é para lá que a landing leva — pelos
+    # CTAs do design (card `t_e42049c1`), não mais pelo formulário do hero.
+    assert 'href="/app/" data-od-id="hero-cta"' in html
+    assert 'href="/app/" data-od-id="capitulo-busca"' in html
 
 
 def test_raiz_responde_head_com_a_pagina(cliente: TestClient):
@@ -154,19 +155,23 @@ def test_raiz_tem_o_titulo_da_landing(cliente: TestClient):
     assert titulo.group(1) == TITULO_INICIO
 
 
-def test_raiz_usa_o_shell_com_um_unico_h1_e_landmarks(cliente: TestClient):
+def test_raiz_usa_o_shell_do_design_com_um_unico_h1_e_landmarks(cliente: TestClient):
+    """A landing usa a navbar `.lnav` e o rodapé `.rodape` do protótipo.
+
+    Card `t_e42049c1` (Regra Zero): o shell do app (`header.topo`,
+    `div.envoltorio` agrupando topo + main, macro `rodape_final`) fica nas
+    outras telas — em `/` o `base.html` cede o bloco `pagina` ao design.
+    """
     html = _get(cliente, INICIO).text
 
     assert html.count("<h1") == 1
-    assert '<header class="topo">' in html
-    assert '<div class="envoltorio">' in html
-    assert '<main id="conteudo"' in html
-    assert '<footer class="rodape-final">' in html
-    # A landing não exibe valor nenhum: a nota de ausência do rodapé sairia como
-    # ruído (mesma regra da 1ª visita da busca, achado A3). A copy da seção de
-    # fonte (card `t_2c2e564b`) fala de "sem dado" — a asserção é sobre a nota
-    # do rodapé, não sobre a expressão em qualquer lugar da página.
-    assert "Esta página nunca troca dado ausente por zero" not in html
+    assert '<header class="lnav" id="nav"' in html
+    assert '<body class="land">' in html
+    assert '<main class="envoltorio" id="conteudo"' in html
+    assert '<footer class="rodape">' in html
+    assert '<header class="topo">' not in html
+    assert '<div class="envoltorio">' not in html
+    assert "rodape-final" not in html
 
 
 def test_raiz_sai_comprimida_com_gzip(cliente: TestClient):

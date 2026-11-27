@@ -174,7 +174,7 @@ def _classes_usadas_no_html_renderizado() -> set[str]:
     Sem esta varredura o teste de órfão apagaria regra viva.
     """
     usadas: set[str] = set()
-    for nome in ("app.js",):
+    for nome in ("app.js", "landing.js"):
         texto = (WEB / "static" / nome).read_text(encoding="utf-8")
         for aspas, valor in CLASSE_ATTR.findall(texto):
             _ = aspas
@@ -185,6 +185,11 @@ def _classes_usadas_no_html_renderizado() -> set[str]:
             re.findall(
                 r"""setAttribute\(\s*["']class["']\s*,\s*["']([^"']+)["']""", texto
             )
+        )
+        # O `landing.js` do design (V5) liga a revelação por
+        # `classList.add("js"/"is-in")`: é uso, não órfão.
+        usadas.update(
+            re.findall(r"""classList\.add\(\s*["']([^"']+)["']\s*\)""", texto)
         )
     for modulo in sorted(WEB.glob("*.py")):
         texto = modulo.read_text(encoding="utf-8")

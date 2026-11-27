@@ -649,10 +649,15 @@ body.land { background: var(--bg); }
 .hero__titulo .hero__linha:nth-child(1) > span { --d: 60ms; }
 .hero__titulo .hero__linha:nth-child(2) > span { --d: 160ms; }
 .hero__titulo .hero__linha:nth-child(3) > span { --d: 260ms; }
+/* Lacuna do protótipo: `div.hero__texto` não tem regra no design, mas a
+   classe é verbatim no HTML (Regra Zero) e todo literal precisa de cobertura
+   no CSS. Grade precisa de `min-width: 0` no filho para não estourar — sem
+   efeito visual onde o conteúdo já cabe. */
+.hero__texto { min-width: 0; }
 .hero__lead { --d: 420ms; }
 .hero__acoes { --d: 520ms; }
 .hero__meta { --d: 600ms; }
-.prancha { --d: 340ms; }
+.prancha[data-reveal] { --d: 340ms; }
 .numeros > div:nth-child(2) { --d: 90ms; }
 .numeros > div:nth-child(3) { --d: 180ms; }
 .numeros > div:nth-child(4) { --d: 270ms; }

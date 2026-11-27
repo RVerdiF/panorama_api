@@ -379,24 +379,32 @@ def test_atalho_sem_barra_continua_existindo_fora_do_indice(cliente: TestClient)
 
 
 def test_script_unico_e_o_app_js_com_defer():
-    """Card `t_71b25279`: o front tem **uma** base de JS, o `app.js` com hash.
+    """Card `t_71b25279`: o front tem base de JS versionada com `defer`.
 
     Substitui a guarda de "zero JavaScript" do NAV-1: o shell continua completo
-    sem JS, mas a única tag **executável** permitida é a do asset servido pelo
-    `AssetRegistry`, herdada de `base.html` — nada de `<script>` inline e nada
-    de segundo `.js`. Ilhas de dados (`type="application/json"`, card V2
-    `t_cbd54a92`) não executam e passam: o `app.js` as lê por `textContent`.
+    sem JS, mas as únicas tags **executáveis** permitidas são as dos assets
+    servidos pelo `AssetRegistry` — o `app.js` herdado de `base.html` em todas
+    as telas, e só em `/` também o `landing.js` vendorizado do protótipo
+    (card `t_e42049c1`: revelação, contadores, progresso). Nada de `<script>`
+    inline. Ilhas de dados (`type="application/json"`, card V2 `t_cbd54a92`)
+    não executam e passam: o `app.js` as lê por `textContent`.
     """
     for caminho in sorted(TEMPLATES.rglob("*.html")):
         texto = caminho.read_text(encoding="utf-8")
         for tag in re.findall(r"<script\b[^>]*>", texto):
             if 'type="application/json"' in tag:
                 continue
-            assert 'src="{{ js_url }}"' in tag, f"{caminho.name}: script sem src: {tag}"
+            assert 'src="{{ js_url }}"' in tag or 'src="{{ js_landing_url }}"' in tag, (
+                f"{caminho.name}: script sem src: {tag}"
+            )
+            if 'src="{{ js_landing_url }}"' in tag:
+                assert caminho.name == "inicio.html", (
+                    f"{caminho.name}: landing.js fora da landing: {tag}"
+                )
             assert "defer" in tag, f"{caminho.name}: script sem defer: {tag}"
         assert texto.count("<script") <= 2, caminho.name
 
-    assert sorted(p.name for p in STATIC.glob("*.js")) == ["app.js"]
+    assert sorted(p.name for p in STATIC.glob("*.js")) == ["app.js", "landing.js"]
 
 
 # -- 6. orçamento do partial -------------------------------------------------
