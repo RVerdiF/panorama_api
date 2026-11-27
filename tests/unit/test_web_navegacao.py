@@ -13,9 +13,9 @@ nenhuma rede/BigQuery):
 * `aria-current`: ``"page"`` no item cuja tela é a própria, ``"true"`` na área
   dona de uma tela-filha (ficha → Escolas, mercado → Municípios);
 * o índice novo ``GET /app/mercados/`` (com barra) responde 200 com a tabela
-  de municípios (uma linha SSR por município + filtro no cliente), 303 para
-  o mercado escolhido e 422 no código inválido, sempre sem tocar no
-  repositório;
+  de municípios no DOM do protótipo (7 colunas, uma linha SSR por município
+  + filtro no cliente): 1 consulta no 200; 303 para o mercado escolhido e
+  422 no código inválido, sem tocar no repositório;
 * o shell não depende de JS: a única tag de script é o `app.js` com `defer`
   (card `t_71b25279`), sem inline em template nenhum;
 * o `<header>` renderizado cabe em 1,5 KB (spec §6: partials ≤ 1,5 KB).
@@ -44,6 +44,7 @@ from tests.unit.conftest import (
     school_row,
     share_row,
 )
+from tests.unit.test_web_indice import fixture_853
 
 ANOS = (2021, 2022, 2023, 2024, 2025)
 BUSCA = f"{PREFIXO_WEB}/"
@@ -276,8 +277,10 @@ def test_rodape_final_traz_fonte_e_versoes(cliente: TestClient):
 
 
 def test_rodape_final_omite_a_nota_onde_nao_ha_valor(cliente: TestClient):
-    sem_nota = (BUSCA, INDICE)
-    com_nota = (ESCOLA, MERCADO)
+    # O índice (V4-I) exibe valores — KPIs e colunas numéricas — então leva a
+    # nota; a busca segue sem valor nenhum e sem nota (achado A3).
+    sem_nota = (BUSCA,)
+    com_nota = (ESCOLA, MERCADO, INDICE)
     nota = "Esta página nunca troca dado ausente por zero"
 
     for caminho in sem_nota:
@@ -286,12 +289,15 @@ def test_rodape_final_omite_a_nota_onde_nao_ha_valor(cliente: TestClient):
         assert nota in _get(cliente, caminho).text, caminho
 
 
-# -- 4. índice `/app/mercados/`: 200, 303 e 422 sem consulta ------------------
+# -- 4. índice `/app/mercados/`: 200 com 1 consulta; 303 e 422 sem consulta --
 
 
-def test_indice_responde_200_com_a_tabela_de_municipios_e_sem_consulta(
+def test_indice_responde_200_com_a_tabela_de_municipios_e_uma_consulta(
     cliente: TestClient, navegacao_repo: FakeRepository
 ):
+    navegacao_repo.indice = fixture_853(
+        [m.co_municipio for m in municipios_mg()]
+    )
     navegacao_repo.calls.clear()
     resposta = _get(cliente, INDICE)
 
@@ -299,8 +305,9 @@ def test_indice_responde_200_com_a_tabela_de_municipios_e_sem_consulta(
     assert resposta.headers["content-type"].startswith("text/html")
     html = resposta.text
     total = len(municipios_mg())
-    # Uma linha SSR por município: só colunas reais (nome + link).
+    # Uma linha SSR por município no DOM do protótipo, com o link da ficha.
     assert html.count('class="acao-tabela"') == total
+    assert html.count("Abrir mercado") == total
     assert html.count(f'href="{INDICE}31') == total
     # Sem o select antigo: nada de `option` nem de campo nomeado.
     assert 'name="co_municipio"' not in html
@@ -308,17 +315,18 @@ def test_indice_responde_200_com_a_tabela_de_municipios_e_sem_consulta(
     # O número anunciado vem de `len(municipios_mg())`, nunca de literal.
     assert f"São {total} municípios de MG." in html
     assert 'role="status"' in html
-    # Página sem valor nenhum: sem a nota de ausência (regra da landing e da
-    # 1ª visita da busca, achado A3).
-    assert "sem dado" not in html
-    assert navegacao_repo.calls == []
+    # 445 sem escola privada: marcador explícito, nunca 0 (P-V-1, variante A).
+    assert html.count('title="sem escola privada ativa"') == 445 * 3
+    # O 200 consulta uma vez; 303/422 (abaixo) continuam sem consulta.
+    assert navegacao_repo.calls == [("get_indice_municipios", {"ano": 2025})]
 
 
 def test_indice_tem_filtro_progressivo_no_cliente():
     """O filtro do índice é progressivo: SSR completo + refinamento em JS.
 
     O JS não roda no TestClient, então a cobertura é estática: o campo de
-    busca, os ids que o `filtrarIndice` (`app.js`) procura e o próprio
+    busca, os ids que o `filtrarIndice` (`app.js`) procura, a coluna do nome
+    lida do cabeçalho (o 4b tem `#` antes do nome), a tabela ordenável e o
     iniciador com a trava de idempotência.
     """
     texto = (TEMPLATES / "mercados_indice.html").read_text(encoding="utf-8")
@@ -327,10 +335,16 @@ def test_indice_tem_filtro_progressivo_no_cliente():
     assert 'type="search"' in texto
     assert 'id="retorno-municipios"' in texto
     assert 'id="tabela-municipios"' in texto
+    assert 'data-ordenavel' in texto
+    assert 'data-tipo="texto"' in texto
+    assert 'data-tipo="numero"' in texto
     assert 'id="indice-municipios"' in texto
+    assert 'data-largura="{{ linha.largura }}"' in texto
     js = (STATIC / "app.js").read_text(encoding="utf-8")
     assert "filtrarIndice" in js
     assert "data-filtro-pronto" in js
+    assert '"Município"' in js
+    assert ".cela-barra__preenche[data-largura]" in js
 
 
 def test_indice_redireciona_303_para_o_mercado_escolhido(

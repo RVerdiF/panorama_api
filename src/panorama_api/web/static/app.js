@@ -101,7 +101,7 @@
      ao lado continua legível: ausência de largura, nunca largura errada. */
   registrar(function aplicarBarras(raiz) {
     var barras = raiz.querySelectorAll
-      ? raiz.querySelectorAll(".barra-share__preenche[data-largura], .comp-preenche[data-largura]")
+      ? raiz.querySelectorAll(".barra-share__preenche[data-largura], .comp-preenche[data-largura], .cela-barra__preenche[data-largura]")
       : [];
     for (var i = 0; i < barras.length; i += 1) {
       var largura = barras[i].getAttribute("data-largura") || "";
@@ -643,10 +643,12 @@
   });
 
   /* Índice de municípios (`#indice-municipios`): filtro progressivo por nome
-     (card D1-E4a). O SSR entrega a tabela completa (853 linhas) e este
+     (cards D1-E4a e V4-I). O SSR entrega a tabela completa (853 linhas) e este
      iniciador só refina: normaliza com `normalizarBusca` (NFD sem
      diacríticos + minúsculas), alterna `hidden` nas linhas e atualiza a
-     contagem em `p#retorno-municipios`. Sem JS a lista continua completa. */
+     contagem em `p#retorno-municipios`. Sem JS a lista continua completa.
+     A coluna do nome sai do cabeçalho (o 4b tem `#` antes do nome): procura
+     o `th` "Município" em vez de fixar o índice da célula. */
   registrar(function filtrarIndice(raiz) {
     var caixa = null;
     if (!raiz || !raiz.querySelector) return;
@@ -658,10 +660,15 @@
     var linhas = caixa.querySelectorAll("table#tabela-municipios tbody tr");
     if (!campo || !retorno || !linhas.length) return;
     caixa.setAttribute("data-filtro-pronto", "true");
+    var colunaNome = 0;
+    var cabecalhos = caixa.querySelectorAll("table#tabela-municipios thead th");
+    for (var k = 0; k < cabecalhos.length; k += 1) {
+      if (cabecalhos[k].textContent.trim() === "Município") colunaNome = cabecalhos[k].cellIndex;
+    }
     var total = linhas.length;
     var nomes = [];
     for (var i = 0; i < linhas.length; i += 1) {
-      nomes.push(normalizarBusca(linhas[i].cells[0] ? linhas[i].cells[0].textContent : ""));
+      nomes.push(normalizarBusca(linhas[i].cells[colunaNome] ? linhas[i].cells[colunaNome].textContent : ""));
     }
     campo.addEventListener("input", function () {
       var termo = normalizarBusca(campo.value.trim());
