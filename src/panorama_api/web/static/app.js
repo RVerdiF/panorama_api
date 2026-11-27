@@ -22,7 +22,9 @@
   }
 
   /* Tabela completa ordenável (t_ee9b1eec): só `table[data-ordenavel]` e
-     colunas com `data-tipo`; o botão do cabeçalho nasce aqui. O valor vem de
+     colunas com `data-tipo`; o botão do cabeçalho nasce aqui — salvo no
+     índice, cujo SSR já emite o botão literal do protótipo (com o `span`
+     da seta). O valor vem de
      `data-valor` (bruto, ponto decimal), nunca do texto: "1.234,5" não é
      número. Vazio vai sempre ao fim nos dois sentidos e `data-fixa` não se
      move: a ordenação é dentro de cada `<tbody>`, o grupo da linha. */
@@ -72,6 +74,10 @@
       colunas[i].removeAttribute("aria-sort");
     }
     th.setAttribute("aria-sort", sentido === 1 ? "ascending" : "descending");
+    // Espelha a direção na seta do protótipo (`th.ordenavel button span`,
+    // literal no SSR do índice): sem ela o indicador nunca aparece.
+    var seta = th.querySelector("button span");
+    if (seta) seta.textContent = sentido === 1 ? "↑" : "↓";
   }
   function clique(ev) {
     var th = ev.target.closest("th[data-tipo]");
@@ -80,16 +86,24 @@
   registrar(function ordenarTabelas(raiz) {
     var tabelas = raiz.querySelectorAll("table[data-ordenavel]");
     for (var i = 0; i < tabelas.length; i += 1) {
-      if (tabelas[i].querySelector("thead button")) continue;
-      var colunas = tabelas[i].querySelectorAll("thead th[data-tipo]");
+      var tabela = tabelas[i];
+      var colunas = tabela.querySelectorAll("thead th[data-tipo]");
       for (var j = 0; j < colunas.length; j += 1) {
+        // O índice já traz o botão literal do protótipo no SSR (com o
+        // `span` da seta): aí não há nada a criar, só a ligar abaixo.
+        if (colunas[j].querySelector("button")) continue;
         var botao = documento.createElement("button");
         botao.type = "button";
         botao.textContent = colunas[j].textContent.trim();
         colunas[j].textContent = "";
         colunas[j].appendChild(botao);
       }
-      tabelas[i].addEventListener("click", clique);
+      // Trava de idempotência: ligar o clique mesmo quando o SSR já
+      // emitiu os botões, uma única vez por tabela.
+      if (tabela.getAttribute("data-ordenacao-pronta") !== "true") {
+        tabela.setAttribute("data-ordenacao-pronta", "true");
+        tabela.addEventListener("click", clique);
+      }
     }
   });
 
@@ -646,7 +660,12 @@
      (cards D1-E4a e V4-I). O SSR entrega a tabela completa (853 linhas) e este
      iniciador só refina: normaliza com `normalizarBusca` (NFD sem
      diacríticos + minúsculas), alterna `hidden` nas linhas e atualiza a
-     contagem em `p#retorno-municipios`. Sem JS a lista continua completa.
+     contagem em `p#retorno-municipios` com a copy do protótipo
+     (`assets/js/app.js` do design, `iniciarMunicipios`), sem o trecho de
+     mock. Sem filtro ou lista vazia, o estado vazio do
+     design entra como `tr > td[colspan] > div.estado-vazio` ("Nenhum
+     município com esse nome"); o `style=` inline do design vira regra no
+     `app.css` (CSP `style-src 'self'`). Sem JS a lista continua completa.
      A coluna do nome sai do cabeçalho (o 4b tem `#` antes do nome): procura
      o `th` "Município" em vez de fixar o índice da célula. */
   registrar(function filtrarIndice(raiz) {
@@ -663,25 +682,56 @@
     var colunaNome = 0;
     var cabecalhos = caixa.querySelectorAll("table#tabela-municipios thead th");
     for (var k = 0; k < cabecalhos.length; k += 1) {
-      if (cabecalhos[k].textContent.trim() === "Município") colunaNome = cabecalhos[k].cellIndex;
+      // O `th` do 4b traz o botão literal do protótipo ("Município ↑…"):
+      // casa pelo nome no início do texto, não pela igualdade.
+      if (cabecalhos[k].textContent.trim().indexOf("Município") === 0) colunaNome = cabecalhos[k].cellIndex;
     }
     var total = linhas.length;
     var nomes = [];
     for (var i = 0; i < linhas.length; i += 1) {
       nomes.push(normalizarBusca(linhas[i].cells[colunaNome] ? linhas[i].cells[colunaNome].textContent : ""));
     }
+    // Linha do estado vazio do protótipo, montada uma vez e anexada ao
+    // `tbody` só quando o filtro zera; `colspan` cobre as colunas do
+    // cabeçalho (7 no 4b, 2 no 4a degradado).
+    var vazio = null;
+    function linhaVazia(corpo) {
+      if (vazio && vazio.parentNode === corpo) return vazio;
+      vazio = documento.createElement("tr");
+      var celula = documento.createElement("td");
+      celula.setAttribute("colspan", String(cabecalhos.length));
+      var estado = documento.createElement("div");
+      estado.setAttribute("class", "estado-vazio");
+      var titulo = documento.createElement("h3");
+      titulo.textContent = "Nenhum município com esse nome";
+      var dica = documento.createElement("p");
+      dica.textContent = "O índice cobre " + total + " municípios. Tente parte do nome, sem acento.";
+      estado.appendChild(titulo);
+      estado.appendChild(dica);
+      celula.appendChild(estado);
+      vazio.appendChild(celula);
+      return vazio;
+    }
     campo.addEventListener("input", function () {
-      var termo = normalizarBusca(campo.value.trim());
+      var q = campo.value;
+      var termo = normalizarBusca(q.trim());
       var visiveis = 0;
       for (var j = 0; j < linhas.length; j += 1) {
         var mostra = termo === "" || nomes[j].indexOf(termo) !== -1;
         linhas[j].hidden = !mostra;
         if (mostra) visiveis += 1;
       }
-      if (visiveis === total) {
-        retorno.textContent = "São " + total + " municípios de MG.";
+      var corpo = caixa.querySelector("table#tabela-municipios tbody");
+      if (!corpo) return;
+      if (visiveis === 0) {
+        corpo.appendChild(linhaVazia(corpo));
+      } else if (vazio && vazio.parentNode) {
+        vazio.parentNode.removeChild(vazio);
+      }
+      if (termo === "") {
+        retorno.textContent = total + " municípios no recorte";
       } else {
-        retorno.textContent = "São " + visiveis + " de " + total + " municípios.";
+        retorno.textContent = visiveis + (visiveis === 1 ? " município encontrado" : " municípios encontrados") + " para \u201c" + q + "\u201d";
       }
     });
   });

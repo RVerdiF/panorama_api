@@ -132,43 +132,38 @@ def _tbody(html: str) -> str:
 
 
 def test_sete_th_do_prototipo_em_ordem(indice_cliente: TestClient):
-    cabeca = re.search(
-        r'<table class="tabela" id="tabela-municipios" data-ordenavel>'
-        r".*?<thead>.*?<tr>(.*?)</tr>",
-        _html(indice_cliente),
-        re.S,
-    )
-    assert cabeca is not None
-    ths = re.findall(r"<th\b([^>]*)>(.*?)</th>", cabeca.group(1))
+    html = _html(indice_cliente)
 
-    assert [(atributos.strip(), texto) for atributos, texto in ths] == [
-        ('class="num" scope="col"', "#"),
-        (
-            'class="ordenavel" data-campo="nome" data-tipo="texto" scope="col"',
-            "Município",
-        ),
-        (
-            'class="ordenavel num" data-campo="matricula" data-tipo="numero" '
-            'aria-sort="descending" scope="col"',
-            "Matrícula privada",
-        ),
-        (
-            'class="ordenavel num" data-campo="escolas" data-tipo="numero" '
-            'scope="col"',
-            "Escolas ativas",
-        ),
-        (
-            'class="ordenavel num" data-campo="variacao" data-tipo="numero" '
-            'scope="col"',
-            "Variação anual",
-        ),
-        (
-            'class="ordenavel num" data-campo="lider" data-tipo="numero" '
-            'scope="col"',
-            "Maior share",
-        ),
-        ('scope="col"', "Ficha"),
+    # Os 7 `th` literais do protótipo (`panorama-escola-municipios.html`),
+    # com o `button` + `span` da seta no SSR (↑ ↓ ↑ ↑ ↑) e o `data-tipo`
+    # do mecanismo de ordenação do app. A ordem na página é a do protótipo.
+    esperados = [
+        '<th class="num" scope="col">#</th>',
+        '<th class="ordenavel" data-campo="nome" data-tipo="texto" scope="col">'
+        '<button type="button">Município <span aria-hidden="true">↑</span></button></th>',
+        '<th class="ordenavel num" data-campo="matricula" data-tipo="numero" '
+        'aria-sort="descending" scope="col">'
+        '<button type="button">Matrícula privada <span aria-hidden="true">↓</span></button></th>',
+        '<th class="ordenavel num" data-campo="escolas" data-tipo="numero" '
+        'scope="col">'
+        '<button type="button">Escolas ativas <span aria-hidden="true">↑</span></button></th>',
+        '<th class="ordenavel num" data-campo="variacao" data-tipo="numero" '
+        'scope="col">'
+        '<button type="button">Variação anual <span aria-hidden="true">↑</span></button></th>',
+        '<th class="ordenavel num" data-campo="lider" data-tipo="numero" '
+        'scope="col">'
+        '<button type="button">Maior share <span aria-hidden="true">↑</span></button></th>',
+        '<th scope="col">Ficha</th>',
     ]
+    posicao = 0
+    for th in esperados:
+        assert th in html, th
+        proxima = html.index(th, posicao)
+        assert proxima >= posicao
+        posicao = proxima
+
+    # A posição usa `td.num.sec`, como o `render` do design.
+    assert _tbody(html).count('<td class="num sec">') == 853
 
 
 # -- 853 tr no SSR, em matrícula desc ------------------------------------------
@@ -212,9 +207,13 @@ def test_sem_js_ordem_e_links_ja_prontos_no_ssr(
     corpo = _tbody(html)
 
     assert html.count("Abrir mercado") == 853
-    assert "São 853 municípios de MG." in html
-    # Cabeçalho sem botão: a ordenação nasce no JS (`ordenarTabelas`).
-    assert "<thead>" in html and "<button" not in html.split("</thead>")[0]
+    assert "853 municípios no recorte." in html
+    # O cabeçalho do SSR já traz os botões literais do protótipo (com as
+    # setas); sem JS eles são estáticos, sem clique — a ordenação e os
+    # links já vêm prontos do servidor (critério 3).
+    cabeca = html.split("<thead>")[1].split("</thead>")[0]
+    assert cabeca.count('<button type="button">') == 5
+    assert cabeca.count('<span aria-hidden="true">') == 5
 
 
 # -- NULL ≠ 0 -----------------------------------------------------------------
@@ -231,6 +230,108 @@ def test_sem_escola_privada_e_marcador_nunca_zero(indice_cliente: TestClient):
     assert corpo.count('title="sem ano anterior"') == 1
     # `n_escolas = 0` é medição real: sai como 0, sem marcador.
     assert corpo.count(">0</td>") == 445
+
+
+def test_matricula_nula_com_escola_nao_marca_sem_escola():
+    """Matrícula nula com escola ≥1 não leva "sem escola privada ativa".
+
+    É o caso real do §4.4 (3 municípios com 1 escola privada e matrícula
+    nula): o motivo só sai quando `n_escolas_privadas` é 0 ou nulo. No
+    código anterior à rodada 1 este teste falha (o título fixo do template
+    e o `qt is None` marcavam as 3 células).
+    """
+    codigos = _codigos_mg()[:3]
+    repo = FakeRepository()
+    repo.indice = [
+        {
+            "co_municipio": codigos[0],
+            "qt_mat_privada": 1000.0,
+            "qt_mat_privada_anterior": 900.0,
+            "n_escolas_privadas": 2,
+            "variacao_pct": 11.1,
+            "share_lider_pct": 40.0,
+        },
+        {
+            # Escola ativa mas matrícula nula: "sem dado" sem motivo.
+            "co_municipio": codigos[1],
+            "qt_mat_privada": None,
+            "qt_mat_privada_anterior": None,
+            "n_escolas_privadas": 1,
+            "variacao_pct": None,
+            "share_lider_pct": None,
+        },
+        {
+            # Sem escola privada: as 3 células com o marcador.
+            "co_municipio": codigos[2],
+            "qt_mat_privada": None,
+            "qt_mat_privada_anterior": None,
+            "n_escolas_privadas": 0,
+            "variacao_pct": None,
+            "share_lider_pct": None,
+        },
+    ]
+    app = create_app(settings=_settings(), repository=repo)
+    with TestClient(app) as cliente:
+        html = _html(cliente)
+
+    corpo = _tbody(html)
+    assert corpo.count("<tr>") == 3
+    # Só o município sem escola leva o marcador, nas 3 células.
+    assert corpo.count('title="sem escola privada ativa"') == 3
+    # O município com escola tem "sem dado" sem título nas 3 células.
+    assert corpo.count('<span class="sem-dado">sem dado</span>') == 3
+
+
+def test_ordenacao_liga_o_clique_mesmo_com_botao_no_ssr(
+    indice_cliente: TestClient,
+):
+    """O `th.ordenavel` do SSR tem botão+seta e o JS liga o clique.
+
+    O `ordenarTabelas` antigo ignorava a tabela quando o `thead` já tinha
+    botão — com o botão literal no SSR, o clique nunca seria ligado. Aqui
+    a cobertura é estática (o `TestClient` não executa JS): o HTML tem os
+    botões com as setas do protótipo, e o `app.js` liga o clique por tabela
+    (uma vez só) e espelha a direção na seta (`button span`).
+    """
+    cabeca = _html(indice_cliente).split("<thead>")[1].split("</thead>")[0]
+    assert cabeca.count('<button type="button">') == 5
+    assert cabeca.count('<span aria-hidden="true">↑</span>') == 4
+    assert cabeca.count('<span aria-hidden="true">↓</span>') == 1
+    assert 'aria-sort="descending"' in cabeca
+
+    js = (STATIC / "app.js").read_text(encoding="utf-8")
+    # Sem o `continue` que pulava a tabela inteira com botão no `thead`.
+    assert 'if (tabelas[i].querySelector("thead button")) continue' not in js
+    # O clique é ligado por tabela, com trava de idempotência.
+    assert 'tabela.addEventListener("click", clique)' in js
+    assert "data-ordenacao-pronta" in js
+    # A direção ordenada volta para a seta do protótipo.
+    assert 'querySelector("button span")' in js
+
+
+def test_filtro_usa_a_copy_do_prototipo_com_estado_vazio():
+    """Contador e estado vazio com a copy do design, sem `style=` inline.
+
+    O protótipo escreve "{n} municípios no recorte…" na carga, "{n}
+    …encontrados para "q"" no filtro e o estado vazio "Nenhum município
+    com esse nome" — sempre sem o trecho do mock "de demonstração". O
+    `style=` inline do design vira regra no `app.css`, sem classe nova.
+    """
+    js = (STATIC / "app.js").read_text(encoding="utf-8")
+
+    assert "municípios no recorte" in js
+    assert "município encontrado" in js
+    assert "municípios encontrados" in js
+    assert "Nenhum município com esse nome" in js
+    assert "Tente parte do nome, sem acento." in js
+    assert '"colspan"' in js or "'colspan'" in js or '("colspan"' in js
+    assert "estado-vazio" in js
+    assert "demonstração" not in js
+
+    css = (STATIC / "app.css").read_text(encoding="utf-8")
+    assert "#tabela-municipios td[colspan] .estado-vazio" in css
+    # A coluna do nome casa por prefixo: o `th` traz o botão ("Município ↑").
+    assert 'indexOf("Município")' in js
 
 
 def test_kpis_somam_ignorando_none(indice_cliente: TestClient):
@@ -336,7 +437,7 @@ def test_indice_vazio_responde_200_com_kpis_sem_dado():
     with TestClient(app) as cliente:
         html = _html(cliente)
 
-    assert "São 0 municípios de MG." in html
+    assert "0 municípios no recorte." in html
     assert html.count('<div class="kpi">') == 4
     assert "style=" not in html
     for texto in FORA_DO_MOCK:

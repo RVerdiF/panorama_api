@@ -114,6 +114,13 @@ PENDENTES: dict[str, frozenset[str]] = {
 #: As unicas telas que podem ter classe fora do prototipo (P7 aberta).
 TELAS_ESCALADAS = frozenset({"comparar.html"})
 
+#: Classes que o protótipo emite no DOM mas não declara em nenhum CSS
+#: vendorizado (Regra Zero: o HTML é o do protótipo, literal). Hoje só
+#: `sec`: o `render` do índice no design (`assets/js/app.js`,
+#: `'<td class="num sec">'`) usa a classe sem regra — ela posiciona nada,
+#: só compõe o literal. Válida em qualquer template, sem virar PENDENTES.
+CLASSES_DO_DOM_DO_PROTOTIPO = frozenset({"sec"})
+
 
 def _classes_do_valor(valor: str) -> set[str]:
     """Tokens de classe de um `class="…"` sem os trechos Jinja."""
@@ -271,7 +278,11 @@ def test_toda_classe_literal_esta_no_prototipo_ou_em_pendentes():
     obsoletas: dict[str, list[str]] = {}
     for rel in sorted(set(_relativos_no_disco()) | set(PENDENTES)):
         literais = _classes_do_template(TEMPLATES / rel)
-        permitidas = prototipo | set(PENDENTES.get(rel, frozenset()))
+        permitidas = (
+            prototipo
+            | set(PENDENTES.get(rel, frozenset()))
+            | CLASSES_DO_DOM_DO_PROTOTIPO
+        )
         fora = sorted(literais - permitidas)
         if fora:
             novas[rel] = fora

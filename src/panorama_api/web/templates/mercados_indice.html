@@ -22,13 +22,16 @@
    * Nome do município é texto (decisão V4-d): só a Ficha linka, para não
      dobrar as paradas de tabulação (853 → 1.706) para o mesmo destino.
    * Ordenação e barras são as do app (`table[data-ordenavel]` + `ordenar`,
-     `aplicarBarras` via `data-largura`): o botão do cabeçalho nasce no JS e
-     o SSR já vem em matrícula desc. Sem JS, o cabeçalho é texto e a tabela
-     continua completa. Nenhum atributo de estilo inline (CSP `style-src
-     'self'`).
-   * `NULL ≠ 0`: município sem escola privada ativa mostra "sem dado" com
-     `title="sem escola privada ativa"` na matrícula, na variação e no share
-     — nunca 0. `n_escolas = 0` é medição real e sai como 0.
+     `aplicarBarras` via `data-largura`): o SSR já emite o `th.ordenavel`
+     literal do protótipo (`button` + `span` da seta, ↑ ↓ ↑ ↑ ↑) e já vem
+     em matrícula desc; o JS só liga o clique e move o `aria-sort`. Sem JS,
+     o cabeçalho é estático e a tabela continua completa. Nenhum atributo
+     de estilo inline (CSP `style-src 'self'`).
+   * `NULL ≠ 0`: município sem escola privada ativa (`n_escolas_privadas`
+     0 ou nulo) mostra "sem dado" com `title="sem escola privada ativa"`
+     na matrícula, na variação e no share — nunca 0. Matrícula nula com
+     escola ≥1 sai como "sem dado" sem esse título. `n_escolas = 0` é
+     medição real e sai como 0.
    * Degradação (§4.6): se o BigQuery falha, a página cai para o 4a (lista
      com 853 links, sem colunas numéricas nem KPIs) com um `div.aviso`, em
      200, sem `ETag` e fora do LRU. #}
@@ -64,7 +67,7 @@
           <label for="filtro-municipio">Filtrar por município</label>
           <input id="filtro-municipio" type="search" autocomplete="off" placeholder="Ex.: Uberlândia, Contagem, Vale">
         </div>
-        <p class="resultado-contagem" id="retorno-municipios" role="status" aria-live="polite">São {{ municipios|length }} municípios de MG.</p>
+        <p class="resultado-contagem" id="retorno-municipios" role="status" aria-live="polite">{{ municipios|length }} municípios no recorte.</p>
       </div>
 
       <div class="tabela-rolagem" role="region" aria-label="Municípios de Minas Gerais (tabela com rolagem)" tabindex="0">
@@ -110,7 +113,7 @@
           <label for="filtro-municipio">Filtrar por município</label>
           <input id="filtro-municipio" type="search" autocomplete="off" placeholder="Ex.: Uberlândia, Contagem, Vale">
         </div>
-        <p class="resultado-contagem" id="retorno-municipios" role="status" aria-live="polite">São {{ total_linhas }} municípios de MG.</p>
+        <p class="resultado-contagem" id="retorno-municipios" role="status" aria-live="polite">{{ total_linhas }} municípios no recorte.</p>
       </div>
 
       <div class="tabela-rolagem">
@@ -119,23 +122,23 @@
           <thead>
             <tr>
               <th class="num" scope="col">#</th>
-              <th class="ordenavel" data-campo="nome" data-tipo="texto" scope="col">Município</th>
-              <th class="ordenavel num" data-campo="matricula" data-tipo="numero" aria-sort="descending" scope="col">Matrícula privada</th>
-              <th class="ordenavel num" data-campo="escolas" data-tipo="numero" scope="col">Escolas ativas</th>
-              <th class="ordenavel num" data-campo="variacao" data-tipo="numero" scope="col">Variação anual</th>
-              <th class="ordenavel num" data-campo="lider" data-tipo="numero" scope="col">Maior share</th>
+              <th class="ordenavel" data-campo="nome" data-tipo="texto" scope="col"><button type="button">Município <span aria-hidden="true">↑</span></button></th>
+              <th class="ordenavel num" data-campo="matricula" data-tipo="numero" aria-sort="descending" scope="col"><button type="button">Matrícula privada <span aria-hidden="true">↓</span></button></th>
+              <th class="ordenavel num" data-campo="escolas" data-tipo="numero" scope="col"><button type="button">Escolas ativas <span aria-hidden="true">↑</span></button></th>
+              <th class="ordenavel num" data-campo="variacao" data-tipo="numero" scope="col"><button type="button">Variação anual <span aria-hidden="true">↑</span></button></th>
+              <th class="ordenavel num" data-campo="lider" data-tipo="numero" scope="col"><button type="button">Maior share <span aria-hidden="true">↑</span></button></th>
               <th scope="col">Ficha</th>
             </tr>
           </thead>
           <tbody id="corpo-municipios">
             {% for linha in linhas %}
             <tr>
-              <td class="num">{{ linha.posicao }}.</td>
+              <td class="num sec">{{ linha.posicao }}.</td>
               <td data-valor="{{ linha.nome | fmt_bruto }}">{{ linha.nome }}</td>
               {% if linha.qt_mat_privada is not none %}
               <td class="num metrica" data-valor="{{ linha.qt_mat_privada | fmt_bruto }}"><span class="cela-barra">{{ linha.qt_mat_privada | fmt_contagem }}<span class="cela-barra__trilho" aria-hidden="true"><span class="cela-barra__preenche" data-largura="{{ linha.largura }}"></span></span></span></td>
               {% else %}
-              <td class="num metrica" data-valor=""><span class="sem-dado" title="sem escola privada ativa">sem dado</span></td>
+              <td class="num metrica" data-valor=""><span class="sem-dado"{% if linha.motivo_matricula %} title="{{ linha.motivo_matricula }}"{% endif %}>sem dado</span></td>
               {% endif %}
               {% if linha.n_escolas is not none %}
               <td class="num metrica" data-valor="{{ linha.n_escolas | fmt_bruto }}">{{ linha.n_escolas | fmt_contagem }}</td>

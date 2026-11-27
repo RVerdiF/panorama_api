@@ -1143,9 +1143,24 @@ def _linhas_indice(
         qt = linha.qt_mat_privada
         anterior = linha.qt_mat_privada_anterior
         variacao = linha.variacao_pct
+        #: Sem escola privada ativa = `n_escolas_privadas` 0 ou nulo (decisão
+        #: P-V-1, variante A; rodada 1 do review). Só aí o motivo "sem escola
+        #: privada ativa" pode sair — matrícula nula com escola ≥1 é ausência
+        #: de outro tipo e não leva esse título (`NULL ≠ 0`).
+        sem_escola = (
+            linha.n_escolas_privadas is None or linha.n_escolas_privadas == 0
+        )
+        if qt is None:
+            motivo_matricula: str | None = (
+                MOTIVO_SEM_ESCOLA_PRIVADA if sem_escola else None
+            )
+        else:
+            motivo_matricula = None
         if variacao is None:
             if qt is None:
-                motivo_variacao: str | None = MOTIVO_SEM_ESCOLA_PRIVADA
+                motivo_variacao: str | None = (
+                    MOTIVO_SEM_ESCOLA_PRIVADA if sem_escola else None
+                )
             elif anterior is None:
                 motivo_variacao = MOTIVO_SEM_ANO_ANTERIOR
             else:
@@ -1178,9 +1193,10 @@ def _linhas_indice(
                 ),
                 "motivo_variacao": motivo_variacao,
                 "share_lider_pct": linha.share_lider_pct,
+                "motivo_matricula": motivo_matricula,
                 "motivo_share": (
                     MOTIVO_SEM_ESCOLA_PRIVADA
-                    if linha.share_lider_pct is None and qt is None
+                    if linha.share_lider_pct is None and qt is None and sem_escola
                     else None
                 ),
             }

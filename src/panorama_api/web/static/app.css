@@ -300,6 +300,15 @@ td .barra-share__trilho {
   vertical-align: middle;
 }
 
+/* Estado vazio do filtro dentro da tabela do índice: transcreve o `style=`
+   inline do protótipo (`iniciarMunicipios`: `border:0;background:transparent;
+   padding:28px 10px`) — a CSP é `style-src 'self'`, sem classe nova. */
+#tabela-municipios td[colspan] .estado-vazio {
+  border: 0;
+  background: transparent;
+  padding: 28px 10px;
+}
+
 /* --- app-only: listas e definições do SSR --- */
 .lista-definicoes {
   display: grid;
