@@ -106,11 +106,11 @@ ESQUELETO = {
         ],
         "mercado": [
             "section.painel",
-            "div.kpis",
+            "div.kpis#kpis-mercado",
             "section.painel#composicao",
             "div.duas-col.duas-col--iguais",
             "section.painel#escolas",
-            "dl.rodape-meta",
+            "dl.rodape-meta#meta-mercado",
             "footer.rodape-final",
         ],
         "seletor": [

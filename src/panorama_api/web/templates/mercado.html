@@ -51,7 +51,7 @@
     </section>
     {% else %}
 
-    <div class="kpis">
+    <div class="kpis" id="kpis-mercado">
       {% for kpi in kpis %}
       <div class="kpi">
         <p class="kpi__rotulo">{{ kpi.rotulo }}</p>
@@ -64,11 +64,7 @@
     <section class="painel" id="composicao" aria-labelledby="titulo-composicao">
       <div class="painel__cabecalho">
         <h2 id="titulo-composicao">Tamanho e composição por etapa</h2>
-        <p class="painel__nota">
-          Matrícula privada por etapa em {{ ano_selecionado | fmt_ano }}. As
-          etapas somam o total privado; <em>Educação básica (total)</em> é o total
-          oficial do Censo, não a soma das subetapas.
-        </p>
+        <p class="painel__nota">Matrícula privada por etapa no ano selecionado. As etapas somam o total privado.</p>
       </div>
       <ul class="composicao" id="composicao-etapas">
         {% for item in composicao %}
@@ -85,9 +81,7 @@
       <section class="painel" id="movimento" aria-labelledby="titulo-movimento">
         <div class="painel__cabecalho">
           <h2 id="titulo-movimento">Movimento de escolas</h2>
-          <p class="painel__nota">
-            Entrada e saída de escolas — {{ etapa_rotulo }}. {{ motivo_entrada_saida }}
-          </p>
+          <p class="painel__nota">Entrada e saída de escolas privadas ativas em relação ao ano anterior.</p>
         </div>
         <div id="movimento-conteudo">
           {% if movimento %}
@@ -109,9 +103,7 @@
           <h2 id="titulo-cobertura">Cobertura e limites</h2>
         </div>
         <div class="nota-metodo">
-          <strong>Sem indicador de concentração.</strong> A medida de concentração
-          do mercado ficou fora do MVP: o recorte padrão não está decidido, e
-          publicá-la sem essa decisão seria vender um número ambíguo.
+          <strong>Sem indicador de concentração.</strong> HHI e C4 ficaram fora do MVP: o recorte padrão não está decidido, e publicar concentração sem essa decisão seria vender um número ambíguo.
         </div>
         <div class="definicao">
           <strong>Share</strong> = matrícula da escola dividida pela matrícula
@@ -138,11 +130,11 @@
       {% else %}
       <div class="tabela-rolagem" role="region" aria-label="Escolas do mercado por share (tabela com rolagem)" tabindex="0">
         <table class="tabela">
-          <caption>Ranking de participação privada — {{ etapa_rotulo }} — {{ ano_selecionado | fmt_ano }}</caption>
+          <caption id="caption-share">Ranking de participação privada</caption>
           <thead>
             <tr><th class="num" scope="col">#</th><th scope="col">Escola</th><th class="num" scope="col">Matrícula</th><th class="num" scope="col">Share privado</th></tr>
           </thead>
-          <tbody>
+          <tbody id="corpo-share">
             {% for linha in linhas_share %}
             <tr{% if linha.id_entidade %} id="escola-{{ linha.id_entidade }}"{% endif %}>
               <td class="num">{{ linha.posicao }}.</td>
@@ -175,18 +167,10 @@
           {% endif %}
         </div>
       </nav>
-      {% if paginacao.refinar %}
-      <div class="aviso">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
-        <p>
-          Limite de paginação atingido. Escolha outra etapa para continuar a leitura.
-        </p>
-      </div>
-      {% endif %}
       {% endif %}
     </section>
 
-    <dl class="rodape-meta" aria-label="Origem dos números do mercado">
+    <dl class="rodape-meta" id="meta-mercado" aria-label="Origem dos números do mercado">
       <div>
         <dt>Ano de referência</dt>
         <dd>{{ meta.ano_referencia | fmt_ano }}</dd>
