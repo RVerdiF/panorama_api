@@ -184,6 +184,10 @@ class BigQueryServingRepository:
         )
         return self._run(sql, params, endpoint="market_share")
 
+    def get_indice_municipios(self, *, ano: int) -> list[dict[str, Any]]:
+        sql, params = queries.indice_municipios(self._fq, ano=ano)
+        return self._run(sql, params, endpoint="indice_municipios")
+
     def get_table_columns(self) -> dict[str, dict[str, str]]:
         tables = ", ".join(f"'{name}'" for name in EXPECTED_COLUMNS)
         sql = queries.INFORMATION_SCHEMA_SQL.format(

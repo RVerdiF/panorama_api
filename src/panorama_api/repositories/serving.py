@@ -54,6 +54,10 @@ class ServingRepository(Protocol):
         offset: int,
     ) -> list[dict[str, Any]]: ...
 
+    def get_indice_municipios(self, *, ano: int) -> list[dict[str, Any]]:
+        """Índice de municípios (V4-4b): 1 linha por município de MG, etapa `bas`."""
+        ...
+
     def get_table_columns(self) -> dict[str, dict[str, str]]:
         """{tabela: {coluna: tipo}} das views do contrato (validação de startup)."""
         ...
