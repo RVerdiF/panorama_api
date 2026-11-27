@@ -309,47 +309,34 @@ router_inicio = APIRouter(include_in_schema=False)
     summary="Página de entrada (landing)",
 )
 def inicio(request: Request) -> Response:
-    """Landing em `/`: hero do produto com o painel do recorte (card `t_437796c3`).
+    """Landing em `/`: porte literal do protótipo (card `t_e42049c1`).
 
-    Substitui o redirect `307` → `/app/` (card `t_0c84b91f`): quem chega na
-    raiz vê a apresentação do produto e o link para a busca, e quem tem `/app/`
-    em favorito ou link compartilhado continua caindo direto nas escolas.
+    O HTML é o `<body>` de `panorama-escola-landing.html`, com adaptações só
+    onde o card manda (links para as rotas do app, sem faixa de protótipo,
+    sem `style=` inline). Substitui o redirect `307` → `/app/`
+    (card `t_0c84b91f`): quem chega na raiz vê a apresentação do produto e o
+    link para a busca, e quem tem `/app/` em favorito ou link compartilhado
+    continua caindo direto nas escolas.
 
-    O painel da coluna direita (a `prancha` do design) troca a série
-    ilustrativa por três números que saem do **código e da config**, nunca de
-    literal no template:
-
-    * municípios: `len(municipios_mg())` — lista IBGE versionada, arquivo de
-      apoio de tela, sem BigQuery;
-    * anos: `settings.anos_disponiveis` (`APP_ANOS_DISPONIVEIS`), já validado e
-      canônico no boot;
-    * etapas e modalidades: chaves de `ETAPAS_ROTULOS` sem `"bas"`, que é o
-      total do Censo e não uma etapa (spec §4).
-
-    Nenhum desses números custa consulta: não há contagem de escolas porque
-    `COUNT(*)` é proibido (`repositories/bigquery/pagination.py:1-5`). Zero
-    chamadas ao repositório. Como :func:`panorama_api.web.e_caminho_web` inclui
-    a raiz, a resposta ganha gzip, `ETag`/`Cache-Control: private, no-cache` com
-    304 e a linha `page_view`, e um erro inesperado aqui vira página HTML
+    A landing não consulta o repositório: os números do design são literais
+    do protótipo. Como :func:`panorama_api.web.e_caminho_web` inclui a raiz,
+    a resposta ganha gzip, `ETag`/`Cache-Control: private, no-cache` com 304
+    e a linha `page_view`, e um erro inesperado aqui vira página HTML
     (nunca `application/problem+json`).
     """
     contexto = contexto_base(request)
     municipios = municipios_mg()
     # Marquise da landing: a tupla versionada é de códigos IBGE; o nome sai da
     # mesma lista de `municipios_mg()`, então o template não escreve topônimo
-    # nenhum e nada de ilustrativo entra na tela (plano §5).
+    # nenhum. O design repete a sequência duas vezes no trilho (loop do
+    # marquee) — o template itera a lista duas vezes.
     por_codigo = {m.co_municipio: m.no_municipio for m in municipios}
     contexto.update(
-        # As 853 opções da barra de busca do hero saem da mesma lista versionada
-        # da busca (`GET /app/`); lista de apoio de tela, zero consulta.
-        municipios=municipios,
-        recorte_municipios=len(municipios),
-        recorte_anos=anos_publicados(_settings(request).anos_disponiveis),
-        # `"bas"` é o total oficial do Censo, não uma etapa do mercado.
-        recorte_etapas=sum(1 for etapa in ETAPAS_ROTULOS if etapa != "bas"),
-        # Assets da landing (plano §7): a camada visual e a foto entram pelo
-        # mesmo registro com hash que o resto do front, só nesta tela.
+        # Assets da landing: a camada visual, o JS de revelação/contadores e
+        # a foto entram pelo mesmo registro com hash que o resto do front,
+        # só nesta tela.
         css_landing_url=assets().url("landing.css"),
+        js_landing_url=assets().url("landing.js"),
         foto_landing_url=assets().url("escola-felisburgo-mg.webp"),
         # A marquise é decorativa: código que não esteja na lista versionada é
         # ignorado aqui em vez de derrubar a landing (500). O teste
