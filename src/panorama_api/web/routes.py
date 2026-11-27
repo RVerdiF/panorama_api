@@ -84,7 +84,6 @@ from panorama_api.web.mercado import (
     itens_subnav,
     kpis_mercado,
 )
-from panorama_api.services.indice import IndiceMunicipios
 from panorama_api.web.municipios import municipios_mg
 from panorama_api.web.paginacao import montar as montar_paginacao
 from panorama_api.web.paginacao import url as url_lista
@@ -1121,10 +1120,12 @@ MOTIVO_SEM_ANO_ANTERIOR = "sem ano anterior"
 
 
 def _linhas_indice(
-    indice: IndiceMunicipios, nomes: Mapping[str, str]
+    indice: Any, nomes: Mapping[str, str]
 ) -> list[dict[str, Any]]:
     """Linhas da tabela já na ordem do SQL (matrícula desc, nulos por último).
 
+    `indice` é o envelope de :func:`dados.indice_municipios` (o tipo mora no
+    `services`, que `routes.py` não importa — fronteira `test_web_fronteira`).
     Cada linha carrega o texto pronto de variação (sinal tipográfico do
     protótipo) e o motivo da ausência, para o template não decidir regra de
     exibição. A largura da barra espelha o mock (`Math.max(2, …)`, 1 casa).
@@ -1187,7 +1188,7 @@ def _linhas_indice(
     return prontas
 
 
-def _kpis_indice(indice: IndiceMunicipios) -> list[dict[str, Any]]:
+def _kpis_indice(indice: Any) -> list[dict[str, Any]]:
     """Os 4 KPIs do topo (plano §4.5): somas que ignoram `None`, nunca 0."""
     totais = indice.kpis
     variacao = totais.variacao_pct
