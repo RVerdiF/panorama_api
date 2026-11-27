@@ -49,7 +49,7 @@ from panorama_api.config import Settings
 from panorama_api.main import create_app
 from panorama_api.web.conteudo import MARQUISE_MUNICIPIOS
 from panorama_api.web.municipios import municipios_mg
-from tests.unit.conftest import FakeRepository
+from tests.unit.conftest import FakeRepository, share_row
 from tests.unit.test_web_estilos import _contraste, _cor_do_token, _tokens
 
 CSS = (
@@ -177,13 +177,82 @@ def test_atrasos_do_design_viraram_nth_child_no_css() -> None:
         ".prancha[data-reveal] { --d: 340ms; }",
         ".numeros > div:nth-child(4) { --d: 270ms; }",
         ".capitulos > .capitulo:nth-child(3) { --d: 140ms; }",
-        ".barras > li:nth-child(1) { --i: 0; --w: 100%; }",
-        ".barras > li:nth-child(5) { --i: 4; --w: 48%; }",
+        ".barras > li:nth-child(1) { --i: 0; }",
+        ".barras > li:nth-child(5) { --i: 4; }",
         ".matriz > .matriz__linha:nth-child(7) { --i: 6; }",
         ".metodo__regras > .regra:nth-child(4) { --d: 240ms; }",
         ".fecho__acoes { --d: 140ms; }",
     ):
         assert regra in css, regra
+
+
+def test_barras_sem_largura_fixa_de_mock() -> None:
+    """As larguras mock 100/76/63/57/48% por posição saíram do CSS.
+
+    O `:nth-child()` das barras carrega só o índice de entrada (`--i`); a
+    largura (`--w`) vem das classes quantizadas `bw-N` (passo 5).
+    """
+    css = _css()
+
+    for regra in (
+        ".barras > li:nth-child(1) { --i: 0; --w: 100%; }",
+        ".barras > li:nth-child(5) { --i: 4; --w: 48%; }",
+    ):
+        assert regra not in css, regra
+    for largura_mock in ("--w: 76%", "--w: 63%", "--w: 57%", "--w: 48%"):
+        assert largura_mock not in css, largura_mock
+    for classe in ("bw-0", "bw-5", "bw-50", "bw-100"):
+        assert f".barras > li.{classe}" in css, classe
+
+
+def test_barras_proporcionais_ao_share() -> None:
+    """A largura de cada barra é `share/max`, quantizada em passo 5 (`bw-N`)."""
+    repo = FakeRepository(
+        share=[
+            share_row(
+                id_entidade=f"3100000{i}",
+                no_entidade=nome,
+                mat_entidade=1000.0,
+                share_privado_pct=share,
+                nu_ano_censo=2025,
+            )
+            for i, (nome, share) in enumerate(
+                (
+                    ("Escola Alfa", 2.0),
+                    ("Escola Beta", 1.9),
+                    ("Escola Gama", 1.7),
+                    ("Escola Delta", 1.6),
+                    ("Escola Epsilon", 1.4),
+                ),
+                start=1,
+            )
+        ]
+    )
+    app = create_app(settings=_settings(), repository=repo)
+    with TestClient(app) as cliente:
+        resposta = cliente.get(
+            INICIO, headers={"Accept-Encoding": "identity", "Accept": "text/html"}
+        )
+
+    assert resposta.status_code == 200
+    classes = re.findall(r'<li class="(bw-\d+)"', resposta.text)
+    assert classes == ["bw-100", "bw-95", "bw-85", "bw-80", "bw-70"], classes
+    larguras = [int(classe.removeprefix("bw-")) for classe in classes]
+    assert larguras == sorted(larguras, reverse=True), larguras
+    for rotulo in ("2,0%", "1,9%", "1,7%", "1,6%", "1,4%"):
+        assert rotulo in resposta.text, rotulo
+
+
+def test_classe_largura_sem_dado_e_minimo_visivel() -> None:
+    """`_classe_largura`: sem dado/max zerado vira `bw-0`; fiapo vira `bw-5`."""
+    from panorama_api.web.routes import _classe_largura
+
+    assert _classe_largura(None, 2.0) == "bw-0"
+    assert _classe_largura(1.5, None) == "bw-0"
+    assert _classe_largura(1.5, 0) == "bw-0"
+    assert _classe_largura(0.0, 2.0) == "bw-0"
+    assert _classe_largura(0.01, 2.0) == "bw-5"
+    assert _classe_largura(2.0, 2.0) == "bw-100"
 
 
 # -- 3. o conjunto de animações é o do protótipo -------------------------------

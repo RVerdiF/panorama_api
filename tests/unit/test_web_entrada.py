@@ -235,13 +235,16 @@ def test_raiz_consulta_no_maximo_4_vezes_o_recorte_fixo(entrada_repo: FakeReposi
     Card `t_e06e1ad5` + série da prancha (card `t_cd53cdc1`): GET e HEAD
     compartilham o cache em processo (por `DATA_VERSION`), então os dois
     juntos não passam de 4 consultas (3 do recorte fixo — BH, maior ano,
-    etapa padrão — e o histórico da escola em destaque).
+    etapa padrão — e o histórico da escola em destaque). O fixture traz o
+    histórico do destaque para o render ser completo e cacheável (parcial
+    com destaque e sem série não cacheia e recalcula no render seguinte).
     """
     repo = FakeRepository(
         municipios=[municipio_row()],
         markets=[market_row(nu_ano_censo=2025, etapa="bas")],
         concentracao=[concentracao_row(nu_ano_censo=2025, etapa="bas")],
         share=[share_row(nu_ano_censo=2025)],
+        history=[history_row(nu_ano_censo=ano) for ano in ANOS],
     )
     app = create_app(settings=_settings(), repository=repo)
     with TestClient(app) as test_client:

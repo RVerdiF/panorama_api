@@ -521,6 +521,47 @@ def test_falha_do_repositorio_mantem_200_com_sem_dado():
         assert mock not in resposta.text, mock
 
 
+def test_falha_no_historico_nao_cacheia_e_recupera_no_render_seguinte():
+    """Histórico fora no 1º render: 'sem dado' sem cachear; volta e recupera.
+
+    O mesmo app atende os dois renders com a mesma `DATA_VERSION` — é a
+    condição que detecta o parcial cacheado: a query só diferencia a chave
+    do cache HTTP (chave = versão + caminho + query), então o 2º render
+    passa pelo handler e lê o `landing_cache` da rota. Se o parcial fosse
+    guardado, o 2º render repetiria o 'sem dado'; como só o sucesso
+    completo cacheia, ele recalcula e mostra a série. (Apps separados por
+    render teriam caches isolados nas duas camadas e passariam mesmo com
+    o defeito — não provariam nada.)
+    """
+    repo = _repo_cheio()
+    repo.errors["get_school_history"] = RuntimeError("bigquery fora")
+    app = create_app(settings=_settings(), repository=repo)
+    with TestClient(app) as cliente:
+        primeira = cliente.request(
+            "GET",
+            f"{INICIO}?prova=1",
+            headers={"Accept": "text/html", "Accept-Encoding": "identity"},
+        )
+        assert primeira.status_code == 200
+        assert "<circle" not in primeira.text
+        assert "sem dado no ano" in _texto(primeira.text)
+
+        del repo.errors["get_school_history"]
+        segunda = cliente.request(
+            "GET",
+            f"{INICIO}?prova=2",
+            headers={"Accept": "text/html", "Accept-Encoding": "identity"},
+        )
+        assert segunda.status_code == 200
+
+    assert segunda.text.count('<circle class="ponto') == 5
+    historicos = [nome for nome, _ in repo.calls if nome == "get_school_history"]
+    assert len(historicos) == 2, repo.calls
+    desc = re.search(r'<desc id="grafico-prancha-desc">(.*?)</desc>', segunda.text, re.S)
+    assert desc is not None
+    assert "sem dado" not in desc.group(1)
+
+
 # -- C4 do contrato e série da prancha (card `t_cd53cdc1`) --------------------
 
 

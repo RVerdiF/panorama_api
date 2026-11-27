@@ -333,6 +333,42 @@ def _linha_concentracao_privadas(
     return None
 
 
+#: Larguras quantizadas das barras da landing (`share/max`, passo 5). A rota
+#: emite uma delas por barra via `_classe_largura`, o `landing.css` define
+#: `--w` para cada uma, e o conjunto valida a emissão (fora dele cai para
+#: `bw-0`). O par `classe` literal mantém a trava de órfãos
+#: (`test_app_only_nao_declara_classe_orfa`) ciente das 21 classes dinâmicas.
+CLASSES_LARGURA_BW = {
+    "classe": "bw-0 bw-5 bw-10 bw-15 bw-20 bw-25 bw-30 bw-35 bw-40 bw-45 bw-50 bw-55 bw-60 bw-65 bw-70 bw-75 bw-80 bw-85 bw-90 bw-95 bw-100"
+}
+
+
+def _classe_largura(share: float | None, max_share: float | None) -> str:
+    """Classe quantizada da largura da barra (`bw-0` a `bw-100`, passo 5).
+
+    A largura é `share/max_share`, quantizada em passos de 5 pontos (o CSS
+    define `--w` por classe, sem `style=` inline — a CSP é `style-src 'self'`).
+    Sem dado (`None`), sem máximo ou máximo zerado: `bw-0`. Fração positiva
+    que quantiza para 0 ganha o mínimo visível `bw-5`. A classe emitida é
+    sempre uma das declaradas em `CLASSES_LARGURA_BW` (o `landing.css`
+    define `--w` para cada uma); fora do conjunto, `bw-0`.
+    """
+    if share is None or max_share is None:
+        return "bw-0"
+    try:
+        fracao = float(share) / float(max_share)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return "bw-0"
+    if not fracao > 0:
+        return "bw-0"
+    quantizada = int(round(fracao * 100 / 5)) * 5
+    quantizada = max(0, min(100, quantizada))
+    if quantizada == 0:
+        return "bw-5"
+    classe = f"bw-{quantizada}"
+    return classe if classe in CLASSES_LARGURA_BW["classe"].split() else "bw-0"
+
+
 def _cache_landing(request: Request) -> dict[tuple[str, str], dict[str, Any]]:
     """Cache em processo da landing, invalidado por `DATA_VERSION`.
 
@@ -502,7 +538,10 @@ def inicio(request: Request) -> Response:
        (o gráfico da prancha e a variação anual, calculada da própria série).
 
     O nome do município vem de `municipios_mg()` (lista versionada, custo
-    zero) e o resultado é cacheado em processo por `DATA_VERSION`. Se o
+    zero) e o resultado é cacheado em processo por `DATA_VERSION` — mas só o
+    sucesso completo: com escola em destaque, o histórico (`serie_dados`)
+    precisa existir para cachear; sem ele o parcial recalcula no próximo
+    render e a página se recupera sozinha quando o BigQuery voltar. Se o
     BigQuery falhar, `/` continua `200` e cada bloco cai para "sem dado" —
     nunca `500`, nunca `0`. Como :func:`panorama_api.web.e_caminho_web`
     inclui a raiz, a resposta ganha gzip, `ETag`/`Cache-Control: private,
@@ -555,6 +594,12 @@ def inicio(request: Request) -> Response:
         ]
         while len(barras) < TOP_LANDING:
             barras.append({"nome": None, "share": None})
+        max_share = max(
+            (float(barra["share"]) for barra in barras if barra["share"] is not None),
+            default=None,
+        )
+        for barra in barras:
+            barra["classe"] = _classe_largura(barra["share"], max_share)
         linha_market = next(
             (
                 linha
@@ -594,7 +639,9 @@ def inicio(request: Request) -> Response:
             delta_texto=delta_texto,
             serie_desc=serie_desc,
         )
-        if linhas_share and linhas_market and linhas_conc:
+        if linhas_share and linhas_market and linhas_conc and (
+            serie_dados is not None if destaque else True
+        ):
             cache[chave] = landing
     contexto = contexto_base(request)
     municipios = municipios_mg()

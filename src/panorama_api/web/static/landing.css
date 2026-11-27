@@ -642,7 +642,10 @@ body.land { background: var(--bg); }
    A CSP do front é `style-src 'self'` sem `unsafe-inline`: o navegador
    descartaria esses atributos. Por isso cada valor vive aqui, como variável
    na regra do próprio elemento, na mesma ordem do documento do design —
-   o efeito visual é idêntico e o HTML não tem nenhum `style=`.
+   o efeito visual é idêntico e o HTML não tem nenhum `style=`. As larguras
+   das barras são a exceção proporcional: `--w` vem das classes `bw-N`
+   (passo 5, calculadas na rota de `share/max`), não de valor fixo por
+   posição — o mock 100/76/63/57/48% por `:nth-child()` saiu.
 
    Variável herdada funciona: `--w` vai no `li` e o `.barras__fill` (neto)
    herda; `--d`/`--i` vão no próprio elemento animado. */
@@ -671,11 +674,36 @@ body.land { background: var(--bg); }
 .prancha__grafico circle.ponto:nth-of-type(3) { --i: 2; }
 .prancha__grafico circle.ponto:nth-of-type(4) { --i: 3; }
 .prancha__grafico circle.ponto:nth-of-type(5) { --i: 4; }
-.barras > li:nth-child(1) { --i: 0; --w: 100%; }
-.barras > li:nth-child(2) { --i: 1; --w: 76%; }
-.barras > li:nth-child(3) { --i: 2; --w: 63%; }
-.barras > li:nth-child(4) { --i: 3; --w: 57%; }
-.barras > li:nth-child(5) { --i: 4; --w: 48%; }
+.barras > li:nth-child(1) { --i: 0; }
+.barras > li:nth-child(2) { --i: 1; }
+.barras > li:nth-child(3) { --i: 2; }
+.barras > li:nth-child(4) { --i: 3; }
+.barras > li:nth-child(5) { --i: 4; }
+/* Larguras proporcionais sem `style=`: a rota quantiza `share/max` em passos
+   de 5 e o template escreve `class="bw-N"` no `li`; cada classe define `--w`
+   (seletor na mesma especificidade das regras acima, valendo pela ordem).
+   `bw-0` é o sem-dado; fração positiva mínima ganha `bw-5` visível. */
+.barras > li.bw-0 { --w: 0%; }
+.barras > li.bw-5 { --w: 5%; }
+.barras > li.bw-10 { --w: 10%; }
+.barras > li.bw-15 { --w: 15%; }
+.barras > li.bw-20 { --w: 20%; }
+.barras > li.bw-25 { --w: 25%; }
+.barras > li.bw-30 { --w: 30%; }
+.barras > li.bw-35 { --w: 35%; }
+.barras > li.bw-40 { --w: 40%; }
+.barras > li.bw-45 { --w: 45%; }
+.barras > li.bw-50 { --w: 50%; }
+.barras > li.bw-55 { --w: 55%; }
+.barras > li.bw-60 { --w: 60%; }
+.barras > li.bw-65 { --w: 65%; }
+.barras > li.bw-70 { --w: 70%; }
+.barras > li.bw-75 { --w: 75%; }
+.barras > li.bw-80 { --w: 80%; }
+.barras > li.bw-85 { --w: 85%; }
+.barras > li.bw-90 { --w: 90%; }
+.barras > li.bw-95 { --w: 95%; }
+.barras > li.bw-100 { --w: 100%; }
 .matriz > .matriz__linha:nth-child(1) { --i: 0; }
 .matriz > .matriz__linha:nth-child(2) { --i: 1; }
 .matriz > .matriz__linha:nth-child(3) { --i: 2; }

@@ -213,7 +213,7 @@
         </div>
         <ul class="barras">
           {% for barra in barras %}
-          <li>
+          <li class="{{ barra.classe }}">
             <span><span class="barras__nome">{{ barra.nome or 'sem dado' }}</span><span class="barras__trilha"><span class="barras__fill"></span></span></span>
             <span class="barras__valor">{% if barra.share is not none %}{{ barra.share|fmt_nulo }}%{% else %}sem dado{% endif %}</span>
           </li>
