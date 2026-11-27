@@ -123,7 +123,7 @@ def _settings() -> Settings:
 
 @pytest.fixture
 def html_da_landing() -> bytes:
-    """HTML cru (sem gzip) de `/`: a landing não consulta o repositório."""
+    """HTML cru (sem gzip) de `/` (repositório fake vazio: blocos em 'sem dado')."""
     app = create_app(settings=_settings(), repository=FakeRepository())
     with TestClient(app) as cliente:
         resposta = cliente.get(

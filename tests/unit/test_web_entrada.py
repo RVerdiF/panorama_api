@@ -6,8 +6,9 @@ nenhuma rede/BigQuery):
 * A1 — `GET /` responde ``200`` com a **página de entrada** em HTML (o redirect
   ``307`` → `/app/` saiu no card `t_386b791c`), `HEAD /` também responde ``200``,
   a página sai com gzip, ``ETag``/`private, no-cache` com ``304``, gera a linha
-  `page_view` (prova em `test_web_observabilidade.py`), não consulta o
-  repositório e um erro inesperado nela vira página HTML — e `/v1/*`/`/health`
+  `page_view` (prova em `test_web_observabilidade.py`), consulta o
+  repositório no máximo 3 vezes por render (recorte fixo, card `t_e06e1ad5`)
+  e um erro inesperado nela vira página HTML — e `/v1/*`/`/health`
   continuam intactos;
 * A2/A3 — `/app/` sem consulta orienta (o que é, recorte MG, anos de
   `APP_ANOS_DISPONIVEIS`, fonte INEP) e **não** mostra "sem dado" do bloco
@@ -34,6 +35,7 @@ from panorama_api.web import routes as web_routes
 from tests.unit.conftest import (
     FakeRepository,
     competidor_row,
+    concentracao_row,
     history_row,
     indicator_row,
     market_row,
@@ -226,14 +228,30 @@ def test_erro_inesperado_na_raiz_vira_pagina_html(
     assert "boom na landing" not in resposta.text
 
 
-def test_raiz_nao_consulta_o_repositorio(entrada_repo: FakeRepository):
-    app = create_app(settings=_settings(), repository=entrada_repo)
+def test_raiz_consulta_no_maximo_3_vezes_o_recorte_fixo(entrada_repo: FakeRepository):
+    """A landing consulta o repositório — no máximo 3 vezes por render.
+
+    Card `t_e06e1ad5`: GET e HEAD compartilham o cache em processo (por
+    `DATA_VERSION`), então os dois juntos não passam de 3 consultas, todas
+    no recorte fixo (BH, maior ano, etapa padrão).
+    """
+    repo = FakeRepository(
+        municipios=[municipio_row()],
+        markets=[market_row(nu_ano_censo=2025, etapa="bas")],
+        concentracao=[concentracao_row(nu_ano_censo=2025, etapa="bas")],
+        share=[share_row(nu_ano_censo=2025)],
+    )
+    app = create_app(settings=_settings(), repository=repo)
     with TestClient(app) as test_client:
-        entrada_repo.calls.clear()
         test_client.request("GET", INICIO)
         test_client.request("HEAD", INICIO)
 
-    assert entrada_repo.calls == []
+    assert 1 <= len(repo.calls) <= 3, repo.calls
+    assert {nome for nome, _ in repo.calls} <= {
+        "get_market_share",
+        "get_market",
+        "get_concentracao",
+    }, repo.calls
 
 
 def test_health_continua_json_intacto(cliente: TestClient):

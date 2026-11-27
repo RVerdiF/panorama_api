@@ -301,6 +301,111 @@ router = APIRouter(prefix=PREFIXO_WEB, include_in_schema=False)
 router_inicio = APIRouter(include_in_schema=False)
 
 
+#: Município da prancha da landing: Belo Horizonte, o mesmo do design e da
+#: marquise (card `t_e06e1ad5`). O nome vem de `municipios_mg()` (lista
+#: versionada, sem consulta ao repositório) — vale o mesmo que
+#: `get_municipio("3106200").no_municipio` sem custar a 4ª consulta.
+CO_MUNICIPIO_LANDING = "3106200"
+#: Top-N do ranking da landing: a prancha é o 1º, as barras são os 5.
+TOP_LANDING = 5
+
+
+def _nome_municipio_landing() -> str | None:
+    """Nome do município da prancha, da lista versionada (sem repositório)."""
+    for municipio in municipios_mg():
+        if municipio.co_municipio == CO_MUNICIPIO_LANDING:
+            return municipio.no_municipio
+    return None
+
+
+def _linha_concentracao_privadas(
+    linhas: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Linha de concentração do recorte privado municipal (o C4 da landing).
+
+    O C4 do contrato é exatamente "as 4 maiores somadas", então a linha
+    procurada é a do recorte de privadas no nível município. Sem ela, a
+    landing diz "sem dado" — nunca um C4 de outro recorte.
+    """
+    for linha in linhas:
+        if linha.get("recorte") == "privadas" and linha.get("nivel") == "municipio":
+            return linha
+    for linha in linhas:
+        if linha.get("recorte") == "privadas":
+            return linha
+    return None
+
+
+def _cache_landing(request: Request) -> dict[tuple[str, str], dict[str, Any]]:
+    """Cache em processo da landing, invalidado por `DATA_VERSION`.
+
+    A chave é `(data_version, anos)`: dado novo invalida sozinho, e cada app
+    (cada teste hermético) tem o próprio dict — sem vazar linha entre apps.
+    Só o sucesso é guardado; falha ou parcial recalcula no próximo render
+    (para a página se recuperar sozinha quando o BigQuery voltar).
+    """
+    cache = getattr(request.app.state, "landing_cache", None)
+    if not isinstance(cache, dict):
+        cache = {}
+        request.app.state.landing_cache = cache
+    return cache
+
+
+def _contar(valor: int | float | None) -> str:
+    """Número cru para `data-contar` (o `landing.js` ignora vazio/NaN).
+
+    `float` integral vira inteiro (`1140`, não `1140.0`); ausência vira string
+    vazia — o texto "sem dado" fica intacto e o contador não anima. Nunca `0`
+    por ausência: o atributo some junto com o dado.
+    """
+    if valor is None or isinstance(valor, bool):
+        return ""
+    if isinstance(valor, float) and valor.is_integer():
+        return str(int(valor))
+    return str(valor)
+
+
+def _contexto_landing(
+    *,
+    ano_ref: int,
+    anos: list[int],
+    nome_municipio: str | None,
+    destaque: dict[str, Any] | None,
+    barras: list[dict[str, Any]],
+    total_privadas: int | float | None,
+    c4_pct: float | None,
+) -> dict[str, Any]:
+    """Monta o contexto da landing a partir das 3 consultas (ou do vazio).
+
+    Ausência é `None` do início ao fim: o template formata com os filtros de
+    `web/filters.py` (`None` vira "sem dado", nunca `0`).
+    """
+    destaque = destaque or {}
+    return {
+        "ano_ref": ano_ref,
+        "anos": anos,
+        "anos_svg": list(zip(anos, (84, 176, 268, 360, 452))),
+        "nome_municipio": nome_municipio,
+        "destaque_nome": destaque.get("no_entidade"),
+        "destaque_mat": destaque.get("mat_entidade"),
+        "destaque_mat_contar": _contar(destaque.get("mat_entidade")),
+        "destaque_share": destaque.get("share_privado_pct"),
+        "barras": barras,
+        "total_privadas": total_privadas,
+        "total_contar": _contar(total_privadas),
+        "c4_pct": c4_pct,
+        "c4_contar": _contar(c4_pct),
+        # Série histórica e variação anual exigiriam `get_school_history` e
+        # `get_school_indicators` — fora do orçamento de 3 consultas da
+        # landing (card `t_e06e1ad5`). Sem dado explícito, sem recomputo.
+        "serie_dados": None,
+        "delta_texto": "sem dado no ano",
+        # A oferta por etapa também está fora do orçamento: a matriz usa o
+        # estado "desconhecido" do próprio design (o "sem dado" da oferta).
+        "proveniencia": f"Fonte: {FONTE_BASE} ({FONTE_ORGAO}) · {ano_ref}",
+    }
+
+
 @router_inicio.api_route(
     CAMINHO_INICIO,
     methods=["GET", "HEAD"],
@@ -309,21 +414,95 @@ router_inicio = APIRouter(include_in_schema=False)
     summary="Página de entrada (landing)",
 )
 def inicio(request: Request) -> Response:
-    """Landing em `/`: porte literal do protótipo (card `t_e42049c1`).
+    """Landing em `/`: estrutura literal do protótipo, valores do repositório.
 
-    O HTML é o `<body>` de `panorama-escola-landing.html`, com adaptações só
-    onde o card manda (links para as rotas do app, sem faixa de protótipo,
-    sem `style=` inline). Substitui o redirect `307` → `/app/`
-    (card `t_0c84b91f`): quem chega na raiz vê a apresentação do produto e o
-    link para a busca, e quem tem `/app/` em favorito ou link compartilhado
-    continua caindo direto nas escolas.
+    O HTML é o `<body>` de `panorama-escola-landing.html` (card `t_e42049c1`):
+    copy, classes, `id`, `aria-*`, `data-reveal`, `data-od-id` — verbatim.
+    Os valores que eram mock do protótipo (card `t_e06e1ad5`) agora vêm do
+    repositório, no máximo 3 consultas por render, todas do recorte fixo
+    (Belo Horizonte, maior ano de `APP_ANOS_DISPONIVEIS`, etapa padrão):
 
-    A landing não consulta o repositório: os números do design são literais
-    do protótipo. Como :func:`panorama_api.web.e_caminho_web` inclui a raiz,
-    a resposta ganha gzip, `ETag`/`Cache-Control: private, no-cache` com 304
-    e a linha `page_view`, e um erro inesperado aqui vira página HTML
-    (nunca `application/problem+json`).
+    1. `get_market_share(..., limit=5)` — escola em destaque (a 1ª) e as 5
+       barras do ranking (nome + `mat_entidade` + `share_privado_pct`);
+    2. `get_market(...)` — total de privadas (`n_escolas_privadas`, o "de N"
+       da posição e o KPI de escolas);
+    3. `get_concentracao(...)` — `c4_pct` do recorte privado municipal (o KPI
+       "participação somada das 4 maiores escolas").
+
+    O nome do município vem de `municipios_mg()` (lista versionada, custo
+    zero) e o resultado é cacheado em processo por `DATA_VERSION`. Se o
+    BigQuery falhar, `/` continua `200` e cada bloco cai para "sem dado" —
+    nunca `500`, nunca `0`. Como :func:`panorama_api.web.e_caminho_web`
+    inclui a raiz, a resposta ganha gzip, `ETag`/`Cache-Control: private,
+    no-cache` com 304 e a linha `page_view`, e um erro inesperado fora das
+    consultas vira página HTML (nunca `application/problem+json`).
     """
+    settings = _settings(request)
+    anos = list(settings.anos_disponiveis)
+    ano_ref = max(anos)
+    chave = (settings.data_version, settings.app_anos_disponiveis)
+    cache = _cache_landing(request)
+    if chave in cache:
+        landing = cache[chave]
+    else:
+        repositorio, _ = dados.fonte(request)
+        try:
+            linhas_share = repositorio.get_market_share(
+                co_municipio=CO_MUNICIPIO_LANDING,
+                ano=ano_ref,
+                etapa=ETAPA_PADRAO_MERCADO,
+                entidade_tipo="escola",
+                limit=TOP_LANDING,
+                offset=0,
+            )
+        except Exception:
+            linhas_share = []
+        try:
+            linhas_market = repositorio.get_market(
+                co_municipio=CO_MUNICIPIO_LANDING,
+                ano=ano_ref,
+                etapa=ETAPA_PADRAO_MERCADO,
+            )
+        except Exception:
+            linhas_market = []
+        try:
+            linhas_conc = repositorio.get_concentracao(
+                co_municipio=CO_MUNICIPIO_LANDING,
+                ano=ano_ref,
+                etapa=ETAPA_PADRAO_MERCADO,
+            )
+        except Exception:
+            linhas_conc = []
+        destaque = linhas_share[0] if linhas_share else None
+        barras = [
+            {
+                "nome": linha.get("no_entidade"),
+                "share": linha.get("share_privado_pct"),
+            }
+            for linha in linhas_share[:TOP_LANDING]
+        ]
+        while len(barras) < TOP_LANDING:
+            barras.append({"nome": None, "share": None})
+        linha_market = next(
+            (
+                linha
+                for linha in linhas_market
+                if linha.get("etapa") == ETAPA_PADRAO_MERCADO
+            ),
+            linhas_market[0] if linhas_market else None,
+        )
+        linha_conc = _linha_concentracao_privadas(linhas_conc)
+        landing = _contexto_landing(
+            ano_ref=ano_ref,
+            anos=anos,
+            nome_municipio=_nome_municipio_landing(),
+            destaque=destaque,
+            barras=barras,
+            total_privadas=(linha_market or {}).get("n_escolas_privadas"),
+            c4_pct=(linha_conc or {}).get("c4_pct"),
+        )
+        if linhas_share and linhas_market and linhas_conc:
+            cache[chave] = landing
     contexto = contexto_base(request)
     municipios = municipios_mg()
     # Marquise da landing: a tupla versionada é de códigos IBGE; o nome sai da
@@ -344,6 +523,7 @@ def inicio(request: Request) -> Response:
         marquise_municipios=[
             por_codigo[codigo] for codigo in MARQUISE_MUNICIPIOS if codigo in por_codigo
         ],
+        **landing,
     )
     return templates().TemplateResponse(request, "inicio.html", contexto)
 

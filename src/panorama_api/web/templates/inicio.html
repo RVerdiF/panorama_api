@@ -84,47 +84,42 @@
 
     <figure class="prancha" data-reveal aria-labelledby="prancha-titulo">
       <div class="prancha__fita">
-        <b id="prancha-titulo">Prancha 01 · Belo Horizonte</b>
-        <i>matrícula · 2021–2025</i>
+        <b id="prancha-titulo">Prancha 01 · {{ nome_municipio or 'sem dado' }}</b>
+        <i>matrícula · {{ anos[0] }}–{{ anos[-1] }}</i>
       </div>
       <div class="prancha__corpo">
-        <p class="prancha__rotulo">Colégio Monte Verde — matrícula total</p>
+        <p class="prancha__rotulo">{{ destaque_nome or 'sem dado' }} — matrícula total</p>
         <p class="prancha__valor">
-          <span data-contar="1140" data-decimais="0">1.140</span>
-          <span class="prancha__delta">+4,9% no ano</span>
+          <span data-contar="{{ destaque_mat_contar }}" data-decimais="0">{{ destaque_mat|fmt_contagem }}</span>
+          <span class="prancha__delta">{{ delta_texto }}</span>
         </p>
 
         <svg class="prancha__grafico" viewBox="0 0 480 212" role="img" aria-labelledby="grafico-prancha-desc">
-          <desc id="grafico-prancha-desc">Série de matrícula do Colégio Monte Verde: 1.115 em 2021, 1.144 em 2022, 1.059 em 2023, 1.087 em 2024 e 1.140 em 2025.</desc>
+          <desc id="grafico-prancha-desc">{% if destaque_nome %}Série de matrícula de {{ destaque_nome }}: sem dado.{% else %}Série de matrícula: sem dado.{% endif %}</desc>
           <line class="grade" x1="52" y1="25" x2="470" y2="25"/>
           <line class="grade" x1="52" y1="100" x2="470" y2="100"/>
           <line class="grade" x1="52" y1="175" x2="470" y2="175"/>
-          <text x="44" y="29" text-anchor="end">1.200</text>
-          <text x="44" y="104" text-anchor="end">1.100</text>
-          <text x="44" y="179" text-anchor="end">1.000</text>
 
-          <path class="area" d="M84 89.5 L176 69.2 L268 128.7 L360 109.1 L452 72 L452 175 L84 175 Z"/>
-          <path class="linha" d="M84 89.5 L176 69.2 L268 128.7 L360 109.1 L452 72"/>
+          {% if serie_dados is not none %}
+          <path class="area" d="{{ serie_dados.area }}"/>
+          <path class="linha" d="{{ serie_dados.linha }}"/>
 
-          <circle class="ponto" cx="84" cy="89.5" r="4"/>
-          <circle class="ponto" cx="176" cy="69.2" r="4"/>
-          <circle class="ponto" cx="268" cy="128.7" r="4"/>
-          <circle class="ponto" cx="360" cy="109.1" r="4"/>
-          <circle class="ponto ponto--ultimo" cx="452" cy="72" r="4.6"/>
+          {% for ponto in serie_dados.pontos %}
+          <circle class="ponto{% if loop.last %} ponto--ultimo{% endif %}" cx="{{ ponto[0] }}" cy="{{ ponto[1] }}" r="4"/>
+          {% endfor %}
+          {% endif %}
 
-          <text class="ano" x="84" y="200" text-anchor="middle">2021</text>
-          <text class="ano" x="176" y="200" text-anchor="middle">2022</text>
-          <text class="ano" x="268" y="200" text-anchor="middle">2023</text>
-          <text class="ano" x="360" y="200" text-anchor="middle">2024</text>
-          <text class="ano" x="452" y="200" text-anchor="middle">2025</text>
+          {% for ano, x in anos_svg %}
+          <text class="ano" x="{{ x }}" y="200" text-anchor="middle">{{ ano }}</text>
+          {% endfor %}
         </svg>
       </div>
       <dl class="prancha__base">
-        <div><dt>Posição</dt><dd>1º de 30</dd></div>
-        <div><dt>Share municipal</dt><dd>11,0%</dd></div>
-        <div><dt>Série</dt><dd>5 anos</dd></div>
+        <div><dt>Posição</dt><dd>{% if destaque_nome and total_privadas is not none %}1º de {{ total_privadas|fmt_contagem }}{% else %}sem dado{% endif %}</dd></div>
+        <div><dt>Share municipal</dt><dd>{% if destaque_share is not none %}{{ destaque_share|fmt_nulo }}%{% else %}sem dado{% endif %}</dd></div>
+        <div><dt>Série</dt><dd>{{ anos|length }} anos</dd></div>
       </dl>
-      <p class="prancha__nota">Recorte do protótipo · valores ilustrativos</p>
+      <p class="prancha__nota">{{ proveniencia }}</p>
     </figure>
   </section>
 
@@ -135,19 +130,19 @@
       <span class="numeros__fonte">malha municipal · real</span>
     </div>
     <div data-reveal>
-      <span class="numeros__valor"><span data-contar="5">5</span></span>
+      <span class="numeros__valor"><span data-contar="{{ anos|length }}">{{ anos|length }}</span></span>
       <span class="numeros__rotulo">anos de Censo, de 2021 a 2025</span>
       <span class="numeros__fonte">série anual</span>
     </div>
     <div data-reveal>
-      <span class="numeros__valor"><span data-contar="30">30</span></span>
-      <span class="numeros__rotulo">escolas privadas no mercado de Belo Horizonte</span>
-      <span class="numeros__fonte">amostra ilustrativa</span>
+      <span class="numeros__valor"><span data-contar="{{ total_contar }}">{{ total_privadas|fmt_contagem }}</span></span>
+      <span class="numeros__rotulo">escolas privadas no mercado de {{ nome_municipio or 'sem dado' }}</span>
+      <span class="numeros__fonte">{{ proveniencia }}</span>
     </div>
     <div data-reveal>
-      <span class="numeros__valor"><span data-contar="21.6" data-decimais="1">21,6</span><i>%</i></span>
-      <span class="numeros__rotulo">participação somada das quatro unidades da Rede Horizonte</span>
-      <span class="numeros__fonte">amostra ilustrativa</span>
+      <span class="numeros__valor"><span data-contar="{{ c4_contar }}" data-decimais="1">{% if c4_pct is not none %}{{ c4_pct|fmt_nulo }}{% else %}sem dado{% endif %}</span>{% if c4_pct is not none %}<i>%</i>{% endif %}</span>
+      <span class="numeros__rotulo">participação somada das 4 maiores escolas</span>
+      <span class="numeros__fonte">{{ proveniencia }}</span>
     </div>
   </section>
 
@@ -214,29 +209,15 @@
       <article class="leitura" data-observar data-od-id="leitura-ranking">
         <div class="leitura__topo">
           <h3>Ranking municipal</h3>
-          <span>Belo Horizonte · 2025</span>
+          <span>{{ nome_municipio or 'sem dado' }} · {{ ano_ref }}</span>
         </div>
         <ul class="barras">
+          {% for barra in barras %}
           <li>
-            <span><span class="barras__nome">Colégio Monte Verde</span><span class="barras__trilha"><span class="barras__fill"></span></span></span>
-            <span class="barras__valor">11,0%</span>
+            <span><span class="barras__nome">{{ barra.nome or 'sem dado' }}</span><span class="barras__trilha"><span class="barras__fill"></span></span></span>
+            <span class="barras__valor">{% if barra.share is not none %}{{ barra.share|fmt_nulo }}%{% else %}sem dado{% endif %}</span>
           </li>
-          <li>
-            <span><span class="barras__nome">Instituto Bandeirantes</span><span class="barras__trilha"><span class="barras__fill"></span></span></span>
-            <span class="barras__valor">8,3%</span>
-          </li>
-          <li>
-            <span><span class="barras__nome">Colégio Horizonte Vale</span><span class="barras__trilha"><span class="barras__fill"></span></span></span>
-            <span class="barras__valor">6,9%</span>
-          </li>
-          <li>
-            <span><span class="barras__nome">Colégio Santa Amélia</span><span class="barras__trilha"><span class="barras__fill"></span></span></span>
-            <span class="barras__valor">6,3%</span>
-          </li>
-          <li>
-            <span><span class="barras__nome">Centro Educ. Ipê Amarelo</span><span class="barras__trilha"><span class="barras__fill"></span></span></span>
-            <span class="barras__valor">5,3%</span>
-          </li>
+          {% endfor %}
         </ul>
         <p class="leitura__pe">participação na matrícula privada do município</p>
       </article>
@@ -244,15 +225,15 @@
       <article class="leitura" data-observar data-od-id="leitura-oferta">
         <div class="leitura__topo">
           <h3>Oferta por etapa</h3>
-          <span>Colégio Monte Verde</span>
+          <span>{{ destaque_nome or 'sem dado' }}</span>
         </div>
         <div class="matriz">
-          <div class="matriz__linha"><span>Creche</span><span class="matriz__estado"><i class="ponto-oferta" data-e="nao"></i></span></div>
-          <div class="matriz__linha"><span>Pré-escola</span><span class="matriz__estado"><i class="ponto-oferta" data-e="sim"></i></span></div>
-          <div class="matriz__linha"><span>Ensino fundamental I</span><span class="matriz__estado"><i class="ponto-oferta" data-e="sim"></i></span></div>
-          <div class="matriz__linha"><span>Ensino fundamental II</span><span class="matriz__estado"><i class="ponto-oferta" data-e="sim"></i></span></div>
-          <div class="matriz__linha"><span>Ensino médio</span><span class="matriz__estado"><i class="ponto-oferta" data-e="sim"></i></span></div>
-          <div class="matriz__linha"><span>Educação profissional</span><span class="matriz__estado"><i class="ponto-oferta" data-e="sim"></i></span></div>
+          <div class="matriz__linha"><span>Creche</span><span class="matriz__estado"><i class="ponto-oferta" data-e="desconhecido"></i></span></div>
+          <div class="matriz__linha"><span>Pré-escola</span><span class="matriz__estado"><i class="ponto-oferta" data-e="desconhecido"></i></span></div>
+          <div class="matriz__linha"><span>Ensino fundamental I</span><span class="matriz__estado"><i class="ponto-oferta" data-e="desconhecido"></i></span></div>
+          <div class="matriz__linha"><span>Ensino fundamental II</span><span class="matriz__estado"><i class="ponto-oferta" data-e="desconhecido"></i></span></div>
+          <div class="matriz__linha"><span>Ensino médio</span><span class="matriz__estado"><i class="ponto-oferta" data-e="desconhecido"></i></span></div>
+          <div class="matriz__linha"><span>Educação profissional</span><span class="matriz__estado"><i class="ponto-oferta" data-e="desconhecido"></i></span></div>
           <div class="matriz__linha"><span>Educação especial</span><span class="matriz__estado"><i class="ponto-oferta" data-e="desconhecido"></i></span></div>
         </div>
         <p class="leitura__pe">
@@ -348,9 +329,8 @@
         </span>
       </a>
       <p class="rodape__nota">
-        Protótipo de avaliação, sem backend. Os 853 municípios de Minas Gerais são reais;
-        todo o restante dos números é ilustrativo e está identificado na tela. Em produção,
-        cada indicador é calculado a partir do Censo Escolar (INEP).
+        Protótipo de avaliação. Os 853 municípios de Minas Gerais são reais;
+        os números desta página vêm do Censo Escolar (INEP).
       </p>
     </div>
     <nav class="rodape__links" aria-label="Links do rodapé">

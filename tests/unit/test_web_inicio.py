@@ -1,19 +1,37 @@
-"""Landing `/` literal ao protótipo — card `t_e42049c1` (Regra Zero).
+"""Landing `/` — estrutura literal do protótipo, valores do repositório.
 
-O protótipo (`panorama-escola-landing.html`) é a especificação: copy, ordem,
-classes, `id`, `aria-*`, `data-reveal`, `data-od-id` — tudo verbatim. Este
-arquivo trava o literal sobre o HTML renderizado de verdade (``TestClient``
-com repositório fake, nenhuma rede/BigQuery) e que `/` continua sem consultar
-o repositório (os números do design são literais do protótipo).
+O protótipo (`panorama-escola-landing.html`) continua sendo a especificação
+de estrutura e copy (card `t_e42049c1`): classes, `id`, `aria-*`,
+`data-reveal`, `data-od-id` — tudo verbatim. Os valores que eram mock do
+protótipo agora vêm do repositório (card `t_e06e1ad5`), no recorte fixo da
+landing (Belo Horizonte, maior ano de `APP_ANOS_DISPONIVEIS`, etapa padrão):
 
-O que saiu com o porte literal (e por quê cada remoção tem substituto aqui):
+* a escola em destaque e as 5 barras saem de um `get_market_share`;
+* a posição ("1º de N") e o KPI de escolas saem de um `get_market`;
+* o KPI "4 maiores" sai do `c4_pct` de um `get_concentracao`;
+* o nome do município vem de `municipios_mg()` (lista versionada, sem custo);
+* série histórica e variação anual estão fora do orçamento de consultas —
+  saem como "sem dado" explícito, nunca recomputadas, nunca `0`.
+
+Regras que este arquivo trava sobre o HTML renderizado de verdade
+(``TestClient`` com repositório fake, nenhuma rede/BigQuery):
+
+* no máximo 3 consultas ao repositório por render, com cache em processo
+  por `DATA_VERSION`;
+* falha do repositório mantém `/` em `200`, com "sem dado" nos blocos;
+* repositório vazio mostra "sem dado" — nunca `0`, nunca nome/valor mock.
+
+O que saiu com a troca dos mocks por dado real (e por que cada remoção tem
+substituto aqui):
 
 * painel do recorte derivado (`recorte_*`) — o design mostra os literais do
   protótipo; a asserção equivalente é a copy literal abaixo;
 * barra de busca do hero (`form.hero__busca`) — o protótipo tem zero `<form>`
   e zero `<input>`; a asserção equivalente é `test_zero_form_e_input`;
-* proibição de números ilustrativos — revogada pela Regra Zero: os literais
-  do design entram, e a asserção equivalente é a presença deles.
+* os 8 literais do protótipo (`Monte Verde`, `1.140`, `+4,9%`, a série do
+  `<desc>`, `1º de 30`, `11,0%`, `amostra ilustrativa`, `21,6%`, `Rede
+  Horizonte`) — viraram dado real ou "sem dado"; a asserção equivalente é
+  `test_repo_vazio_nao_traz_mock` + `test_valores_vem_do_repositorio`.
 """
 
 from __future__ import annotations
@@ -24,7 +42,13 @@ from fastapi.testclient import TestClient
 
 from panorama_api.config import Settings
 from panorama_api.main import create_app
-from tests.unit.conftest import FakeRepository
+from tests.unit.conftest import (
+    FakeRepository,
+    concentracao_row,
+    market_row,
+    municipio_row,
+    share_row,
+)
 
 ANOS = (2021, 2022, 2023, 2024, 2025)
 ANOS_CSV = ",".join(str(ano) for ano in ANOS)
@@ -57,10 +81,12 @@ def _settings(*, anos: str = ANOS_CSV) -> Settings:
     )
 
 
-def _pagina(*, anos: str = ANOS_CSV) -> tuple[str, FakeRepository]:
+def _pagina(
+    *, anos: str = ANOS_CSV, repo: FakeRepository | None = None
+) -> tuple[str, FakeRepository]:
     """HTML de `/` e o repositório fake que a página recebeu (para contar chamadas)."""
-    repo = FakeRepository()
-    app = create_app(settings=_settings(anos=anos), repository=repo)
+    repositorio = repo if repo is not None else FakeRepository()
+    app = create_app(settings=_settings(anos=anos), repository=repositorio)
     with TestClient(app) as cliente:
         resposta = cliente.request(
             "GET", INICIO, headers={"Accept": "text/html", "Accept-Encoding": "identity"}
@@ -68,7 +94,35 @@ def _pagina(*, anos: str = ANOS_CSV) -> tuple[str, FakeRepository]:
 
     assert resposta.status_code == 200
     assert resposta.headers["content-type"].startswith("text/html")
-    return resposta.text, repo
+    return resposta.text, repositorio
+
+
+def _repo_cheio() -> FakeRepository:
+    """Fake com o recorte da landing: top-5 de BH/2025, mercado e C4 reais."""
+    return FakeRepository(
+        municipios=[municipio_row()],
+        markets=[market_row(nu_ano_censo=2025, etapa="bas")],
+        concentracao=[concentracao_row(nu_ano_censo=2025, etapa="bas")],
+        share=[
+            share_row(
+                id_entidade=f"3100000{i}",
+                no_entidade=nome,
+                mat_entidade=matricula,
+                share_privado_pct=share,
+                nu_ano_censo=2025,
+            )
+            for i, (nome, matricula, share) in enumerate(
+                (
+                    ("Escola Alfa", 1140.0, 11.0),
+                    ("Escola Beta", 830.0, 8.3),
+                    ("Escola Gama", 690.0, 6.9),
+                    ("Escola Delta", 630.0, 6.3),
+                    ("Escola Epsilon", 530.0, 5.3),
+                ),
+                start=1,
+            )
+        ],
+    )
 
 
 def _texto(html: str) -> str:
@@ -140,24 +194,61 @@ def test_copy_das_secoes_e_literal():
         assert frase in plano, frase
 
 
-def test_numeros_e_leituras_do_design_estao_na_pagina():
-    html, _ = _pagina()
+def test_valores_vem_do_repositorio():
+    """Prancha, barras e KPIs mostram o recorte real (BH/2025/etapa padrão)."""
+    html, _ = _pagina(repo=_repo_cheio())
+    plano = _texto(html)
 
-    for literal in (
+    # Prancha: destaque é a 1ª do share; posição usa o total de privadas.
+    assert "Prancha 01 · Belo Horizonte" in plano
+    assert "Escola Alfa — matrícula total" in plano
+    assert "1.140" in html
+    assert "1º de 30" in plano
+    assert "11,0%" in html
+    assert "Fonte: Censo Escolar (INEP) · 2025" in html
+    # Barras: o top-5 real, na ordem do share.
+    for nome, share in (
+        ("Escola Alfa", "11,0%"),
+        ("Escola Beta", "8,3%"),
+        ("Escola Gama", "6,9%"),
+        ("Escola Delta", "6,3%"),
+        ("Escola Epsilon", "5,3%"),
+    ):
+        assert nome in html, nome
+        assert share in html, share
+    assert html.count('class="barras__valor"') == 5
+    # KPIs: total de privadas do `get_market`, C4 do `get_concentracao`.
+    assert "escolas privadas no mercado de Belo Horizonte" in plano
+    assert "participação somada das 4 maiores escolas" in plano
+    assert "60,0" in html
+    # Leituras do design continuam no lugar, com os nomes reais.
+    assert "Ranking municipal" in html
+    assert "Oferta por etapa" in html
+    assert html.count('class="matriz__linha"') == 7
+
+
+def test_repo_vazio_nao_traz_mock():
+    """Sem dado no repositório: 'sem dado' explícito — nunca `0`, nunca mock."""
+    html, _ = _pagina()
+    plano = _texto(html)
+
+    assert "sem dado" in plano
+    for mock in (
+        "Monte Verde",
+        "Rede Horizonte",
+        "amostra",
+        "ilustrativ",
         "1.140",
-        "+4,9% no ano",
-        "Prancha 01 · Belo Horizonte",
-        "Colégio Monte Verde",
+        "+4,9%",
         "1º de 30",
         "11,0%",
         "8,3%",
         "21,6",
-        "Rede Horizonte",
-        "Ranking municipal",
-        "Oferta por etapa",
-        "amostra ilustrativa",
     ):
-        assert literal in html, literal
+        assert mock not in html, mock
+    # "sem dado" não vaza como zero em nenhum contador do design.
+    assert ">0<" not in html
+    # A estrutura das leituras continua — só os valores caem para "sem dado".
     assert html.count('class="barras__valor"') == 5
     assert html.count('class="matriz__linha"') == 7
 
@@ -172,14 +263,24 @@ def test_data_reveal_presente_28_vezes():
 
 
 def test_contadores_e_observadores_do_design():
-    html, _ = _pagina()
+    """Os 5 `data-contar` do design, com o número real (vazio = sem dado)."""
+    html, _ = _pagina(repo=_repo_cheio())
 
     assert html.count("data-contar") == 5
     for alvo in ('data-contar="1140"', 'data-contar="853"', 'data-contar="5"',
-                 'data-contar="30"', 'data-contar="21.6"'):
+                 'data-contar="30"', 'data-contar="60"'):
         assert alvo in html, alvo
     assert 'data-decimais="1"' in html
     assert html.count("data-observar") == 2
+
+
+def test_contadores_vazios_nao_animam_nem_zeram():
+    """Sem dado: `data-contar` vazio (o `landing.js` ignora NaN)."""
+    html, _ = _pagina()
+
+    assert html.count("data-contar") == 5
+    assert html.count('data-contar=""') == 3
+    assert "sem dado" in html
 
 
 def test_data_od_ids_do_design():
@@ -322,7 +423,6 @@ def test_links_internos_da_landing_resolvem_no_front():
         landing = cliente.request(
             "GET", INICIO, headers={"Accept-Encoding": "identity", "Accept": "text/html"}
         )
-        assert repo.calls == []
         metodologia = cliente.request(
             "GET", "/app/metodologia", headers={"Accept-Encoding": "identity"}
         )
@@ -335,8 +435,53 @@ def test_links_internos_da_landing_resolvem_no_front():
     assert mercado.status_code == 200
 
 
-def test_inicio_nao_consulta_o_repositorio():
-    """A landing é literal do protótipo: nenhuma consulta ao repositório."""
-    _, repo = _pagina()
+# -- contrato de consultas da landing (card `t_e06e1ad5`) ---------------------
 
-    assert repo.calls == []
+METODOS_LANDING = frozenset({"get_market_share", "get_market", "get_concentracao"})
+
+
+def test_inicio_consulta_no_maximo_3_vezes_por_render():
+    """A landing consulta o repositório — no máximo 3 vezes, só o recorte fixo."""
+    _, repo = _pagina(repo=_repo_cheio())
+
+    assert 1 <= len(repo.calls) <= 3, repo.calls
+    assert {nome for nome, _ in repo.calls} <= METODOS_LANDING, repo.calls
+    for _, kwargs in repo.calls:
+        assert kwargs["co_municipio"] == "3106200", kwargs
+        assert kwargs["ano"] == ANOS[-1], kwargs
+        assert kwargs["etapa"] == "bas", kwargs
+
+
+def test_segundo_render_reaproveita_o_cache_por_data_version():
+    """O cache em processo zera o custo do render seguinte (mesma versão)."""
+    repo = _repo_cheio()
+    app = create_app(settings=_settings(), repository=repo)
+    with TestClient(app) as cliente:
+        for _ in range(2):
+            resposta = cliente.request(
+                "GET",
+                INICIO,
+                headers={"Accept": "text/html", "Accept-Encoding": "identity"},
+            )
+            assert resposta.status_code == 200
+
+    assert 1 <= len(repo.calls) <= 3, repo.calls
+
+
+def test_falha_do_repositorio_mantem_200_com_sem_dado():
+    """BigQuery fora: `/` continua 200 e cada bloco cai para 'sem dado'."""
+    repo = _repo_cheio()
+    repo.errors = {
+        "get_market_share": RuntimeError("bigquery fora"),
+        "get_market": RuntimeError("bigquery fora"),
+        "get_concentracao": RuntimeError("bigquery fora"),
+    }
+    with TestClient(create_app(settings=_settings(), repository=repo)) as cliente:
+        resposta = cliente.request(
+            "GET", INICIO, headers={"Accept": "text/html", "Accept-Encoding": "identity"}
+        )
+
+    assert resposta.status_code == 200
+    assert "sem dado" in resposta.text
+    for mock in ("Monte Verde", "Rede Horizonte", "amostra", "ilustrativ"):
+        assert mock not in resposta.text, mock
