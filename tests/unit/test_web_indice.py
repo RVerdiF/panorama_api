@@ -207,7 +207,9 @@ def test_sem_js_ordem_e_links_ja_prontos_no_ssr(
     corpo = _tbody(html)
 
     assert html.count("Abrir mercado") == 853
-    assert "853 municípios no recorte." in html
+    # Contador do protótipo: "{n} municípios no recorte", sem ponto final.
+    assert "853 municípios no recorte" in html
+    assert "853 municípios no recorte." not in html
     # O cabeçalho do SSR já traz os botões literais do protótipo (com as
     # setas); sem JS eles são estáticos, sem clique — a ordenação e os
     # links já vêm prontos do servidor (critério 3).
@@ -305,8 +307,59 @@ def test_ordenacao_liga_o_clique_mesmo_com_botao_no_ssr(
     # O clique é ligado por tabela, com trava de idempotência.
     assert 'tabela.addEventListener("click", clique)' in js
     assert "data-ordenacao-pronta" in js
-    # A direção ordenada volta para a seta do protótipo.
+    # A direção ordenada volta para a seta do protótipo com os glifos do
+    # design (`iniciarOrdenacao`: `▲`/`▼` no ativo, `""` nos demais).
     assert 'querySelector("button span")' in js
+    assert 'sentido === 1 ? "▲" : "▼"' in js
+    assert 'antiga.textContent = ""' in js
+
+
+def test_app_css_nao_duplica_a_seta_do_th_ordenavel():
+    """O `::after` do app não vale para o `th.ordenavel` do protótipo.
+
+    O `th.ordenavel` traz o `span` literal da seta (governado pelo
+    `panorama.css` vendorizado). A regra `th[data-tipo][aria-sort]
+    button::after` também casava com ele (todo `th.ordenavel` tem
+    `data-tipo`), e o cabeçalho mostrava duas setas — o `span` e o
+    `::after`. A regra fica restrita a `:not(.ordenavel)`, que é o
+    mecanismo antigo das tabelas da ficha.
+    """
+    css = (STATIC / "app.css").read_text(encoding="utf-8")
+    sem_comentario = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+
+    assert "th[data-tipo]:not(.ordenavel)[aria-sort] button::after" in sem_comentario
+    assert "th[data-tipo]:not(.ordenavel)[aria-sort=\"descending\"] button::after" in (
+        sem_comentario
+    )
+    # Nenhuma regra `th[data-tipo]` alcança o `th.ordenavel` do índice.
+    for seletor in re.findall(r"th\[data-tipo\][^{},]*", sem_comentario):
+        assert ":not(.ordenavel)" in seletor, seletor
+
+
+def test_app_css_preserva_a_geometria_do_th_ordenavel():
+    """O bloco de ordenação do app não redefine o `th.ordenavel` do design.
+
+    O `panorama.css` vendorizado dá ao `th.ordenavel button` padding
+    `12px 11px` e altura natural. O bloco app-only (pensado para o botão
+    que o `app.js` cria) declara `padding: 11px 12px` e `min-height: 44px`;
+    sem o `:not(.ordenavel)`, ele vencia por vir depois no cascade e
+    alargava cada coluna — a tabela de 7 colunas passava do container em
+    1280 e a coluna "Ficha" era cortada. Aqui a proteção é estrutural:
+    todo seletor do bloco que casa com `th[data-tipo]` carrega
+    `:not(.ordenavel)`, e a geometria do design fica valendo.
+    """
+    css = (STATIC / "app.css").read_text(encoding="utf-8")
+    sem_comentario = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+
+    for seletor in re.findall(r"[^{}]*th\[data-tipo\][^{}]*\{", sem_comentario):
+        assert ":not(.ordenavel)" in seletor, seletor
+
+    # A célula do nome quebra em duas linhas, como no protótipo (a regra
+    # numérica `nowrap` alargava a coluna e estourava o container).
+    assert re.search(
+        r"#tabela-municipios td:nth-child\(2\)\s*\{\s*white-space:\s*normal;",
+        sem_comentario,
+    )
 
 
 def test_filtro_usa_a_copy_do_prototipo_com_estado_vazio():
@@ -437,7 +490,8 @@ def test_indice_vazio_responde_200_com_kpis_sem_dado():
     with TestClient(app) as cliente:
         html = _html(cliente)
 
-    assert "0 municípios no recorte." in html
+    assert "0 municípios no recorte" in html
+    assert "0 municípios no recorte." not in html
     assert html.count('<div class="kpi">') == 4
     assert "style=" not in html
     for texto in FORA_DO_MOCK:

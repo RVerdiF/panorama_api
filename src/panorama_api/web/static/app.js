@@ -72,12 +72,16 @@
     var colunas = tabela.querySelectorAll("thead th[data-tipo]");
     for (i = 0; i < colunas.length; i += 1) {
       colunas[i].removeAttribute("aria-sort");
+      // Como no `iniciarOrdenacao` do protótipo: quem perde a ordem tem o
+      // `span` da seta esvaziado (o vazio esconde a seta pelo CSS).
+      var antiga = colunas[i].querySelector("button span");
+      if (antiga) antiga.textContent = "";
     }
     th.setAttribute("aria-sort", sentido === 1 ? "ascending" : "descending");
     // Espelha a direção na seta do protótipo (`th.ordenavel button span`,
-    // literal no SSR do índice): sem ela o indicador nunca aparece.
+    // literal no SSR do índice) com os glifos do design: `▲`/`▼` no ativo.
     var seta = th.querySelector("button span");
-    if (seta) seta.textContent = sentido === 1 ? "↑" : "↓";
+    if (seta) seta.textContent = sentido === 1 ? "▲" : "▼";
   }
   function clique(ev) {
     var th = ev.target.closest("th[data-tipo]");

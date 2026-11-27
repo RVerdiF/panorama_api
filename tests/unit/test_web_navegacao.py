@@ -313,7 +313,9 @@ def test_indice_responde_200_com_a_tabela_de_municipios_e_uma_consulta(
     assert 'name="co_municipio"' not in html
     assert "<option" not in html
     # O número anunciado vem de `len(municipios_mg())`, nunca de literal.
-    assert f"{total} municípios no recorte." in html
+    # Contador do protótipo: sem ponto final (o JS limpa o filtro igual).
+    assert f"{total} municípios no recorte" in html
+    assert f"{total} municípios no recorte." not in html
     assert 'role="status"' in html
     # 445 sem escola privada: marcador explícito, nunca 0 (P-V-1, variante A).
     assert html.count('title="sem escola privada ativa"') == 445 * 3

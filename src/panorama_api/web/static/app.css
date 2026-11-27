@@ -10,8 +10,9 @@
    - série SVG legada renderizada no servidor (`.serie-*`, usada por
      `escola.py:svg_serie`/`svg_serie_comparada`);
    - ordenação atual por `th[data-tipo]` (botão criado no `app.js`);
-     as setas vivem sob `th[data-tipo][aria-sort]` para não colidir
-     com o `th.ordenavel > span` do protótipo;
+     as setas vivem sob `th[data-tipo]:not(.ordenavel)[aria-sort]` para
+     não colidir com o `span` do `th.ordenavel` do protótipo (sem o
+     `:not(.ordenavel)` as duas setas apareciam juntas);
    - trilho do share em linha na tabela do mercado (`td
      .barra-share__trilho`; no ranking vale o flex do protótipo);
    - `#movimento-conteudo .ranking` e os `margin-top` do mercado, que
@@ -215,6 +216,7 @@
 .tabela td.nome-escola {
   white-space: normal;
 }
+
 .tabela td[data-valor],
 .tabela tbody th[data-valor] {
   text-align: right;
@@ -222,17 +224,33 @@
   white-space: nowrap;
 }
 
+/* A coluna do nome do índice não é numérica: no protótipo a célula é um
+   `<td>` simples e o nome quebra em duas linhas (o design não tem
+   `data-valor` ali — o app mantém o atributo como insumo da ordenação).
+   Sem esta quebra, os nomes longos empurravam a tabela para fora do
+   container em 1280 e a coluna "Ficha" era cortada. */
+#tabela-municipios td:nth-child(2) {
+  white-space: normal;
+}
+
 .tabela th[data-tipo="numero"] {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-/* --- app-only: ordenação atual (botão criado no app.js) --- */
-th[data-tipo] {
+/* --- app-only: ordenação antiga (`th[data-tipo]` sem o literal do protótipo) ---
+   O `:not(.ordenavel)` é obrigatório: o `th.ordenavel` do índice tem
+   `data-tipo` só como mecanismo de ordenação, e quem define a aparência dele
+   é o `panorama.css` vendorizado (padding 12px 11px, altura natural, o
+   `span` da seta). Sem o `:not()`, este bloco sobrescrevia o design —
+   `min-height: 44px` e `padding: 11px 12px` alargavam as colunas o
+   bastante para a tabela de 7 colunas passar do container em 1280 e cortar
+   a "Ficha", além de somar o `::after` ao `span`. */
+th[data-tipo]:not(.ordenavel) {
   padding: 0;
 }
 
-th[data-tipo] button {
+th[data-tipo]:not(.ordenavel) button {
   width: 100%;
   min-height: 44px;
   display: flex;
@@ -251,25 +269,25 @@ th[data-tipo] button {
   text-align: left;
 }
 
-th[data-tipo="numero"] button {
+th[data-tipo="numero"]:not(.ordenavel) button {
   justify-content: flex-end;
 }
 
-th[data-tipo] button:hover {
+th[data-tipo]:not(.ordenavel) button:hover {
   background: var(--surface-warm);
   color: var(--fg);
 }
 
-th[data-tipo][aria-sort] button {
+th[data-tipo]:not(.ordenavel)[aria-sort] button {
   color: var(--accent);
 }
 
-th[data-tipo][aria-sort] button::after {
+th[data-tipo]:not(.ordenavel)[aria-sort] button::after {
   content: " ▴";
   font-size: 10px;
 }
 
-th[data-tipo][aria-sort="descending"] button::after {
+th[data-tipo]:not(.ordenavel)[aria-sort="descending"] button::after {
   content: " ▾";
 }
 
