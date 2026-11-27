@@ -34,13 +34,14 @@
     {{ subnav(subnav_itens) }}
   </div>
 
+  <div id="ficha-escola">
   <section id="resumo" aria-label="Resumo da escola">
     {#- Entrada da comparação lado a lado: a ficha já tem o id e abre a página
         com um id, onde se busca a segunda escola sem JS. Parágrafo simples:
         o protótipo não tem painel nem bloco de definição aqui. -#}
     <p><a class="botao botao--secundario" href="{{ href_comparar }}">{{ rotulo_comparar }}</a></p>
 
-    <div class="kpis">
+    <div class="kpis" id="kpis-escola">
       {% for kpi in kpis %}
       <div class="kpi">
         <p class="kpi__rotulo">{{ kpi.rotulo }}</p>
@@ -55,13 +56,11 @@
     <div class="painel__cabecalho">
       <h2 id="titulo-serie">Série de matrículas</h2>
       <p class="painel__nota">
-        Educação básica (total oficial do Censo, não a soma das subetapas) por
-        ano censitário. Ano sem valor aparece como <em>sem dado</em> — nunca
-        como zero.
+        Educação básica, todos os anos publicados do Censo. Passe o cursor sobre a linha para ler cada ano; a tabela abaixo repete os mesmos números.
       </p>
     </div>
     <script type="application/json" id="dados-serie">{{ serie.ilha }}</script>
-    <div class="grafico">
+    <div class="grafico" id="serie-svg">
       {% if serie.svg %}{{ serie.svg }}{% else %}<p class="sem-dado">sem dado</p>{% endif %}
     </div>
     <p class="legenda">
@@ -71,7 +70,7 @@
 
     <div class="tabela-rolagem" role="region" aria-label="Série de matrículas por ano (tabela com rolagem)" tabindex="0">
       <table class="tabela tabela--compacta">
-        <caption>Série de matrículas por ano censitário</caption>
+        <caption>Série completa — equivalente textual do gráfico</caption>
         <thead>
           <tr>
             <th scope="col">Ano</th>
@@ -79,7 +78,7 @@
             <th scope="col" class="num">Variação anual</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="corpo-serie">
           {% for ponto in serie.pontos %}
           <tr>
             <th scope="row">{{ ponto.ano | fmt_ano }}</th>
@@ -111,7 +110,7 @@
       {# Componente do protótipo: total oficial, etapas que somam e
          modalidades que não somam — `dl`s, não tabela ordenável. O estado da
          oferta viaja em `data-estado` (sim/nao/desconhecido). #}
-      <div class="grupos-oferta">
+      <div class="grupos-oferta" id="oferta-grupos">
         <div class="grupo-oferta grupo-oferta--total">
           <p class="grupo-oferta__titulo">{{ etapas[0].titulo }} <small>{{ etapas[0].nota }}</small></p>
           <dl class="grupo-oferta__total">
@@ -146,16 +145,13 @@
       <section class="painel" id="rendimento" aria-labelledby="titulo-rendimento">
         <div class="painel__cabecalho">
           <h2 id="titulo-rendimento">Rendimento</h2>
-          <p class="painel__nota">
-            Taxas do Censo, em porcentagem; ausência com a flag de origem.
-          </p>
         </div>
         <div class="tabela-rolagem" role="region" aria-label="Rendimento por ano (tabela com rolagem)" tabindex="0">
           {# Ordenável no cliente: Ano e cada taxa. A ordem inicial é
              cronológica, então o `aria-sort` do servidor é verdade também
              sem JS. #}
           <table class="tabela" data-ordenavel>
-            <caption>Rendimento escolar por ano censitário</caption>
+            <caption>Indicador de rendimento por ano</caption>
             <thead>
               <tr>
                 <th scope="col" data-tipo="numero" aria-sort="ascending">Ano</th>
@@ -164,7 +160,7 @@
                 {% endfor %}
               </tr>
             </thead>
-            <tbody>
+            <tbody id="corpo-rendimento">
               {% for linha in rendimento %}
               <tr>
                 <th scope="row" data-valor="{{ linha.ano | fmt_bruto }}">{{ linha.ano | fmt_ano }}</th>
@@ -178,9 +174,8 @@
         </div>
         <div class="nota-metodo">
           <strong>{{ rotulo_retencao }}:</strong>
-          {% if indicador and indicador.retencao_liquida_proxy_pct is not none %}{{ indicador.retencao_liquida_proxy_pct | fmt_nulo }}%{% else %}sem dado{% endif %}
-          — o indicador mede saldo de matrícula dentro da própria escola; não
-          mede saída de alunos do sistema.
+          <span id="proxy-retencao" class="mono">{% if indicador and indicador.retencao_liquida_proxy_pct is not none %}{{ indicador.retencao_liquida_proxy_pct | fmt_nulo }}%{% else %}sem dado{% endif %}</span>
+          <br>O indicador mede saldo de matrícula dentro da própria escola; não mede saída de alunos do sistema.
         </div>
       </section>
 
@@ -233,13 +228,13 @@
     <div class="painel__cabecalho">
       <h2 id="titulo-ranking">Ranking municipal por matrícula</h2>
       <p class="painel__nota">
-        Escolas privadas ativas do município e ano. A escola desta ficha está
-        destacada; a lista nominal completa de concorrentes não é publicada pela
-        base — ela vive no ranking de share do mercado.
+        Escolas privadas ativas de {{ cabecalho.no_municipio | fmt_nulo }}. A escola desta ficha está destacada.
       </p>
     </div>
+    <div id="ranking-municipal">
     {% if ranking.linhas %}
     <ul class="ranking">
+
       {% for linha in ranking.linhas %}
       <li{% if linha.destaque %} data-destaque{% endif %}>
         <span class="ranking__pos">{% if linha.posicao is not none %}{{ linha.posicao }}.{% else %}—{% endif %}</span>
@@ -258,9 +253,10 @@
     {% else %}
     <div class="nota-metodo"><p><strong>sem dado</strong> de ranking para o ano de referência.</p></div>
     {% endif %}
+    </div>
     <nav class="paginacao" aria-label="Mais escolas do mercado">
       <p class="paginacao__estado">
-        {% if ranking.total %}de {{ ranking.total }} escolas privadas ativas no município{% else %}sem dado de contagem de escolas{% endif %}
+        {% if ranking.total %}{{ ranking.linhas | length }} de {{ ranking.total }} escolas privadas ativas{% else %}sem dado de contagem de escolas{% endif %}
       </p>
       <div class="paginacao__botoes">
         <a class="botao botao--secundario" href="{{ app_prefix }}/mercados/{{ ranking.co_municipio }}#escolas">Ver todas no mercado</a>
@@ -269,7 +265,7 @@
   </section>
   {% endif %}
 
-  <dl class="rodape-meta" aria-label="Origem dos números da série de matrículas">
+  <dl class="rodape-meta" id="meta-escola" aria-label="Origem dos números da série de matrículas">
     <div>
       <dt>Ano de referência</dt>
       <dd>{{ meta.ano_referencia | fmt_ano }}</dd>
@@ -301,6 +297,7 @@
       </dd>
     </div>
   </dl>
+  </div>
 
   {{ rodape_final() }}
 {% endblock %}

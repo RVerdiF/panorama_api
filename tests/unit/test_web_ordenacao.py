@@ -51,13 +51,13 @@ ANOS = (2021, 2022, 2023, 2024, 2025)
 
 #: Legendas (`<caption>`) das tabelas do card. A legenda é o que identifica a
 #: tabela no HTML — nenhum teste depende da posição dela na página.
-LEGENDA_T3 = "Rendimento escolar por ano censitário"
+LEGENDA_T3 = "Indicador de rendimento por ano"
 
 #: Tabelas fora da lista do card (rejeitadas na spec §2): não ordenam.
 #: As tabelas de cobertura (T6) e movimento (T7) do mercado saíram no card
 #: D1-E3 (o protótipo usa `nota-metodo`/`definicao` e `ul.ranking`).
 LEGENDAS_SEM_ORDENACAO = (
-    "Série de matrículas por ano censitário",  # T1
+    "Série completa — equivalente textual do gráfico",  # T1
 )
 
 TABELA = re.compile(r"<table\b([^>]*)>(.*?)</table>", re.S)
