@@ -1,7 +1,6 @@
 /* ============================================================================
-   Landing `/` — camada visual (card `t_3f09d837`). Recorte c' do
-   `landing.css` de design, sha256
-   5d55d4908367a64abc4ced45f53f9240785c95c7812b4e9b192a7eccd5bbef82.
+   Landing `/` — camada visual (t_3f09d837). Recorte c' do `landing.css` de
+   design, sha256 5d55d4908367a64abc4ced45f53f9240785c95c7812b4e9b192a7eccd5bbef82.
 
    Só o que a tela usa (plano `landing-d2.md` §4): sem `.lnav`, rodapé próprio,
    `body.land`, leituras, faixa de números e série SVG. Carregado só em `/`,
@@ -15,7 +14,10 @@
 /* ---------------- hero ---------------- */
 .hero {
   position: relative;
-  display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr);
+  /* Razão diferente da do design (1.12/.88): a copy do produto é mais longa e
+     a máscara exige uma linha por `span` — com a razão original, a linha mais
+     longa quebra dentro da janela da máscara. A prancha cede a diferença. */
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr);
   gap: clamp(32px, 5vw, 76px);
   align-items: center;
   padding: clamp(48px, 7vw, 104px) 0 clamp(40px, 5vw, 72px);
@@ -42,13 +44,15 @@
 }
 
 .hero__titulo {
-  margin: 0; max-width: 15ch;
+  /* Sem `max-width` em `ch`: o limite de 15ch do design cortava "da educação
+     básica" na largura do container e a máscara precisa de 1 linha por `span`. */
+  margin: 0;
   font-family: var(--font-display); font-weight: 600;
   font-size: clamp(44px, 5.4vw, 78px);
   line-height: 1.02; letter-spacing: -.032em;
   color: var(--fg);
 }
-/* A linha é a janela da máscara: `overflow: hidden` na `.hero__linha`, e o
+/* A linha é a janela da máscara: `overflow: hidden` na `.hero__linha` e o
    `span` interno sobe. O estado base (fora da media query) é visível. */
 .hero__linha { display: block; overflow: hidden; padding-block-end: .1em; margin-block-end: -.1em; }
 
@@ -70,9 +74,9 @@
 }
 
 /* ---------------- busca do hero ---------------- */
-/* O formulário de busca (card `t_e075a6f6`) substitui os dois CTAs do design,
-   com os mesmos controles e rotas. Só o invólucro e o grupo de ações ficam
-   aqui: os campos são o `.campo` do protótipo, já ajustado no `app.css`. */
+/* O formulário de busca (t_e075a6f6) substitui os dois CTAs do design, com os
+   mesmos controles e rotas. Só o invólucro e o grupo de ações ficam aqui: os
+   campos são o `.campo` do protótipo, já ajustado no `app.css`. */
 .hero__busca {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -87,11 +91,9 @@
 .hero__busca .hero__acoes {
   display: grid; grid-template-columns: minmax(0, 1fr); gap: 0.5rem;
 }
-.hero__acoes .botao { min-height: 50px; padding: 0 24px; font-size: var(--text-base); }
 
 /* ---------------- prancha (cartão de dados) ---------------- */
-/* A prancha do design trazia a série de uma escola; aqui carrega o recorte
-   publicado (municípios, anos, etapas) — os três números derivados de antes. */
+/* A prancha do design trazia a série de uma escola; aqui carrega o recorte. */
 .prancha {
   margin: 0; position: relative;
   background: var(--surface);
@@ -115,8 +117,7 @@
   color: color-mix(in oklab, var(--surface) 84%, var(--bg));
   font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
 }
-/* O título da fita é o `<h2>` da seção (`id="recorte-titulo"`): herda a caixa
-   do `b` do design, sem margem nem peso de título grande. */
+/* O título da fita é o `<h2>` da seção: herda a caixa do `b` do design. */
 .prancha__fita h2 {
   margin: 0; font-family: inherit; font-size: inherit; font-weight: 500;
   letter-spacing: inherit; line-height: 1.4; color: var(--surface);
@@ -169,8 +170,7 @@
 }
 
 /* ---------------- capítulos ---------------- */
-/* Cada capítulo é uma linha inteira clicável: o `::after` do link estica a área
-   de clique sobre o cartão, e o foco permanece no link (nome acessível curto). */
+/* Cada capítulo é uma linha inteira clicável: o `::after` estica a área. */
 .capitulos { border-top: 2px solid var(--fg); }
 .capitulo {
   position: relative;
@@ -309,8 +309,8 @@
 .marquee__trilha span::after { content: "·"; margin-left: 34px; opacity: .55; }
 
 /* ---------------- movimento ---------------- */
-/* Tudo o que se move vive aqui: sem `no-preference` não existe `animation` e o
-   estado base é o final. Nenhum `infinite` (WCAG 2.2.2): o pulso roda uma vez. */
+/* Tudo o que se move vive aqui: sem `no-preference` não existe `animation`.
+   Nenhum `infinite` (WCAG 2.2.2): o pulso roda uma vez. */
 @media (prefers-reduced-motion: no-preference) {
   .hero__linha > span {
     display: block; transform: translateY(112%);
@@ -351,7 +351,7 @@
   }
 }
 
-@keyframes linha-sobe { from { transform: translateY(112%); } }
+@keyframes linha-sobe { to { transform: translateY(0); } }
 @keyframes entra { from { opacity: 0; transform: translateY(14px); } }
 @keyframes revela { from { opacity: 0; transform: translateY(18px); } }
 @keyframes pulso { 0%, 100% { opacity: .45; } 50% { opacity: 1; } }

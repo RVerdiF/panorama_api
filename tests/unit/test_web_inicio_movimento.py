@@ -292,6 +292,27 @@ def test_html_nao_traz_as_leituras_do_design(html: str) -> None:
     assert "Oferta por etapa" not in html
 
 
+def test_mascara_do_titulo_termina_visivel() -> None:
+    """O `@keyframes` da máscara tem de terminar em `translateY(0)`.
+
+    Regressão real do porte: com o keyframe invertido (`from` em vez de `to`),
+    o título termina 112% abaixo da própria caixa e some atrás do
+    `overflow: hidden` da linha — a hero fica com um buraco no lugar do `h1`.
+    O estado pré-animação é o deslocamento, declarado na regra.
+    """
+    css = _css_sem_comentario()
+    keyframes = re.search(r"@keyframes linha-sobe\s*\{(.*?)\n\}", css, re.S)
+    assert keyframes is not None, "@keyframes linha-sobe ausente"
+    assert re.search(r"to\s*\{\s*transform:\s*translateY\(0\)", keyframes.group(1)), (
+        keyframes.group(1)
+    )
+    # O deslocamento inicial vive na regra, não no keyframe: assim o estado base
+    # (fora da media query) continua visível.
+    regra = re.search(r"\.hero__linha > span\s*\{([^}]*)\}", css)
+    assert regra is not None
+    assert "translateY(112%)" in regra.group(1), regra.group(1)
+
+
 def test_marquise_do_html_nao_repete_nome_e_nao_tem_numero(html: str) -> None:
     """A marquise é decorativa: sem número, sem duplicata e fora do foco."""
     abertura = re.search(r'<div class="marquee[^"]*"[^>]*>', html)
