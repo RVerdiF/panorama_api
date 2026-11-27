@@ -23,7 +23,7 @@
         <option value="{{ ano }}"{% if ano == ano_selecionado %} selected{% endif %}>{{ ano | fmt_ano }}</option>
         {%- endfor %}
       </select>
-      <p class="campo__dica">Anos publicados nesta versão dos dados.</p>
+      <p class="campo__dica">Anos publicados do Censo no recorte.</p>
     </div>
 
     <div class="campo">
@@ -33,7 +33,7 @@
         <option value="{{ codigo }}"{% if codigo == etapa_selecionada %} selected{% endif %}>{{ rotulo }}</option>
         {%- endfor %}
       </select>
-      <p class="campo__dica">A composição cobre todas as etapas; cobertura e movimento seguem a etapa.</p>
+      <p class="campo__dica">O recorte vale para as duas seções.</p>
     </div>
 
     <div class="campo">
@@ -43,7 +43,7 @@
         <option value="{{ item.co_municipio }}"{% if item.co_municipio == municipio %} selected{% endif %}>{{ item.no_municipio }}</option>
         {%- endfor %}
       </select>
-      <p class="campo__dica">{{ municipios | length }} municípios de MG.</p>
+      <p class="campo__dica">Recorte de demonstração: um município.</p>
     </div>
   </div>
 
