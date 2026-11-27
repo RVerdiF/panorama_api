@@ -614,3 +614,19 @@ def test_escola_inexistente_vira_404_html(client, repository):
     assert resposta.status_code == 404
     assert resposta.headers["cache-control"] == "no-store"
     assert "não encontrado" in _html(resposta, status=404).lower()
+
+
+def test_app_js_rotulo_do_svg_da_serie_e_literal_do_prototipo():
+    """E5: o SVG hidratado por `static/app.js` (`desenharSerie`) é o que o leitor
+    de tela recebe com JS ativo; o rótulo precisa ser o literal de
+    `app.js:660` do protótipo, não o texto antigo com "percorrer os anos"."""
+    from pathlib import Path
+
+    fonte = (
+        Path(__file__).resolve().parents[2]
+        / "src/panorama_api/web/static/app.js"
+    ).read_text(encoding="utf-8")
+
+    assert '". Use as setas do teclado para ler ano a ano."' in fonte
+    assert "percorrer os anos" not in fonte
+    assert "a tabela abaixo traz os mesmos números" not in fonte
