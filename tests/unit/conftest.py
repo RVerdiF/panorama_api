@@ -269,6 +269,7 @@ class FakeRepository:
         markets: list[dict[str, Any]] | None = None,
         concentracao: list[dict[str, Any]] | None = None,
         share: list[dict[str, Any]] | None = None,
+        indice: list[dict[str, Any]] | None = None,
     ) -> None:
         self.schema = schema if schema is not None else full_schema()
         self.schools = schools or []
@@ -279,6 +280,7 @@ class FakeRepository:
         self.markets = markets or []
         self.concentracao = concentracao or []
         self.share = share or []
+        self.indice = indice if indice is not None else []
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.errors: dict[str, Exception] = {}
 
@@ -383,6 +385,10 @@ class FakeRepository:
             and r["entidade_tipo"] == kwargs["entidade_tipo"]
         ]
         return self._page(rows, kwargs["limit"], kwargs["offset"])
+
+    def get_indice_municipios(self, **kwargs: Any) -> list[dict[str, Any]]:
+        self._record("get_indice_municipios", kwargs)
+        return [dict(row) for row in self.indice]
 
     def get_table_columns(self) -> dict[str, dict[str, str]]:
         self._record("get_table_columns", {})
