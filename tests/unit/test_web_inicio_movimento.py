@@ -1,23 +1,40 @@
-"""Movimento, progressividade e contraste da landing `/` (plano §8.2, card D2-E3).
+"""Movimento e progressividade da landing `/` — card `t_e42049c1` (Regra Zero).
 
-O porte não traz `landing.js` (P5 = não) nem contador nenhum: **todo** o
-movimento é CSS, e o contrato é que ele nunca esconda conteúdo quando o
-navegador não pode animar. Os invariantes são estáticos, lidos do
-`static/landing.css` e do HTML de `/`, sem rede e sem navegador:
+O design usa JS (`landing.js` vendorizado em `static/landing.js`): a classe
+`js` no `<html>`, a revelação `[data-reveal]` → `is-in`, os contadores
+(`data-contar`), a barra de progresso (`#progresso`) e a navbar compacta
+(`data-compacto`). O movimento do CSS é o do protótipo — marquee em loop
+infinito de 52 s, pulso de 2,8 s — e tudo respeita `prefers-reduced-motion`.
 
-1. todo `animation`/`animation-timeline` do `landing.css` vive dentro de
-   `@media (prefers-reduced-motion: no-preference)`;
-2. não existe `infinite` — nenhuma animação automática passa de 5 s (WCAG 2.2.2);
-3. `opacity: 0` só aparece dentro de `@keyframes`, e não há a classe `.js`:
-   juntas, essas duas condições garantem a página completa sem JS;
-4. todo `animation-timeline` está sob `@supports (animation-timeline: view())`;
-5. o HTML de `/` não tem `style=` nem `data-contar`;
-6. a tabela de contraste do §6 vale como asserção;
-7. todo código de `MARQUISE_MUNICIPIOS` existe em `municipios_mg()`;
-8. o `.webp` responde `image/webp` com `immutable` (em `test_web_inicio_orcamento`).
+Os invariantes são estáticos, lidos do `static/landing.css`, do
+`static/landing.js` e do HTML de `/`, sem rede e sem navegador:
+
+1. `.js [data-reveal]` e `.js [data-reveal].is-in` existem no CSS, e o
+   `landing.js` põe a classe `js` no `<html>`;
+2. o HTML de `/` tem 28 `data-reveal`, 5 `data-contar` e 2 `data-observar`;
+3. zero `style=` no HTML (os 40 valores do design vivem como `:nth-child()`
+   no CSS, na mesma ordem);
+4. o conjunto de `@keyframes` é o do protótipo (nem mais, nem menos);
+5. a marquee repete a sequência 2×, é `aria-hidden` e pausa no hover;
+6. o bloco `prefers-reduced-motion: reduce` neutraliza o movimento;
+7. a tabela de contraste do §6 do plano antigo vale como asserção;
+8. todo código de `MARQUISE_MUNICIPIOS` existe em `municipios_mg()`;
+9. o `.webp` responde `image/webp` com `immutable` (em
+   `test_web_inicio_orcamento`).
+
+O que saiu com o porte literal (revogado pela Regra Zero):
+
+* `test_nao_existe_a_classe_js`, `test_html_nao_depende_de_js...`,
+  `test_html_sem_style_e_sem_contador` (antigo), `test_toda_animacao_exige_no_preference`,
+  `test_nenhuma_animacao_infinita`, `test_nenhuma_animacao_dura_mais...` — o
+  design usa JS e animações incondicionais; o substituto é a presença do
+  mecanismo (itens 1–2) e o conjunto exato de keyframes (item 4);
+* `test_html_nao_traz_*` (ilustrativos, faixa de números, leituras) — os
+  literais do protótipo entram por definição; a asserção equivalente é a
+  copy literal em `test_web_inicio.py`.
 
 Nada aqui toca rede, dataset ou BigQuery: o HTML vem do `TestClient` com
-repositório fake vazio, e o CSS é o arquivo versionado.
+repositório fake vazio, e o CSS/JS são os arquivos versionados.
 """
 
 from __future__ import annotations
@@ -32,7 +49,7 @@ from panorama_api.config import Settings
 from panorama_api.main import create_app
 from panorama_api.web.conteudo import MARQUISE_MUNICIPIOS
 from panorama_api.web.municipios import municipios_mg
-from tests.unit.conftest import FakeRepository
+from tests.unit.conftest import FakeRepository, share_row
 from tests.unit.test_web_estilos import _contraste, _cor_do_token, _tokens
 
 CSS = (
@@ -43,22 +60,31 @@ CSS = (
     / "static"
     / "landing.css"
 )
+JS = (
+    Path(__file__).resolve().parents[2]
+    / "src"
+    / "panorama_api"
+    / "web"
+    / "static"
+    / "landing.js"
+)
 PROTOTIPO = CSS.parent / "prototipo" / "panorama.css"
 
 INICIO = "/"
-#: Duração máxima de uma animação automática (WCAG 2.2.2, cinco segundos).
-LIMITE_ANIMACAO_MS = 5_000
 #: Mínimo de contraste para texto normal (WCAG 1.4.3).
 CONTRASTE_TEXTO_MINIMO = 4.5
+#: O conjunto fechado de animações do protótipo (nem mais, nem menos).
+KEYFRAMES_DO_DESIGN = frozenset(
+    {"linha-sobe", "desenha", "aparece", "ponto-entra", "pulso", "desliza"}
+)
 
 
 def _css() -> str:
     return CSS.read_text(encoding="utf-8")
 
 
-def _css_sem_comentario() -> str:
-    """CSS sem comentário: prosa não é declaração (o `infinite` do texto sai)."""
-    return re.sub(r"/\*.*?\*/", "", _css(), flags=re.S)
+def _js() -> str:
+    return JS.read_text(encoding="utf-8")
 
 
 def _blocos(css: str) -> list[tuple[str, str]]:
@@ -90,109 +116,215 @@ def html() -> str:
     return resposta.text
 
 
-# -- 1. todo movimento sob `prefers-reduced-motion: no-preference` -----------
+# -- 1. o mecanismo de revelação: `.js` + `is-in` ----------------------------
 
 
-def test_toda_animacao_exige_no_preference() -> None:
+def test_revelacao_exige_a_classe_js() -> None:
     css = _css()
-    inicio = css.index("@media (prefers-reduced-motion: no-preference)")
-    # O bloco de movimento é o único lugar com `animation:`; tudo o que é
-    # declarado antes dele seria animação incondicional.
-    for seletor, corpo in _blocos(css):
-        if not re.search(r"\banimation(-timeline|-range)?\s*:", corpo):
-            continue
-        posicao = css.index(corpo)
-        assert posicao > inicio, f"animação fora do bloco de no-preference: {seletor.strip()}"
-    assert "animation:" in css[inicio:], "bloco de movimento vazio?"
+
+    assert ".js [data-reveal]" in css
+    assert ".js [data-reveal].is-in" in css
 
 
-# -- 2. nenhuma animação infinita (WCAG 2.2.2) ------------------------------
+def test_landing_js_poe_a_classe_js_no_html() -> None:
+    js = _js()
+
+    assert 'document.documentElement.classList.add("js")' in js
 
 
-def test_nenhuma_animacao_infinita() -> None:
-    assert "infinite" not in _css_sem_comentario()
+def test_revelacao_observa_rolagem_com_intersection_observer() -> None:
+    js = _js()
+
+    assert "IntersectionObserver" in js
+    assert '"is-in"' in js or "'is-in'" in js
+    assert "[data-reveal]" in js
+    assert "[data-observar]" in js
 
 
-def test_nenhuma_animacao_dura_mais_de_cinco_segundos() -> None:
-    for _, corpo in _blocos(_css()):
-        for duracao in re.findall(r"\banimation:\s*[^;]*?([\d.]+)s", corpo):
-            assert float(duracao) * 1000 <= LIMITE_ANIMACAO_MS, corpo
+def test_contadores_progresso_e_nav_compacta_no_js() -> None:
+    js = _js()
+
+    assert "[data-contar]" in js
+    assert 'getElementById("progresso")' in js
+    assert 'getElementById("nav")' in js
+    assert '"data-compacto"' in js or "'data-compacto'" in js
 
 
-# -- 3. a página fica completa sem JS e sem suporte -------------------------
+# -- 2. o DOM que o JS espera --------------------------------------------------
 
 
-def test_opacity_zero_so_dentro_de_keyframes() -> None:
-    css = _css()
-    for seletor, corpo in _blocos(css):
-        if not re.search(r"opacity:\s*0(?:[;\s}]|$)", corpo):
-            continue
-        assert "@keyframes" in seletor or seletor.strip().startswith("from"), (
-            f"`opacity: 0` fora de `@keyframes` esconde conteúdo: {seletor.strip()}"
-        )
+def test_html_tem_os_ganchos_do_js(html: str) -> None:
+    assert html.count("data-reveal") == 28
+    assert html.count("data-contar") == 5
+    assert html.count("data-observar") == 2
+    assert 'id="progresso"' in html
+    assert 'id="nav"' in html
+    assert 'data-compacto="false"' in html
 
 
-def test_nao_existe_a_classe_js() -> None:
-    """Sem `.js`, nada depende de script para aparecer (D2-2)."""
-    css = _css()
-    assert not re.search(r"^\s*\.js\b", css, re.M)
-    assert ".js " not in css and ".js[" not in css
-
-
-def test_html_nao_depende_de_js_para_mostrar_conteudo(html: str) -> None:
-    assert "data-reveal" not in html
-    assert "is-in" not in html
-
-
-# -- 4. toda timeline de rolagem sob `@supports` ----------------------------
-
-
-def test_toda_animation_timeline_esta_sob_supports() -> None:
-    css = _css()
-    suportes = [
-        (achado.start(), achado.end())
-        for achado in re.finditer(r"@supports \(animation-timeline: view\(\)\)", css)
-    ]
-    assert suportes, "nenhum `@supports (animation-timeline: view())` no arquivo"
-
-    for seletor, corpo in _blocos(css):
-        if "animation-timeline" not in corpo:
-            continue
-        posicao = css.index(corpo)
-        assert any(inicio < posicao for inicio, _ in suportes), (
-            f"`animation-timeline` fora do `@supports`: {seletor.strip()}"
-        )
-
-
-def test_timeline_de_rolagem_declara_animation_range() -> None:
-    for seletor, corpo in _blocos(_css()):
-        if "animation-timeline" not in corpo:
-            continue
-        assert "animation-range" in corpo, seletor.strip()
-
-
-# -- 5. sem `style=` e sem contador no HTML ---------------------------------
-
-
-def test_html_sem_style_e_sem_contador(html: str) -> None:
+def test_html_sem_style_inline(html: str) -> None:
+    """Os 40 `style=` do protótipo viraram `:nth-child()` no `landing.css`."""
     assert not re.search(r"\sstyle\s*=", html)
-    assert "data-contar" not in html
-    # Zero consulta (P2): nenhum `data-observar` do design, nada de ilha JSON.
-    assert "data-observar" not in html
 
 
-# -- 6. contraste medido (plano §6) ----------------------------------------
+def test_atrasos_do_design_viraram_nth_child_no_css() -> None:
+    css = _css()
+
+    # Mesmos valores, mesma ordem do documento do protótipo (40 atributos).
+    for regra in (
+        ".hero__titulo .hero__linha:nth-child(1) > span { --d: 60ms; }",
+        ".hero__lead { --d: 420ms; }",
+        ".prancha[data-reveal] { --d: 340ms; }",
+        ".numeros > div:nth-child(4) { --d: 270ms; }",
+        ".capitulos > .capitulo:nth-child(3) { --d: 140ms; }",
+        ".barras > li:nth-child(1) { --i: 0; }",
+        ".barras > li:nth-child(5) { --i: 4; }",
+        ".matriz > .matriz__linha:nth-child(7) { --i: 6; }",
+        ".metodo__regras > .regra:nth-child(4) { --d: 240ms; }",
+        ".fecho__acoes { --d: 140ms; }",
+    ):
+        assert regra in css, regra
+
+
+def test_barras_sem_largura_fixa_de_mock() -> None:
+    """As larguras mock 100/76/63/57/48% por posição saíram do CSS.
+
+    O `:nth-child()` das barras carrega só o índice de entrada (`--i`); a
+    largura (`--w`) vem das classes quantizadas `bw-N` (passo 5).
+    """
+    css = _css()
+
+    for regra in (
+        ".barras > li:nth-child(1) { --i: 0; --w: 100%; }",
+        ".barras > li:nth-child(5) { --i: 4; --w: 48%; }",
+    ):
+        assert regra not in css, regra
+    for largura_mock in ("--w: 76%", "--w: 63%", "--w: 57%", "--w: 48%"):
+        assert largura_mock not in css, largura_mock
+    for classe in ("bw-0", "bw-5", "bw-50", "bw-100"):
+        assert f".barras > li.{classe}" in css, classe
+
+
+def test_barras_proporcionais_ao_share() -> None:
+    """A largura de cada barra é `share/max`, quantizada em passo 5 (`bw-N`)."""
+    repo = FakeRepository(
+        share=[
+            share_row(
+                id_entidade=f"3100000{i}",
+                no_entidade=nome,
+                mat_entidade=1000.0,
+                share_privado_pct=share,
+                nu_ano_censo=2025,
+            )
+            for i, (nome, share) in enumerate(
+                (
+                    ("Escola Alfa", 2.0),
+                    ("Escola Beta", 1.9),
+                    ("Escola Gama", 1.7),
+                    ("Escola Delta", 1.6),
+                    ("Escola Epsilon", 1.4),
+                ),
+                start=1,
+            )
+        ]
+    )
+    app = create_app(settings=_settings(), repository=repo)
+    with TestClient(app) as cliente:
+        resposta = cliente.get(
+            INICIO, headers={"Accept-Encoding": "identity", "Accept": "text/html"}
+        )
+
+    assert resposta.status_code == 200
+    classes = re.findall(r'<li class="(bw-\d+)"', resposta.text)
+    assert classes == ["bw-100", "bw-95", "bw-85", "bw-80", "bw-70"], classes
+    larguras = [int(classe.removeprefix("bw-")) for classe in classes]
+    assert larguras == sorted(larguras, reverse=True), larguras
+    for rotulo in ("2,0%", "1,9%", "1,7%", "1,6%", "1,4%"):
+        assert rotulo in resposta.text, rotulo
+
+
+def test_classe_largura_sem_dado_e_minimo_visivel() -> None:
+    """`_classe_largura`: sem dado/max zerado vira `bw-0`; fiapo vira `bw-5`."""
+    from panorama_api.web.routes import _classe_largura
+
+    assert _classe_largura(None, 2.0) == "bw-0"
+    assert _classe_largura(1.5, None) == "bw-0"
+    assert _classe_largura(1.5, 0) == "bw-0"
+    assert _classe_largura(0.0, 2.0) == "bw-0"
+    assert _classe_largura(0.01, 2.0) == "bw-5"
+    assert _classe_largura(2.0, 2.0) == "bw-100"
+
+
+# -- 3. o conjunto de animações é o do protótipo -------------------------------
+
+
+def test_keyframes_sao_os_do_design() -> None:
+    keyframes = set(re.findall(r"@keyframes\s+([A-Za-z-]+)", _css()))
+
+    assert keyframes == KEYFRAMES_DO_DESIGN
+
+
+def test_marquee_em_loop_com_pausa_no_hover() -> None:
+    css = _css()
+
+    assert "animation: desliza 52s linear infinite;" in css
+    assert ".marquee:hover .marquee__trilha { animation-play-state: paused; }" in css
+
+
+def test_pulso_do_sinal_e_de_2_8s() -> None:
+    assert "animation: pulso 2.8s ease-in-out infinite;" in _css()
+
+
+def test_mascara_do_titulo_termina_visivel() -> None:
+    """O `@keyframes` da máscara tem de terminar em `translateY(0)`."""
+    css = re.sub(r"/\*.*?\*/", "", _css(), flags=re.S)
+    keyframes = re.search(r"@keyframes linha-sobe\s*\{(.*?)\n\}", css, re.S)
+    assert keyframes is not None, "@keyframes linha-sobe ausente"
+    assert re.search(r"to\s*\{\s*transform:\s*translateY\(0\)", keyframes.group(1)), (
+        keyframes.group(1)
+    )
+    regra = re.search(r"\.hero__linha > span\s*\{([^}]*)\}", css)
+    assert regra is not None
+    assert "translateY(112%)" in regra.group(1), regra.group(1)
+
+
+def test_movimento_reduzido_neutraliza_o_design() -> None:
+    css = _css()
+
+    assert "@media (prefers-reduced-motion: reduce)" in css
+    bloco = css[css.index("@media (prefers-reduced-motion: reduce)") :]
+    for invariante in (
+        ".marquee__trilha { animation: none; }",
+        "[data-reveal] { opacity: 1; transform: none; }",
+        ".hero__linha > span { transform: none; }",
+    ):
+        assert invariante in bloco, invariante
+
+
+# -- 4. marquise: sequência duplicada, fora do foco ----------------------------
+
+
+def test_marquise_do_html_repete_a_sequencia_2x(html: str) -> None:
+    """O loop do marquee exige a sequência duplicada (é o design, não um erro)."""
+    abertura = re.search(r'<div class="marquee[^"]*"[^>]*>', html)
+    assert abertura is not None, "marquise ausente em `/`"
+    assert 'aria-hidden="true"' in abertura.group(0), abertura.group(0)
+    corpo = html[abertura.end() : html.index("</section>", abertura.end())]
+    nomes = re.findall(r"<span>([^<]+)</span>", corpo)
+    assert nomes, "marquise sem município"
+    metade = len(nomes) // 2
+    assert nomes[:metade] == nomes[metade:]
+    assert not re.search(r"\d", "".join(nomes)), nomes
+    esperados = {municipio.no_municipio for municipio in municipios_mg()}
+    for nome in nomes:
+        assert nome in esperados, nome
+
+
+# -- 5. contraste medido (plano §6) -------------------------------------------
 
 
 def _fundos() -> dict[str, str]:
-    """Pares de cor do painel escuro, da fita e do texto, sobre os tokens.
-
-    Os fundos são `color-mix(in oklab, …)` no CSS; `_cor_do_token` resolve os
-    hex do `:root` e `_contraste` aplica a mesma fórmula WCAG usada em
-    `test_web_estilos`. O que este teste trava é o par efetivo documentado no
-    §6 do plano: qualquer troca de token que baixe um par abaixo de 4,5:1
-    quebra aqui.
-    """
+    """Pares de cor do painel escuro, da fita e do texto, sobre os tokens."""
     tokens = _tokens()
     return {
         "surface": tokens["surface"],
@@ -207,7 +339,6 @@ def _fundos() -> dict[str, str]:
 def test_contraste_dos_pares_do_painel_e_da_fita() -> None:
     cores = _fundos()
 
-    # Texto sobre os fundos de cartão e de página.
     pares = (
         (cores["fg"], cores["surface"]),
         (cores["fg-2"], cores["bg"]),
@@ -219,110 +350,21 @@ def test_contraste_dos_pares_do_painel_e_da_fita() -> None:
 
 
 def test_contraste_do_texto_secundario_sobre_bg_e_surface() -> None:
-    """`--muted-strong` é `color-mix(muted 58%, fg 42%)`, como no `:root`."""
     tokens = _tokens()
-    # `--muted-strong` é declarado por `color-mix`: a razão documentada no plano
-    # é 6,09:1 sobre `--bg` e 7,05:1 sobre `--surface`. O piso é o mesmo 4,5:1,
-    # medido a partir dos dois tokens de origem.
     assert "muted-strong" in PROTOTIPO.read_text(encoding="utf-8")
     assert _contraste(tokens["fg-2"], tokens["bg"]) >= CONTRASTE_TEXTO_MINIMO
     assert _contraste(tokens["fg-2"], tokens["surface"]) >= CONTRASTE_TEXTO_MINIMO
 
 
 def test_contraste_do_capitulo_no_hover() -> None:
-    """Hover do capítulo: `--ink-accent` sobre a superfície misturada."""
     cores = _fundos()
     assert _contraste(cores["accent"], cores["surface"]) >= CONTRASTE_TEXTO_MINIMO
 
 
-# -- 7. a marquise só usa município que existe na lista ---------------------
+# -- 6. a marquise só usa município que existe na lista ------------------------
 
 
 def test_todo_codigo_da_marquise_existe_na_lista() -> None:
     conhecidos = {municipio.co_municipio for municipio in municipios_mg()}
     faltando = [codigo for codigo in MARQUISE_MUNICIPIOS if codigo not in conhecidos]
     assert not faltando, f"código IBGE fora da lista versionada: {faltando}"
-
-
-# -- 9. nenhum número ilustrativo do design (critério 5 do card) ------------
-
-#: Valores e nomes do protótipo de design que **não têm lastro** no produto
-#: (plano `landing-d2.md` §5). A prancha mostra só `recorte_municipios`,
-#: `recorte_anos` e `recorte_etapas`; o resto saiu com as leituras.
-ILUSTRATIVOS = (
-    "1.140",  # matrícula do Colégio Monte Verde em 2025
-    "1.115",  # primeiro ponto da mesma série
-    "1.144",
-    "1.059",
-    "1.087",
-    "+4,9%",  # delta no ano
-    "11,0%",  # share municipal da escola
-    "8,3%",  # ranking municipal, 2º
-    "1º de 30",  # posição da escola no ranking
-    "21,6",  # participação somada das quatro unidades da Rede Horizonte
-    "Rede Horizonte",
-    "Colégio Monte Verde",
-    "Instituto Bandeirantes",
-    "Colégio Horizonte Vale",
-    "Colégio Santa Amélia",
-    "Centro Educ. Ipê Amarelo",
-)
-
-
-@pytest.mark.parametrize("ilustrativo", ILUSTRATIVOS)
-def test_html_nao_traz_numero_ilustrativo_do_design(html: str, ilustrativo: str) -> None:
-    assert ilustrativo not in html, ilustrativo
-
-
-def test_html_nao_traz_a_faixa_de_numeros_do_design(html: str) -> None:
-    """A faixa de 4 números do design (853 · 5 · 30 · 21,6%) saiu inteira.
-
-    O `853` e os anos continuam, mas na prancha — o design os repetia numa
-    faixa própria, com dois valores ilustrativos no meio.
-    """
-    assert 'class="numeros"' not in html
-    assert "amostra ilustrativa" not in html
-    assert "escolas privadas no mercado de Belo Horizonte" not in html
-
-
-def test_html_nao_traz_as_leituras_do_design(html: str) -> None:
-    """Ranking e matriz de oferta dependiam de dado que não existe (P2 = não)."""
-    assert 'class="leituras"' not in html
-    assert "Ranking municipal" not in html
-    assert "Oferta por etapa" not in html
-
-
-def test_mascara_do_titulo_termina_visivel() -> None:
-    """O `@keyframes` da máscara tem de terminar em `translateY(0)`.
-
-    Regressão real do porte: com o keyframe invertido (`from` em vez de `to`),
-    o título termina 112% abaixo da própria caixa e some atrás do
-    `overflow: hidden` da linha — a hero fica com um buraco no lugar do `h1`.
-    O estado pré-animação é o deslocamento, declarado na regra.
-    """
-    css = _css_sem_comentario()
-    keyframes = re.search(r"@keyframes linha-sobe\s*\{(.*?)\n\}", css, re.S)
-    assert keyframes is not None, "@keyframes linha-sobe ausente"
-    assert re.search(r"to\s*\{\s*transform:\s*translateY\(0\)", keyframes.group(1)), (
-        keyframes.group(1)
-    )
-    # O deslocamento inicial vive na regra, não no keyframe: assim o estado base
-    # (fora da media query) continua visível.
-    regra = re.search(r"\.hero__linha > span\s*\{([^}]*)\}", css)
-    assert regra is not None
-    assert "translateY(112%)" in regra.group(1), regra.group(1)
-
-
-def test_marquise_do_html_nao_repete_nome_e_nao_tem_numero(html: str) -> None:
-    """A marquise é decorativa: sem número, sem duplicata e fora do foco."""
-    abertura = re.search(r'<div class="marquee[^"]*"[^>]*>', html)
-    assert abertura is not None, "marquise ausente em `/`"
-    assert 'aria-hidden="true"' in abertura.group(0), abertura.group(0)
-    corpo = html[abertura.end() : html.index("</section>", abertura.end())]
-    nomes = re.findall(r"<span>([^<]+)</span>", corpo)
-    assert nomes, "marquise sem município"
-    assert len(nomes) == len(set(nomes)), "marquise com nome repetido"
-    assert not re.search(r"\d", "".join(nomes)), nomes
-    esperados = {municipio.no_municipio for municipio in municipios_mg()}
-    for nome in nomes:
-        assert nome in esperados, nome

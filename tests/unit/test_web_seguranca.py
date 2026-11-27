@@ -9,7 +9,8 @@ partir daí valem três invariantes que este arquivo protege:
 * nada em `/v1` (e `/health`) ganha header novo: o contrato público é comparado
   com o mesmo app **sem** o middleware de segurança;
 * o asset JS é servido como `text/javascript; charset=utf-8` com cache imutável,
-  e as páginas carregam exatamente uma tag `<script src=… defer>` — sem inline,
+  e as páginas carregam só as tags `<script src=… defer>` esperadas (o `app.js`
+  em todas; `/` soma o `landing.js`, card `t_e42049c1`) — sem inline,
   sem `<style>`, sem `style=` e sem atributo `on*=`.
 """
 
@@ -297,8 +298,14 @@ def _tags_script(html: str) -> list[str]:
     return re.findall(r"<script\b[^>]*>\s*</script>", html)
 
 
+#: Scripts com `defer` esperados por página: só `/` soma o `landing.js`
+#: (card `t_e42049c1`) ao `app.js`. A asserção de regra que sobrevive é
+#: "nenhum script inline, nenhuma origem externa".
+SCRIPTS_ESPERADOS = {"/": ("app.js", "landing.js")}
+
+
 @pytest.mark.parametrize(("caminho", "status"), PAGINAS)
-def test_pagina_carrega_exatamente_o_app_js_com_defer(
+def test_pagina_carrega_os_scripts_esperados_com_defer(
     cliente: TestClient, caminho: str, status: int
 ) -> None:
     # Sem seguir redirect: o 301 da concorrência antiga não tem HTML.
@@ -311,10 +318,10 @@ def test_pagina_carrega_exatamente_o_app_js_com_defer(
         assert _tags_script(resposta.text) == [], caminho
         return
     tags = _tags_script(resposta.text)
-    assert tags == [f'<script src="{assets().url("app.js")}" defer></script>'], (
-        caminho,
-        tags,
-    )
+    esperados = SCRIPTS_ESPERADOS.get(caminho, ("app.js",))
+    assert tags == [
+        f'<script src="{assets().url(nome)}" defer></script>' for nome in esperados
+    ], (caminho, tags)
 
 
 @pytest.mark.parametrize(("caminho", "status"), PAGINAS)

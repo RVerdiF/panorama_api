@@ -22,12 +22,18 @@
      AssetRegistry, `defer` para não bloquear o parser, CSP estrita do /app.
      Sem inline: a página continua idêntica e completa sem este arquivo. #}
   <script src="{{ js_url }}" defer></script>
+  {# JS por página (card `t_e42049c1`): a landing soma o `landing.js`
+     vendorizado ao `app.js`, com `defer`. Inerte por padrão — nenhuma outra
+     tela preenche o bloco, e ele não emite byte nenhum quando vazio. #}
+  {% block scripts_pagina %}{% endblock %}
 </head>
-<body>
+<body{% block atributos_corpo %}{% endblock %}>
   <a class="pular-para-conteudo" href="#conteudo">Pular para o conteúdo</a>
   {# Shell do protótipo (card V3-S0): o envoltório agrupa topo e main; o rodapé
      único de cada página é a macro `rodape_final`, chamada uma vez por tela —
-     não há mais rodapé global aqui. #}
+     não há mais rodapé global aqui. A landing (`t_e42049c1`) sobrescreve o
+     bloco `pagina` com a navbar `.lnav` e o rodapé `.rodape` do design. #}
+  {% block pagina %}
   <div class="envoltorio">
     {% include "partials/topo.html" %}
 
@@ -35,5 +41,6 @@
       {% block conteudo %}{% endblock %}
     </main>
   </div>
+  {% endblock %}
 </body>
 </html>

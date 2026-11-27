@@ -301,6 +301,217 @@ router = APIRouter(prefix=PREFIXO_WEB, include_in_schema=False)
 router_inicio = APIRouter(include_in_schema=False)
 
 
+#: Município da prancha da landing: Belo Horizonte, o mesmo do design e da
+#: marquise (card `t_e06e1ad5`). O nome vem de `municipios_mg()` (lista
+#: versionada, sem consulta ao repositório) — vale o mesmo que
+#: `get_municipio("3106200").no_municipio` a custo zero.
+CO_MUNICIPIO_LANDING = "3106200"
+#: Top-N do ranking da landing: a prancha é o 1º, as barras são os 5.
+TOP_LANDING = 5
+
+
+def _nome_municipio_landing() -> str | None:
+    """Nome do município da prancha, da lista versionada (sem repositório)."""
+    for municipio in municipios_mg():
+        if municipio.co_municipio == CO_MUNICIPIO_LANDING:
+            return municipio.no_municipio
+    return None
+
+
+def _linha_concentracao_privadas(
+    linhas: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Linha de concentração do recorte privado das escolas (o C4 da landing).
+
+    O C4 do contrato é exatamente "as 4 maiores somadas", então a linha
+    procurada é a do recorte `privado` no nível `escola`. Sem ela, a
+    landing diz "sem dado" — nunca um C4 de outro recorte.
+    """
+    for linha in linhas:
+        if linha.get("recorte") == "privado" and linha.get("nivel") == "escola":
+            return linha
+    return None
+
+
+#: Larguras quantizadas das barras da landing (`share/max`, passo 5). A rota
+#: emite uma delas por barra via `_classe_largura`, o `landing.css` define
+#: `--w` para cada uma, e o conjunto valida a emissão (fora dele cai para
+#: `bw-0`). O par `classe` literal mantém a trava de órfãos
+#: (`test_app_only_nao_declara_classe_orfa`) ciente das 21 classes dinâmicas.
+CLASSES_LARGURA_BW = {
+    "classe": "bw-0 bw-5 bw-10 bw-15 bw-20 bw-25 bw-30 bw-35 bw-40 bw-45 bw-50 bw-55 bw-60 bw-65 bw-70 bw-75 bw-80 bw-85 bw-90 bw-95 bw-100"
+}
+
+
+def _classe_largura(share: float | None, max_share: float | None) -> str:
+    """Classe quantizada da largura da barra (`bw-0` a `bw-100`, passo 5).
+
+    A largura é `share/max_share`, quantizada em passos de 5 pontos (o CSS
+    define `--w` por classe, sem `style=` inline — a CSP é `style-src 'self'`).
+    Sem dado (`None`), sem máximo ou máximo zerado: `bw-0`. Fração positiva
+    que quantiza para 0 ganha o mínimo visível `bw-5`. A classe emitida é
+    sempre uma das declaradas em `CLASSES_LARGURA_BW` (o `landing.css`
+    define `--w` para cada uma); fora do conjunto, `bw-0`.
+    """
+    if share is None or max_share is None:
+        return "bw-0"
+    try:
+        fracao = float(share) / float(max_share)
+    except (TypeError, ValueError, ZeroDivisionError):
+        return "bw-0"
+    if not fracao > 0:
+        return "bw-0"
+    quantizada = int(round(fracao * 100 / 5)) * 5
+    quantizada = max(0, min(100, quantizada))
+    if quantizada == 0:
+        return "bw-5"
+    classe = f"bw-{quantizada}"
+    return classe if classe in CLASSES_LARGURA_BW["classe"].split() else "bw-0"
+
+
+def _cache_landing(request: Request) -> dict[tuple[str, str], dict[str, Any]]:
+    """Cache em processo da landing, invalidado por `DATA_VERSION`.
+
+    A chave é `(data_version, anos)`: dado novo invalida sozinho, e cada app
+    (cada teste hermético) tem o próprio dict — sem vazar linha entre apps.
+    Só o sucesso é guardado; falha ou parcial recalcula no próximo render
+    (para a página se recuperar sozinha quando o BigQuery voltar).
+    """
+    cache = getattr(request.app.state, "landing_cache", None)
+    if not isinstance(cache, dict):
+        cache = {}
+        request.app.state.landing_cache = cache
+    return cache
+
+
+def _contar(valor: int | float | None) -> str:
+    """Número cru para `data-contar` (o `landing.js` ignora vazio/NaN).
+
+    `float` integral vira inteiro (`1140`, não `1140.0`); ausência vira string
+    vazia — o texto "sem dado" fica intacto e o contador não anima. Nunca `0`
+    por ausência: o atributo some junto com o dado.
+    """
+    if valor is None or isinstance(valor, bool):
+        return ""
+    if isinstance(valor, float) and valor.is_integer():
+        return str(int(valor))
+    return str(valor)
+
+
+#: Abscissas da prancha para os 5 anos do recorte (o `viewBox` tem 480 de
+#: largura; os rótulos de ano usam as mesmas posições via `anos_svg`).
+_XS_PRANCHA = (84, 176, 268, 360, 452)
+#: Ordenadas do gráfico: do topo (25) à base (175) das linhas de grade.
+_Y_TOPO_PRANCHA = 25
+_Y_BASE_PRANCHA = 175
+
+
+def _serie_prancha(
+    linhas: list[dict[str, Any]],
+    *,
+    anos: list[int],
+    nome_destaque: str | None,
+) -> tuple[dict[str, Any] | None, str, str]:
+    """Série da prancha a partir do `get_school_history` da escola em destaque.
+
+    Devolve `(serie_dados, delta_texto, serie_desc)`: os pontos `(x, y)` na
+    escala do `viewBox`, a variação anual calculada da própria série (último
+    ano contra o anterior, via `texto_variacao`) e o texto do `<desc>`.
+    Qualquer ausência (sem destaque, sem linha, valor ausente ou nulo) vira
+    `(None, "sem dado no ano", ...)` — nunca ponto inventado, nunca `0`.
+    """
+    por_ano = {linha.get("nu_ano_censo"): linha for linha in linhas}
+    valores: list[float | None] = []
+    for ano in anos:
+        linha = por_ano.get(ano)
+        valor = linha.get("qt_mat_bas") if linha else None
+        if isinstance(valor, bool):
+            valor = None
+        valores.append(valor if valor is None else float(valor))
+    if nome_destaque:
+        desc = f"Série de matrícula de {nome_destaque}: "
+    else:
+        desc = "Série de matrícula: "
+    if any(valor is None for valor in valores):
+        return None, "sem dado no ano", desc + "sem dado."
+    assert all(valor is not None for valor in valores)
+    reais = [float(valor) for valor in valores]  # type: ignore[misc]
+    minimo, maximo = min(reais), max(reais)
+    if maximo == minimo:
+        ordenadas = [100.0 for _ in reais]
+    else:
+        amplitude = maximo - minimo
+        ordenadas = [
+            _Y_BASE_PRANCHA
+            - (valor - minimo) / amplitude * (_Y_BASE_PRANCHA - _Y_TOPO_PRANCHA)
+            for valor in reais
+        ]
+    if len(anos) == len(_XS_PRANCHA):
+        xs = list(_XS_PRANCHA)
+    elif len(anos) == 1:
+        xs = [268]
+    else:
+        passo = (_XS_PRANCHA[-1] - _XS_PRANCHA[0]) / (len(anos) - 1)
+        xs = [_XS_PRANCHA[0] + round(i * passo) for i in range(len(anos))]
+    pontos = [[x, round(y, 1)] for x, y in zip(xs, ordenadas)]
+    linha_path = "M " + " L ".join(f"{x},{y:.1f}" for x, y in pontos)
+    area_path = (
+        f"{linha_path} L {xs[-1]},{_Y_BASE_PRANCHA} L {xs[0]},{_Y_BASE_PRANCHA} Z"
+    )
+    anterior, ultimo = reais[-2], reais[-1]
+    variacao = (ultimo - anterior) / anterior * 100 if anterior else None
+    desc += ", ".join(f"{ano}={int(valor)}" for ano, valor in zip(anos, reais))
+    return (
+        {"area": area_path, "linha": linha_path, "pontos": pontos},
+        texto_variacao(variacao),
+        desc + ".",
+    )
+
+
+def _contexto_landing(
+    *,
+    ano_ref: int,
+    anos: list[int],
+    nome_municipio: str | None,
+    destaque: dict[str, Any] | None,
+    barras: list[dict[str, Any]],
+    total_privadas: int | float | None,
+    c4_pct: float | None,
+    serie_dados: dict[str, Any] | None,
+    delta_texto: str,
+    serie_desc: str,
+) -> dict[str, Any]:
+    """Monta o contexto da landing a partir das 4 consultas (ou do vazio).
+
+    Ausência é `None` do início ao fim: o template formata com os filtros de
+    `web/filters.py` (`None` vira "sem dado", nunca `0`).
+    """
+    destaque = destaque or {}
+    return {
+        "ano_ref": ano_ref,
+        "anos": anos,
+        "anos_svg": list(zip(anos, (84, 176, 268, 360, 452))),
+        "nome_municipio": nome_municipio,
+        "destaque_nome": destaque.get("no_entidade"),
+        "destaque_mat": destaque.get("mat_entidade"),
+        "destaque_mat_contar": _contar(destaque.get("mat_entidade")),
+        "destaque_share": destaque.get("share_privado_pct"),
+        "barras": barras,
+        "total_privadas": total_privadas,
+        "total_contar": _contar(total_privadas),
+        "c4_pct": c4_pct,
+        "c4_contar": _contar(c4_pct),
+        # A série histórica e a variação anual vêm do `get_school_history`
+        # da escola em destaque (a 4ª consulta). Sem ela, "sem dado".
+        # A oferta por etapa continua fora do orçamento: a matriz usa o
+        # estado "desconhecido" do próprio design (o "sem dado" da oferta).
+        "serie_dados": serie_dados,
+        "delta_texto": delta_texto,
+        "serie_desc": serie_desc,
+        "proveniencia": f"Fonte: {FONTE_BASE} ({FONTE_ORGAO}) · {ano_ref}",
+    }
+
+
 @router_inicio.api_route(
     CAMINHO_INICIO,
     methods=["GET", "HEAD"],
@@ -309,47 +520,142 @@ router_inicio = APIRouter(include_in_schema=False)
     summary="Página de entrada (landing)",
 )
 def inicio(request: Request) -> Response:
-    """Landing em `/`: hero do produto com o painel do recorte (card `t_437796c3`).
+    """Landing em `/`: estrutura literal do protótipo, valores do repositório.
 
-    Substitui o redirect `307` → `/app/` (card `t_0c84b91f`): quem chega na
-    raiz vê a apresentação do produto e o link para a busca, e quem tem `/app/`
-    em favorito ou link compartilhado continua caindo direto nas escolas.
+    O HTML é o `<body>` de `panorama-escola-landing.html` (card `t_e42049c1`):
+    copy, classes, `id`, `aria-*`, `data-reveal`, `data-od-id` — verbatim.
+    Os valores que eram mock do protótipo (card `t_e06e1ad5`) agora vêm do
+    repositório, no máximo 4 consultas por render, todas do recorte fixo
+    (Belo Horizonte, maior ano de `APP_ANOS_DISPONIVEIS`, etapa padrão):
 
-    O painel da coluna direita (a `prancha` do design) troca a série
-    ilustrativa por três números que saem do **código e da config**, nunca de
-    literal no template:
+    1. `get_market_share(..., limit=5)` — escola em destaque (a 1ª) e as 5
+       barras do ranking (nome + `mat_entidade` + `share_privado_pct`);
+    2. `get_market(...)` — total de privadas (`n_escolas_privadas`, o "de N"
+       da posição e o KPI de escolas);
+    3. `get_concentracao(...)` — `c4_pct` do recorte privado das escolas (o KPI
+       "participação somada das 4 maiores escolas");
+    4. `get_school_history(...)` — série de matrícula da escola em destaque
+       (o gráfico da prancha e a variação anual, calculada da própria série).
 
-    * municípios: `len(municipios_mg())` — lista IBGE versionada, arquivo de
-      apoio de tela, sem BigQuery;
-    * anos: `settings.anos_disponiveis` (`APP_ANOS_DISPONIVEIS`), já validado e
-      canônico no boot;
-    * etapas e modalidades: chaves de `ETAPAS_ROTULOS` sem `"bas"`, que é o
-      total do Censo e não uma etapa (spec §4).
-
-    Nenhum desses números custa consulta: não há contagem de escolas porque
-    `COUNT(*)` é proibido (`repositories/bigquery/pagination.py:1-5`). Zero
-    chamadas ao repositório. Como :func:`panorama_api.web.e_caminho_web` inclui
-    a raiz, a resposta ganha gzip, `ETag`/`Cache-Control: private, no-cache` com
-    304 e a linha `page_view`, e um erro inesperado aqui vira página HTML
-    (nunca `application/problem+json`).
+    O nome do município vem de `municipios_mg()` (lista versionada, custo
+    zero) e o resultado é cacheado em processo por `DATA_VERSION` — mas só o
+    sucesso completo: com escola em destaque, o histórico (`serie_dados`)
+    precisa existir para cachear; sem ele o parcial recalcula no próximo
+    render e a página se recupera sozinha quando o BigQuery voltar. Se o
+    BigQuery falhar, `/` continua `200` e cada bloco cai para "sem dado" —
+    nunca `500`, nunca `0`. Como :func:`panorama_api.web.e_caminho_web`
+    inclui a raiz, a resposta ganha gzip, `ETag`/`Cache-Control: private,
+    no-cache` com 304 e a linha `page_view`, e um erro inesperado fora das
+    consultas vira página HTML (nunca `application/problem+json`).
     """
+    settings = _settings(request)
+    anos = list(settings.anos_disponiveis)
+    ano_ref = max(anos)
+    chave = (settings.data_version, settings.app_anos_disponiveis)
+    cache = _cache_landing(request)
+    if chave in cache:
+        landing = cache[chave]
+    else:
+        repositorio, _ = dados.fonte(request)
+        try:
+            linhas_share = repositorio.get_market_share(
+                co_municipio=CO_MUNICIPIO_LANDING,
+                ano=ano_ref,
+                etapa=ETAPA_PADRAO_MERCADO,
+                entidade_tipo="escola",
+                limit=TOP_LANDING,
+                offset=0,
+            )
+        except Exception:
+            linhas_share = []
+        try:
+            linhas_market = repositorio.get_market(
+                co_municipio=CO_MUNICIPIO_LANDING,
+                ano=ano_ref,
+                etapa=ETAPA_PADRAO_MERCADO,
+            )
+        except Exception:
+            linhas_market = []
+        try:
+            linhas_conc = repositorio.get_concentracao(
+                co_municipio=CO_MUNICIPIO_LANDING,
+                ano=ano_ref,
+                etapa=ETAPA_PADRAO_MERCADO,
+            )
+        except Exception:
+            linhas_conc = []
+        destaque = linhas_share[0] if linhas_share else None
+        barras = [
+            {
+                "nome": linha.get("no_entidade"),
+                "share": linha.get("share_privado_pct"),
+            }
+            for linha in linhas_share[:TOP_LANDING]
+        ]
+        while len(barras) < TOP_LANDING:
+            barras.append({"nome": None, "share": None})
+        max_share = max(
+            (float(barra["share"]) for barra in barras if barra["share"] is not None),
+            default=None,
+        )
+        for barra in barras:
+            barra["classe"] = _classe_largura(barra["share"], max_share)
+        linha_market = next(
+            (
+                linha
+                for linha in linhas_market
+                if linha.get("etapa") == ETAPA_PADRAO_MERCADO
+            ),
+            linhas_market[0] if linhas_market else None,
+        )
+        linha_conc = _linha_concentracao_privadas(linhas_conc)
+        try:
+            co_destaque = (destaque or {}).get("id_entidade")
+            linhas_hist = (
+                repositorio.get_school_history(
+                    co_entidade=co_destaque,
+                    ano_inicio=anos[0],
+                    ano_fim=anos[-1],
+                )
+                if co_destaque
+                else []
+            )
+        except Exception:
+            linhas_hist = []
+        serie_dados, delta_texto, serie_desc = _serie_prancha(
+            linhas_hist,
+            anos=anos,
+            nome_destaque=(destaque or {}).get("no_entidade"),
+        )
+        landing = _contexto_landing(
+            ano_ref=ano_ref,
+            anos=anos,
+            nome_municipio=_nome_municipio_landing(),
+            destaque=destaque,
+            barras=barras,
+            total_privadas=(linha_market or {}).get("n_escolas_privadas"),
+            c4_pct=(linha_conc or {}).get("c4_pct"),
+            serie_dados=serie_dados,
+            delta_texto=delta_texto,
+            serie_desc=serie_desc,
+        )
+        if linhas_share and linhas_market and linhas_conc and (
+            serie_dados is not None if destaque else True
+        ):
+            cache[chave] = landing
     contexto = contexto_base(request)
     municipios = municipios_mg()
     # Marquise da landing: a tupla versionada é de códigos IBGE; o nome sai da
     # mesma lista de `municipios_mg()`, então o template não escreve topônimo
-    # nenhum e nada de ilustrativo entra na tela (plano §5).
+    # nenhum. O design repete a sequência duas vezes no trilho (loop do
+    # marquee) — o template itera a lista duas vezes.
     por_codigo = {m.co_municipio: m.no_municipio for m in municipios}
     contexto.update(
-        # As 853 opções da barra de busca do hero saem da mesma lista versionada
-        # da busca (`GET /app/`); lista de apoio de tela, zero consulta.
-        municipios=municipios,
-        recorte_municipios=len(municipios),
-        recorte_anos=anos_publicados(_settings(request).anos_disponiveis),
-        # `"bas"` é o total oficial do Censo, não uma etapa do mercado.
-        recorte_etapas=sum(1 for etapa in ETAPAS_ROTULOS if etapa != "bas"),
-        # Assets da landing (plano §7): a camada visual e a foto entram pelo
-        # mesmo registro com hash que o resto do front, só nesta tela.
+        # Assets da landing: a camada visual, o JS de revelação/contadores e
+        # a foto entram pelo mesmo registro com hash que o resto do front,
+        # só nesta tela.
         css_landing_url=assets().url("landing.css"),
+        js_landing_url=assets().url("landing.js"),
         foto_landing_url=assets().url("escola-felisburgo-mg.webp"),
         # A marquise é decorativa: código que não esteja na lista versionada é
         # ignorado aqui em vez de derrubar a landing (500). O teste
@@ -357,6 +663,7 @@ def inicio(request: Request) -> Response:
         marquise_municipios=[
             por_codigo[codigo] for codigo in MARQUISE_MUNICIPIOS if codigo in por_codigo
         ],
+        **landing,
     )
     return templates().TemplateResponse(request, "inicio.html", contexto)
 

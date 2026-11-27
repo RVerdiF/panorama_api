@@ -6,8 +6,10 @@ nenhuma rede/BigQuery):
 * A1 — `GET /` responde ``200`` com a **página de entrada** em HTML (o redirect
   ``307`` → `/app/` saiu no card `t_386b791c`), `HEAD /` também responde ``200``,
   a página sai com gzip, ``ETag``/`private, no-cache` com ``304``, gera a linha
-  `page_view` (prova em `test_web_observabilidade.py`), não consulta o
-  repositório e um erro inesperado nela vira página HTML — e `/v1/*`/`/health`
+  `page_view` (prova em `test_web_observabilidade.py`), consulta o
+  repositório no máximo 4 vezes por render (recorte fixo, card `t_e06e1ad5`
+  + série da prancha, card `t_cd53cdc1`)
+  e um erro inesperado nela vira página HTML — e `/v1/*`/`/health`
   continuam intactos;
 * A2/A3 — `/app/` sem consulta orienta (o que é, recorte MG, anos de
   `APP_ANOS_DISPONIVEIS`, fonte INEP) e **não** mostra "sem dado" do bloco
@@ -34,6 +36,7 @@ from panorama_api.web import routes as web_routes
 from tests.unit.conftest import (
     FakeRepository,
     competidor_row,
+    concentracao_row,
     history_row,
     indicator_row,
     market_row,
@@ -50,7 +53,7 @@ MUNICIPIO = "3106200"
 MERCADO = f"{PREFIXO_WEB}/mercados/{MUNICIPIO}"
 ESCOLA = f"{PREFIXO_WEB}/escolas/31000001"
 TITULO_INICIO = (
-    "Panorama Escola — escolas e mercados da educação básica em Minas Gerais"
+    "Panorama Escola — inteligência de mercado educacional em Minas Gerais"
 )
 
 
@@ -115,15 +118,16 @@ def test_raiz_responde_a_landing_em_html(cliente: TestClient):
     # Não é mais redirect: o corpo é a página, não um `Location`.
     assert "location" not in resposta.headers
     html = resposta.text
-    # O `h1` do design tem três `span.hero__linha` (máscara); a copy é a mesma.
+    # O `h1` do design tem três `span.hero__linha` (máscara do título).
     h1 = re.search(r"<h1\b[^>]*>(.*?)</h1>", html, re.S)
     assert h1 is not None, "h1 ausente em `/`"
     assert re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", h1.group(1))).strip() == (
-        "Escolas e mercados da educação básica em Minas Gerais"
+        "O mercado escolar de Minas, lido por dentro."
     )
-    # A busca continua em `/app/`, e é para lá que a landing leva — desde o card
-    # `t_e075a6f6` pelo formulário GET do hero, não por um link textual.
-    assert re.search(r'<form class="hero__busca" method="get" action="/app/"', html)
+    # A busca continua em `/app/`, e é para lá que a landing leva — pelos
+    # CTAs do design (card `t_e42049c1`), não mais pelo formulário do hero.
+    assert 'href="/app/" data-od-id="hero-cta"' in html
+    assert 'href="/app/" data-od-id="capitulo-busca"' in html
 
 
 def test_raiz_responde_head_com_a_pagina(cliente: TestClient):
@@ -154,19 +158,23 @@ def test_raiz_tem_o_titulo_da_landing(cliente: TestClient):
     assert titulo.group(1) == TITULO_INICIO
 
 
-def test_raiz_usa_o_shell_com_um_unico_h1_e_landmarks(cliente: TestClient):
+def test_raiz_usa_o_shell_do_design_com_um_unico_h1_e_landmarks(cliente: TestClient):
+    """A landing usa a navbar `.lnav` e o rodapé `.rodape` do protótipo.
+
+    Card `t_e42049c1` (Regra Zero): o shell do app (`header.topo`,
+    `div.envoltorio` agrupando topo + main, macro `rodape_final`) fica nas
+    outras telas — em `/` o `base.html` cede o bloco `pagina` ao design.
+    """
     html = _get(cliente, INICIO).text
 
     assert html.count("<h1") == 1
-    assert '<header class="topo">' in html
-    assert '<div class="envoltorio">' in html
-    assert '<main id="conteudo"' in html
-    assert '<footer class="rodape-final">' in html
-    # A landing não exibe valor nenhum: a nota de ausência do rodapé sairia como
-    # ruído (mesma regra da 1ª visita da busca, achado A3). A copy da seção de
-    # fonte (card `t_2c2e564b`) fala de "sem dado" — a asserção é sobre a nota
-    # do rodapé, não sobre a expressão em qualquer lugar da página.
-    assert "Esta página nunca troca dado ausente por zero" not in html
+    assert '<header class="lnav" id="nav"' in html
+    assert '<body class="land">' in html
+    assert '<main class="envoltorio" id="conteudo"' in html
+    assert '<footer class="rodape">' in html
+    assert '<header class="topo">' not in html
+    assert '<div class="envoltorio">' not in html
+    assert "rodape-final" not in html
 
 
 def test_raiz_sai_comprimida_com_gzip(cliente: TestClient):
@@ -221,14 +229,35 @@ def test_erro_inesperado_na_raiz_vira_pagina_html(
     assert "boom na landing" not in resposta.text
 
 
-def test_raiz_nao_consulta_o_repositorio(entrada_repo: FakeRepository):
-    app = create_app(settings=_settings(), repository=entrada_repo)
+def test_raiz_consulta_no_maximo_4_vezes_o_recorte_fixo(entrada_repo: FakeRepository):
+    """A landing consulta o repositório — no máximo 4 vezes por render.
+
+    Card `t_e06e1ad5` + série da prancha (card `t_cd53cdc1`): GET e HEAD
+    compartilham o cache em processo (por `DATA_VERSION`), então os dois
+    juntos não passam de 4 consultas (3 do recorte fixo — BH, maior ano,
+    etapa padrão — e o histórico da escola em destaque). O fixture traz o
+    histórico do destaque para o render ser completo e cacheável (parcial
+    com destaque e sem série não cacheia e recalcula no render seguinte).
+    """
+    repo = FakeRepository(
+        municipios=[municipio_row()],
+        markets=[market_row(nu_ano_censo=2025, etapa="bas")],
+        concentracao=[concentracao_row(nu_ano_censo=2025, etapa="bas")],
+        share=[share_row(nu_ano_censo=2025)],
+        history=[history_row(nu_ano_censo=ano) for ano in ANOS],
+    )
+    app = create_app(settings=_settings(), repository=repo)
     with TestClient(app) as test_client:
-        entrada_repo.calls.clear()
         test_client.request("GET", INICIO)
         test_client.request("HEAD", INICIO)
 
-    assert entrada_repo.calls == []
+    assert 1 <= len(repo.calls) <= 4, repo.calls
+    assert {nome for nome, _ in repo.calls} <= {
+        "get_market_share",
+        "get_market",
+        "get_concentracao",
+        "get_school_history",
+    }, repo.calls
 
 
 def test_health_continua_json_intacto(cliente: TestClient):

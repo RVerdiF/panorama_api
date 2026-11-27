@@ -1,6 +1,6 @@
-"""Orçamento de peso da landing `/` — card `t_386b791c` (spec §7).
+"""Orçamento de peso da landing `/` — card `t_e42049c1` (porte literal, V5).
 
-Este é o teste que vale para **todos** os cards da landing (L1→L4): quem
+Este é o teste que vale para **todos** os cards da landing (L1→L4 e V5): quem
 engordar o HTML de `/` ou o `app.css` além do orçamento quebra aqui, antes do
 review. Os limites, em bytes:
 
@@ -8,7 +8,14 @@ review. Os limites, em bytes:
 |---|---|---|
 | HTML de `/` | 65.536 B | 14.336 B |
 | CSS total nas demais telas (3 stylesheets) | 66.560 B | 16.384 B |
-| CSS total em `/` (até 4 stylesheets) | 73.728 B | 18.432 B |
+| CSS total em `/` (4 stylesheets) | 88.064 B | 21.504 B |
+
+O teto de `/` subiu no V5 (`t_e42049c1`): o `landing.css` agora é o do
+protótipo verbatim (26.679 B) mais a seção de `:nth-child()` que substitui
+os 40 `style=` inline (a CSP é `style-src 'self'`). Medido: 83.981 B brutos
+e 20.078 B em gzip no total (4 contextos gzip somem mais que 1 arquivo só).
+Diferença para o teto antigo do P4 (73.728 B / 18.432 B): +10.253 B brutos
+(+13,9%) e +1.646 B em gzip (+8,9%) — é o peso do design, não folga.
 
 O teto de `/` é o do **P4** aprovado no plano `landing-d2.md` (card
 `t_891eee10`): o porte da landing acrescenta um quarto stylesheet, carregado
@@ -29,11 +36,12 @@ A imagem da landing também é orçamento: o WebP servido com hash e
 
 As fontes são orçamento à parte (`test_web_fontes.py`): 6 arquivos, ≤ 360 KB.
 
-Além do peso, o orçamento inclui a forma dos recursos: **6 requests** na
-primeira visita (o HTML, três stylesheets, o `app.js` com `defer` — card
-`t_71b25279` — e o `preload` da fonte do corpo, card V1), nenhum `<img>`,
-`<iframe>`, `@import` ou `url(` de origem externa no CSS. A página continua
-funcionando sem JS: o script é só melhoria progressiva.
+Além do peso, o orçamento inclui a forma dos recursos: **8 requests** na
+primeira visita (o HTML, quatro stylesheets, o `app.js` e o `landing.js` com
+`defer` — card `t_e42049c1` — e o `preload` da fonte do corpo, card V1), um
+`<img>` (a foto da banda), nenhum `<iframe>`, `@import` ou `url(` de origem
+externa no CSS. A página continua legível sem JS: os scripts são melhoria
+progressiva (revelação, contadores, progresso).
 
 As medições são impressas (rode com `-s` para vê-las) e aparecem no handoff do
 card. Nada aqui toca rede ou BigQuery: o HTML vem do `TestClient` com
@@ -74,11 +82,11 @@ LIMITE_HTML_BRUTO = 65_536
 LIMITE_HTML_GZIP = 14_336
 LIMITE_CSS_BRUTO = 66_560
 LIMITE_CSS_GZIP = 16_384
-#: Teto do CSS **da landing**: os do P4 do plano `landing-d2.md` (73.728 B
-#: brutos / 18.432 B em gzip), para o quarto stylesheet da landing caber sem
-#: abrir o mesmo espaço nas outras telas.
-LIMITE_CSS_LANDING_BRUTO = 73_728
-LIMITE_CSS_LANDING_GZIP = 18_432
+#: Teto do CSS **da landing**: revisto no V5 (`t_e42049c1`) para o peso do
+#: design verbatim + a seção de `:nth-child()` (medido 83.981 B brutos /
+#: 20.078 B em gzip, tetos com folga em 86/21 KB).
+LIMITE_CSS_LANDING_BRUTO = 88_064
+LIMITE_CSS_LANDING_GZIP = 21_504
 #: Orçamento da foto da landing (P4): 1 WebP 960×540 de até 80 KB, e nenhuma
 #: outra imagem no HTML de `/` (o teste de `<img>` continua abaixo).
 LIMITE_IMAGEM_BRUTOS = 81_920
@@ -95,6 +103,7 @@ REFERENCIA = re.compile(r'(?:src|href)="([^"]*)"')
 ESTILO = re.compile(r"<link[^>]*rel=\"stylesheet\"[^>]*>")
 SCRIPT = re.compile(r"<script\b[^>]*>\s*</script>")
 ASSET_JS = re.compile(r'src="/app/static/[0-9a-f]{12}-app\.js" defer')
+ASSET_LANDING_JS = re.compile(r'src="/app/static/[0-9a-f]{12}-landing\.js" defer')
 #: Tag `<img …>` inteira (o porte permite exatamente uma, a foto da banda).
 IMAGEM_TAG = re.compile(r"<img\b[^>]*>")
 
@@ -114,7 +123,7 @@ def _settings() -> Settings:
 
 @pytest.fixture
 def html_da_landing() -> bytes:
-    """HTML cru (sem gzip) de `/`: a landing não consulta o repositório."""
+    """HTML cru (sem gzip) de `/` (repositório fake vazio: blocos em 'sem dado')."""
     app = create_app(settings=_settings(), repository=FakeRepository())
     with TestClient(app) as cliente:
         resposta = cliente.get(
@@ -210,12 +219,14 @@ def test_css_da_landing_tem_teto_proprio(html_da_landing: bytes):
 # -- forma dos recursos: 3 stylesheets com hash, sem terceiros ------------
 
 
-def test_landing_carrega_so_o_app_js_local(html_da_landing: bytes):
+def test_landing_carrega_app_js_e_landing_js_com_defer(html_da_landing: bytes):
+    """A landing soma o `landing.js` (V5) ao `app.js`: dois scripts, com `defer`."""
     html = html_da_landing.decode("utf-8")
 
     scripts = SCRIPT.findall(html)
-    assert len(scripts) == 1, f"esperado 1 script, achei {len(scripts)}"
+    assert len(scripts) == 2, f"esperados 2 scripts, achei {len(scripts)}"
     assert ASSET_JS.search(scripts[0]), scripts[0]
+    assert ASSET_LANDING_JS.search(scripts[1]), scripts[1]
     assert "<iframe" not in html.lower()
 
     # Exatamente uma imagem: a foto da banda, local, com hash, fora do caminho
@@ -377,4 +388,54 @@ def test_imagem_da_landing_e_servida_como_webp_imutavel():
     assert resposta.headers["cache-control"] == "public, max-age=31536000, immutable"
     assert resposta.headers["x-content-type-options"] == "nosniff"
     assert resposta.content == asset.corpo
+
+
+# -- o `landing.js` da landing: orçamento, servido e construções ---------------
+
+
+#: Orçamento do `landing.js` vendorizado (V5, byte a byte do protótipo, sem
+#: minificação). O teto é o tamanho real medido (`wc -c`, 4269) com folga.
+ORCAMENTO_LANDING_JS = 8_192
+
+#: Construções proibidas num arquivo sob CSP estrita sem `'unsafe-eval'`
+#: (mesma lista do `app.js`: o `landing.js` do design usa `textContent` e
+#: CSSOM, nunca `innerHTML`).
+PROIBIDOS_LANDING_JS = ("eval(", "innerHTML", "new Function", "document.write")
+
+
+def test_landing_js_e_servido_como_javascript_imutavel():
+    """Critério 10 do card: `200` + `immutable` + `text/javascript` na URL com hash."""
+    from panorama_api.web.routes import STATIC_DIR, assets
+
+    assert (STATIC_DIR / "landing.js").is_file(), "landing.js ausente em static/"
+
+    registro = assets()
+    url = registro.url("landing.js")
+    assert re.fullmatch(r"/app/static/[0-9a-f]{12}-landing\.js", url), url
+
+    app = create_app(settings=_settings(), repository=FakeRepository())
+    with TestClient(app) as cliente:
+        resposta = cliente.get(url)
+
+    assert resposta.status_code == 200, url
+    assert resposta.headers["content-type"] == "text/javascript; charset=utf-8"
+    assert resposta.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert resposta.headers["x-content-type-options"] == "nosniff"
+
+
+def test_landing_js_cabe_no_orcamento_de_8192_bytes():
+    from panorama_api.web.routes import STATIC_DIR
+
+    tamanho = len((STATIC_DIR / "landing.js").read_bytes())
+    print(f"landing.js: {tamanho} B brutos")
+
+    assert tamanho <= ORCAMENTO_LANDING_JS, f"landing.js com {tamanho} bytes"
+
+
+def test_landing_js_nao_usa_construcoes_incompativeis_com_a_csp():
+    from panorama_api.web.routes import STATIC_DIR
+
+    fonte = (STATIC_DIR / "landing.js").read_text(encoding="utf-8")
+    for proibido in PROIBIDOS_LANDING_JS:
+        assert proibido not in fonte, proibido
 

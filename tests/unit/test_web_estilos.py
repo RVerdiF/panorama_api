@@ -125,31 +125,16 @@ def test_hover_em_link_botao_e_paginacao():
         assert seletor in css, f":hover ausente para {seletor}"
 
 
-def test_acao_do_formulario_nao_troca_flex_direction_na_regra_base():
-    """O botão de busca estica na largura da célula em `campo--acao`.
-
-    A busca do protótipo não tem mais o link "Limpar filtros" dentro da célula
-    de ação (o limpar é um `a.botao` nos chips), então a regra `:has()` que
-    virava linha saiu no D1-E7. O que sobra é o invariante: a base não força
-    `row`, senão o botão deixa de esticar na coluna.
-    """
-    base = _regra(".campo--acao")
-    assert "flex-direction" not in base, (
-        "`.campo--acao` não deve trocar flex-direction na regra base"
-    )
-
-
-def test_alvos_de_toque_do_formulario_tem_44px():
-    """O formulário do SSR empilha campos e botão; ambos com alvo ≥44px.
-
-    O `.paginacao__link` do SSR antigo saiu no D1-E7 — a paginação das telas
-    migradas é `nav.paginacao > .botao` (`.botao` já tem 46px no protótipo).
-    """
-    campos = _regra('.campo input[type="search"],\n.campo select')
-    for regra, alvo in ((campos, "campos"), (_regra(".formulario button"), "botão")):
-        altura = re.search(r"(?:min-)?height:\s*(\d+)px", regra)
-        assert altura is not None, f"{alvo} do formulário sem altura explícita"
-        assert int(altura.group(1)) >= ALVO_MINIMO_PX
+# -- busca no hero: removida no V5 (card `t_e42049c1`) ------------------------
+#
+# O protótipo tem zero `<form>` e zero `<input>` na landing: a barra de busca
+# do hero, o `.campo--acao` e o `.hero__busca` saíram com o porte literal.
+# Os testes que os travavam (`test_acao_do_formulario_*`,
+# `test_alvos_de_toque_do_formulario_*`, `test_campos_e_botoes_da_busca_*`,
+# `test_barra_do_hero_*`) saíram junto — a asserção equivalente sobre o DOM
+# do design é `test_zero_form_e_input_na_landing` em `test_web_inicio.py`.
+# O que fica desta seção são os invariantes dos botões do design, que os
+# CTAs da landing (`botao--primario/secundario`) continuam usando.
 
 
 # -- prancha do recorte (card t_437796c3; porte em D2-E3) --------------------
@@ -192,17 +177,14 @@ def test_rotulos_e_nota_da_prancha_usam_o_texto_secundario():
 
 
 def test_hero_e_desktop_first_com_uma_coluna_abaixo_de_1040px():
-    """O design novo é desktop-first: 2 colunas acima, 1 coluna ≤ 1040px.
+    """O design é desktop-first: `1.12fr/.88fr` acima, 1 coluna ≤ 1040px.
 
-    A regra base declara duas colunas e o breakpoint de 1040px empilha — o
-    inverso do SSR antigo, que subia de 1 para 2 colunas em 48rem. A razão entre
-    as colunas difere da do design (1.12/.88) porque a copy do produto é mais
-    longa e a máscara do título exige uma linha por `span`; o que este teste
-    trava é a **forma** de duas colunas, não o número exato.
+    Card `t_e42049c1` (Regra Zero): a razão do porte antigo saiu — o CSS é o
+    do protótipo verbatim, e este teste trava os números do design.
     """
     base = _regra(".hero")
     assert "display: grid" in base
-    assert re.search(r"grid-template-columns:\s*minmax\(0, [\d.]+fr\) minmax\(0, [\d.]+fr\)", base), base
+    assert "grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr)" in base
 
     css = _css_total()
     bloco = re.search(r"@media \(max-width: 1040px\)\s*\{(.*?)\n\}", css, re.S)
@@ -235,10 +217,7 @@ def test_nenhum_outline_none_sem_indicador_visivel():
     assert ".grafico svg:focus-visible .grafico__captura" in css
 
 
-# -- busca no hero da landing (card t_e075a6f6, spec §6/§8) -------------------
-
-#: Seletor composto dos controles da barra do hero, como está no arquivo.
-CAMPOS_DO_HERO = '.campo input[type="search"],\n.campo select'
+# -- CTAs do hero da landing (card `t_e42049c1`): sem barra de busca ---------
 
 
 def _cor_da_variavel(nome: str) -> str:
@@ -248,7 +227,7 @@ def _cor_da_variavel(nome: str) -> str:
 
 
 def test_botao_primario_do_hero_tem_branco_sobre_a_cor_de_destaque():
-    """"Buscar escolas": o par texto/fundo medido, não herdado."""
+    """CTA primário da landing: o par texto/fundo medido, não herdado."""
     primario = _regra(".botao--primario")
 
     assert "background: var(--accent)" in primario
@@ -260,7 +239,7 @@ def test_botao_primario_do_hero_tem_branco_sobre_a_cor_de_destaque():
 
 
 def test_botao_secundario_do_hero_e_contorno_com_a_cor_de_acao():
-    """`formaction` do mercado: superfície elevada, texto `--fg` e borda token."""
+    """CTA secundário da landing: superfície elevada, texto `--fg` e borda token."""
     secundario = _regra(".botao--secundario")
     base = _regra(".botao")
 
@@ -281,34 +260,8 @@ def test_hover_do_botao_secundario_nao_troca_o_texto_de_cor():
     assert "var(--accent)" in hover
 
 
-def test_campos_e_botoes_da_busca_do_hero_tem_alvo_de_44px():
-    """WCAG 2.5.5 nos dois modos (empilhado e em pílula)."""
-    campos = _regra(CAMPOS_DO_HERO)
-    botao = _regra(".botao")
-
-    for regra, alvo in ((campos, "campos"), (botao, "botões")):
-        altura = re.search(r"(?:min-)?height:\s*(\d+)px", regra)
-        assert altura is not None, f"{alvo} da busca do hero sem min-height"
-        assert int(altura.group(1)) >= ALVO_MINIMO_PX
-
-    # Largura: os campos ocupam 100% da coluna e os botões, a do `.hero__acoes`.
-    assert "width: 100%" in campos
-    assert "grid-template-columns: minmax(0, 1fr)" in _regra(".hero__busca .hero__acoes")
-
-
-def test_barra_do_hero_empilha_com_raio_16px_e_vira_pilula_em_48rem():
-    css = _css_total()
-    base = _regra(".hero__busca")
-
-    # Empilhada abaixo de 48rem: uma coluna, raio de 16 px e sombra da peça.
-    assert "grid-template-columns: minmax(0, 1fr)" in base
-    assert "border-radius: 16px" in base
-    assert "box-shadow: 0 1px 3px rgba(0, 0, 0, .08)" in base
-    # Pílula a partir de 48rem: o raio de 999 px vive dentro do breakpoint.
-    pilula = css.index("border-radius: 999px")
-    assert css.rindex("@media (min-width: 48rem)", 0, pilula) >= 0
-    # O bloco dos botões ocupa a linha inteira da grade da barra.
-    assert "grid-column: 1 / -1" in css
+# (nota V5 no topo desta seção: a barra de busca do hero saiu; o que fica
+# são os invariantes dos botões dos CTAs do design.)
 
 
 def test_foco_visivel_continua_valendo_para_os_botoes():
