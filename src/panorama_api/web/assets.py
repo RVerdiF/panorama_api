@@ -47,6 +47,7 @@ MEDIA_TYPES: Mapping[str, str] = {
     ".svg": "image/svg+xml",
     ".ico": "image/x-icon",
     ".png": "image/png",
+    ".webp": "image/webp",
     ".woff2": "font/woff2",
     ".js": "text/javascript; charset=utf-8",
 }
