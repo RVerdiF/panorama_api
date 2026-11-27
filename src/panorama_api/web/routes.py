@@ -41,6 +41,7 @@ from panorama_api.web.conteudo import (
     ETAPAS_ROTULOS,
     ETAPA_PADRAO_MERCADO,
     EXPLICACAO_OFERTA_DESCONHECIDA,
+    MARQUISE_MUNICIPIOS,
     MOTIVO_SECAO_INDICADORES,
     ROTULO_COMPARAR_COM_ESTA,
     ROTULO_RETENCAO,
@@ -314,8 +315,9 @@ def inicio(request: Request) -> Response:
     raiz vê a apresentação do produto e o link para a busca, e quem tem `/app/`
     em favorito ou link compartilhado continua caindo direto nas escolas.
 
-    O painel da coluna direita troca a foto da referência visual por três
-    números que saem do **código e da config**, nunca de literal no template:
+    O painel da coluna direita (a `prancha` do design) troca a série
+    ilustrativa por três números que saem do **código e da config**, nunca de
+    literal no template:
 
     * municípios: `len(municipios_mg())` — lista IBGE versionada, arquivo de
       apoio de tela, sem BigQuery;
@@ -333,6 +335,10 @@ def inicio(request: Request) -> Response:
     """
     contexto = contexto_base(request)
     municipios = municipios_mg()
+    # Marquise da landing: a tupla versionada é de códigos IBGE; o nome sai da
+    # mesma lista de `municipios_mg()`, então o template não escreve topônimo
+    # nenhum e nada de ilustrativo entra na tela (plano §5).
+    por_codigo = {m.co_municipio: m.no_municipio for m in municipios}
     contexto.update(
         # As 853 opções da barra de busca do hero saem da mesma lista versionada
         # da busca (`GET /app/`); lista de apoio de tela, zero consulta.
@@ -341,6 +347,16 @@ def inicio(request: Request) -> Response:
         recorte_anos=anos_publicados(_settings(request).anos_disponiveis),
         # `"bas"` é o total oficial do Censo, não uma etapa do mercado.
         recorte_etapas=sum(1 for etapa in ETAPAS_ROTULOS if etapa != "bas"),
+        # Assets da landing (plano §7): a camada visual e a foto entram pelo
+        # mesmo registro com hash que o resto do front, só nesta tela.
+        css_landing_url=assets().url("landing.css"),
+        foto_landing_url=assets().url("escola-felisburgo-mg.webp"),
+        # A marquise é decorativa: código que não esteja na lista versionada é
+        # ignorado aqui em vez de derrubar a landing (500). O teste
+        # `test_todo_codigo_da_marquise_existe_na_lista` trava o cadastro.
+        marquise_municipios=[
+            por_codigo[codigo] for codigo in MARQUISE_MUNICIPIOS if codigo in por_codigo
+        ],
     )
     return templates().TemplateResponse(request, "inicio.html", contexto)
 

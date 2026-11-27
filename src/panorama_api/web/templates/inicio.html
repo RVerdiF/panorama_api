@@ -3,11 +3,30 @@
 
 {% block titulo %}Panorama Escola — escolas e mercados da educação básica em Minas Gerais{% endblock %}
 
+{# Camada visual da landing (card `t_3f09d837`): o recorte c' do `landing.css` do
+   protótipo de design, carregado **só** aqui. O bloco entra depois do CSS do
+   protótipo e antes do `app.css`, que fecha a cascata (D1-a). #}
+{% block estilos_pagina %}
+  <link rel="stylesheet" href="{{ css_landing_url }}">
+{% endblock %}
+
 {% block conteudo %}
-  <section class="hero">
-    <div class="hero__texto">
-      <h1>Escolas e mercados da educação básica em Minas Gerais</h1>
-      <p class="subtitulo">
+  {# Porte de `panorama-escola-landing.html` (plano `landing-d2.md` §4). O que
+     saiu do design: a faixa de protótipo, a navbar própria (`.lnav`), a série
+     SVG, a faixa de números ilustrativos, o ranking e a matriz de oferta do
+     Colégio Monte Verde, o fecho de protótipo, o rodapé próprio e o
+     `landing.js`. Fica o shell do app e dado real apenas. #}
+  <section class="hero" aria-labelledby="titulo-hero">
+    <div>
+      <p class="eyebrow">Observatório de mercado educacional · Minas Gerais</p>
+
+      <h1 class="hero__titulo" id="titulo-hero">
+        <span class="hero__linha"><span>Escolas e mercados</span></span>
+        <span class="hero__linha"><span>da educação básica</span></span>
+        <span class="hero__linha"><span>em Minas Gerais</span></span>
+      </h1>
+
+      <p class="hero__lead">
         Matrículas, oferta por etapa, rendimento e participação de mercado das escolas
         mineiras, a partir do Censo Escolar da Educação Básica (INEP).
       </p>
@@ -20,7 +39,7 @@
          navegação. Nada de JS, nada de ano (o ano não filtra a busca) e nada de
          `apenas_ativas` (refinamento da tela de resultados). #}
       <form class="hero__busca" method="get" action="{{ app_prefix }}/" role="search" aria-label="Buscar escolas ou mercado municipal">
-        <div class="hero__campo">
+        <div class="campo">
           <label for="q">Nome da escola</label>
           <input
             type="search"
@@ -30,10 +49,10 @@
             maxlength="100"
             autocomplete="off"
             aria-describedby="q-dica">
-          <p class="dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
+          <p class="campo__dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
         </div>
 
-        <div class="hero__campo">
+        <div class="campo">
           <label for="co_municipio">Município</label>
           {{ select_municipios("co_municipio", "") }}
         </div>
@@ -48,77 +67,144 @@
             formnovalidate>Ver mercado do município</button>
         </div>
       </form>
+
+      <ul class="hero__meta">
+        <li>Censo Escolar · INEP</li>
+        <li>{{ recorte_anos }}</li>
+        <li>MG · {{ recorte_municipios }} municípios</li>
+      </ul>
     </div>
 
-    {# Painel do recorte (spec §4): ocupa a coluna direita no lugar da foto da
-       referência visual. Os três números saem do código e da config — nenhum
-       literal aqui, e nenhuma contagem de escolas: `COUNT(*)` é proibido pela
-       arquitetura. `bas` não entra na contagem de etapas porque é o total do
-       Censo, não uma etapa do mercado. #}
-    <section class="recorte" aria-labelledby="recorte-titulo">
-      <h2 id="recorte-titulo">Recorte dos dados</h2>
-      <dl class="recorte__lista">
-        <div class="recorte__item">
-          <dt class="recorte__rotulo">municípios de Minas Gerais</dt>
-          <dd class="recorte__valor">{{ recorte_municipios }}</dd>
+    {# Prancha 01 do design, com o recorte real no lugar da série ilustrativa. Os
+       três números saem do código e da config — nenhum literal aqui, e nenhuma
+       contagem de escolas: `COUNT(*)` é proibido pela arquitetura. `bas` não
+       entra na contagem de etapas porque é o total do Censo, não uma etapa do
+       mercado. #}
+    <figure class="prancha" aria-labelledby="recorte-titulo">
+      <div class="prancha__fita">
+        <h2 id="recorte-titulo">Recorte dos dados</h2>
+        <i>matrícula · {{ recorte_anos }}</i>
+      </div>
+      <dl class="prancha__base">
+        <div>
+          <dt>municípios de Minas Gerais</dt>
+          <dd>{{ recorte_municipios }}</dd>
         </div>
-        <div class="recorte__item">
-          <dt class="recorte__rotulo">anos do Censo Escolar publicados</dt>
-          <dd class="recorte__valor">{{ recorte_anos }}</dd>
+        <div>
+          <dt>anos do Censo Escolar publicados</dt>
+          <dd>{{ recorte_anos }}</dd>
         </div>
-        <div class="recorte__item">
-          <dt class="recorte__rotulo">etapas e modalidades no mercado</dt>
-          <dd class="recorte__valor">{{ recorte_etapas }}</dd>
+        <div>
+          <dt>etapas e modalidades no mercado</dt>
+          <dd>{{ recorte_etapas }}</dd>
         </div>
       </dl>
-      <p class="recorte__fonte">Fonte: Censo Escolar da Educação Básica (INEP).</p>
-    </section>
+      <p class="prancha__nota">Fonte: Censo Escolar da Educação Básica (INEP).</p>
+    </figure>
   </section>
 
-  {# Conteúdo da landing (card `t_2c2e564b`, spec §5): o que dá para consultar,
-     de onde vêm os dados e para quem é. Copy institucional, sem superlativo e
-     sem CTA de piloto — a landing pública da Fase 2 do `plano.md` é outra. Os
-     anos da seção de fonte saem de `settings.anos_disponiveis` já formatados em
-     `recorte_anos`; nada de literal de ano aqui. #}
-  <section class="secao" aria-labelledby="encontra-titulo">
-    <h2 id="encontra-titulo">O que você encontra</h2>
-    <div class="encontra">
+  {# Capítulos (plano §4, bloco 10): as três rotas do produto, com o texto atual
+     de cada item. Cada linha inteira é clicável pelo `::after` do link; o nome
+     acessível é o texto do próprio link. "Rede mantenedora" do design sai
+     porque não tem rota. #}
+  <section class="secao" id="capitulos" aria-labelledby="encontra-titulo">
+    <div class="secao__cabecalho">
       <div>
-        <h3>Ficha da escola</h3>
-        <p>Série de matrículas, oferta por etapa e rendimento. Nas escolas privadas ativas, também a posição da escola no município.</p>
-        <a href="#q">Buscar uma escola</a>
+        <p class="eyebrow">Capítulos</p>
+        <h2 id="encontra-titulo">O que você encontra</h2>
       </div>
-      <div>
-        <h3>Mercado municipal</h3>
-        <p>Tamanho do mercado, composição por etapa e participação das escolas privadas, ano a ano.</p>
-        <a href="{{ app_prefix }}/mercados/3106200">Ver o mercado de Belo Horizonte</a>
+      <p class="secao__texto">
+        O instrumento foi desenhado para ser percorrido nos dois sentidos: do
+        município para as escolas, da escola para o mercado em volta.
+      </p>
+    </div>
+
+    <div class="capitulos">
+      <div class="capitulo">
+        <span class="capitulo__num">01</span>
+        <div>
+          <h3>Ficha da escola</h3>
+          <p>Série de matrículas, oferta por etapa e rendimento. Nas escolas privadas ativas, também a posição da escola no município.</p>
+        </div>
+        <a class="capitulo__ir" href="#q">Buscar uma escola
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5"/></svg>
+        </a>
       </div>
-      <div>
-        <h3>Metodologia</h3>
-        <p>De onde vem cada número, o que cada indicador mede e quais são os limites de leitura.</p>
-        <a href="{{ href_metodologia }}">Ler a metodologia</a>
+      <div class="capitulo">
+        <span class="capitulo__num">02</span>
+        <div>
+          <h3>Mercado municipal</h3>
+          <p>Tamanho do mercado, composição por etapa e participação das escolas privadas, ano a ano.</p>
+        </div>
+        <a class="capitulo__ir" href="{{ app_prefix }}/mercados/3106200">Ver o mercado de Belo Horizonte
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5"/></svg>
+        </a>
+      </div>
+      <div class="capitulo">
+        <span class="capitulo__num">03</span>
+        <div>
+          <h3>Metodologia</h3>
+          <p>De onde vem cada número, o que cada indicador mede e quais são os limites de leitura.</p>
+        </div>
+        <a class="capitulo__ir" href="{{ href_metodologia }}">Ler a metodologia
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8h9M8.5 4.5 12 8l-3.5 3.5"/></svg>
+        </a>
       </div>
     </div>
   </section>
 
-  <section class="secao" aria-labelledby="fonte-titulo">
-    <h2 id="fonte-titulo">De onde vêm os dados</h2>
-    <p>
-      Os números vêm do Censo Escolar da Educação Básica, levantamento anual do
-      INEP que cobre todas as escolas do país. O Panorama Escola recorta Minas
-      Gerais e publica os anos {{ recorte_anos }}. Quando um dado não existe na
-      base, a tela mostra “sem dado”, e nunca zero.
-    </p>
-    <p><a href="{{ href_metodologia }}">Como os números são calculados</a></p>
-  </section>
+  {# Banda com foto (plano §4, bloco 13 e §9): a única imagem da página, fora da
+     dobra, `lazy` + `async` e com dimensões declaradas. O crédito TASL fica
+     sempre visível na `figcaption`, não em hover. #}
+  <figure class="banda">
+    <div class="banda__moldura">
+      <img src="{{ foto_landing_url }}" width="960" height="540"
+           alt="Fachada de uma escola municipal de um andar, com muro e portão, em Felisburgo, Minas Gerais."
+           loading="lazy" decoding="async">
+    </div>
+    <figcaption>
+      <h2 id="publico-titulo">Para quem é</h2>
+      <p>
+        Para quem acompanha a educação básica privada em Minas Gerais: gestão e
+        expansão de redes, direção de escolas e análise de mercado. O Panorama não
+        exibe dado individual de aluno.
+      </p>
+      <p class="banda__credito">
+        Escola Municipal Euplínia Magalhães Barbosa, Felisburgo (MG). Foto: Túllio F,
+        via <a href="https://commons.wikimedia.org/wiki/File:Escola_Municipal_Euplinia_Magalhaes_Barbosa_-_Felisburgo_18.jpg" rel="noopener">Wikimedia Commons</a>,
+        <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.pt-br" rel="noopener">CC BY-SA 4.0</a>. Imagem redimensionada,
+        exibida em tons de cinza.
+      </p>
+    </figcaption>
+  </figure>
 
-  <section class="secao" aria-labelledby="publico-titulo">
-    <h2 id="publico-titulo">Para quem é</h2>
-    <p>
-      Para quem acompanha a educação básica privada em Minas Gerais: gestão e
-      expansão de redes, direção de escolas e análise de mercado. O Panorama não
-      exibe dado individual de aluno.
-    </p>
+  {# Painel de método (plano §4, bloco 14): "De onde vêm os dados" com os anos da
+     config, e a marquise com nomes reais da lista versionada — decorativa para
+     leitores de tela e sem número nenhum. #}
+  <section class="secao metodo" id="metodo" aria-labelledby="fonte-titulo">
+    <div class="metodo__cabecalho">
+      <div>
+        <p class="eyebrow">Método</p>
+        <h2 id="fonte-titulo">De onde vêm os dados</h2>
+      </div>
+      <div class="metodo__intro">
+        <p>
+          Os números vêm do Censo Escolar da Educação Básica, levantamento anual do
+          INEP que cobre todas as escolas do país. O Panorama Escola recorta Minas
+          Gerais e publica os anos {{ recorte_anos }}. Quando um dado não existe na
+          base, a tela mostra “sem dado”, e nunca zero.
+        </p>
+        <p><a href="{{ href_metodologia }}">Como os números são calculados</a></p>
+      </div>
+    </div>
+
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee__trilha">
+        {%- for municipio in marquise_municipios %}
+        <span>{{ municipio }}</span>
+        {%- endfor %}
+      </div>
+    </div>
   </section>
 
   {# A landing apresenta o produto e não exibe valor nenhum: sem a nota de

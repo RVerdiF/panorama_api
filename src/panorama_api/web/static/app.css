@@ -120,8 +120,7 @@
   border-radius: var(--radius-md);
   background: var(--surface-raise);
 }
-.campo label,
-.hero__campo label {
+.campo label {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
@@ -332,155 +331,10 @@ td .barra-share__trilho {
   gap: 0.65rem;
 }
 
-/* --- app-only: landing/hero, recorte e cartões (telas sem contraparte) --- */
-.hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 1.5rem;
-  align-items: start;
-}
-
-/* O `h1` da landing usa o mesmo topo de escala (`--text-3xl`): 76 px é outdoor
-   numa página de leitura, então `--text-4xl` fica no token, não no título. */
-.hero h1 {
-  margin: 0 0 var(--space-4);
-  font-size: clamp(2.25rem, 4.6vw, var(--text-3xl));
-  line-height: var(--leading-tight);
-  letter-spacing: var(--tracking-display);
-  max-width: 24ch;
-}
-
-.hero__busca {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.75rem;
-  margin: 1.5rem 0 0;
-  padding: 1rem;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  background: var(--surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.hero__campo {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  min-width: 0;
-}
-
-.hero__campo input[type="search"],
-.hero__campo select {
-  font: inherit;
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-  height: 46px;
-  padding: 0 13px;
-  border: 1px solid var(--muted);
-  border-radius: var(--radius-sm);
-  background: var(--surface-raise);
-  color: var(--fg);
-  box-shadow: var(--inset-well);
-}
-
-.hero__acoes {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.5rem;
-}
-
-/* Painel do recorte: tint do acento e raio grande; contraste medido no teste. */
-.hero .recorte {
-  margin-top: 0;
-  padding: var(--space-6);
-  background: var(--surface-warm);
-  border-radius: 16px;
-}
-
-.hero .recorte h2 {
-  margin-top: 0;
-  font-family: var(--font-display);
-  font-size: var(--text-lg);
-  letter-spacing: -0.005em;
-}
-
-.recorte__lista {
-  display: grid;
-  gap: 1.25rem;
-  margin: 0;
-}
-
-/* Número em cima do rótulo sem inverter a ordem do `dl`: o número segue `dd`. */
-.recorte__item {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 0.15rem;
-}
-
-.recorte__rotulo {
-  color: var(--muted-strong);
-  max-width: none;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.recorte__valor {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 2.75rem);
-  font-weight: 600;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.recorte__fonte {
-  margin: 1.25rem 0 0;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.02em;
-  color: var(--muted-strong);
-  max-width: none;
-}
-
-/* "O que você encontra": 3 colunas a partir de 48rem. */
-.encontra {
-  display: grid;
-  gap: 1.25rem;
-}
-
-/* Cada card é uma coluna flex com o link ancorado no pé: os três CTAs ficam na
-   mesma linha de base mesmo com parágrafos de alturas diferentes. */
-.encontra > div {
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-5);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-md);
-  background: var(--surface-raise);
-  box-shadow: var(--bevel-top), var(--raise-sm);
-}
-
-.encontra h3 {
-  margin: 0 0 var(--space-2);
-}
-
-.encontra p {
-  margin: 0 0 var(--space-3);
-  font-size: var(--text-sm);
-  color: var(--fg-2);
-}
-
-.encontra a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  margin-top: auto;
-  font-weight: 600;
-}
+/* --- app-only: barra de busca do hero --- */
+/* `.hero__busca`, `.hero__campo` e `.hero__acoes` saíram no card `t_3f09d837`:
+   são markup exclusivo de `/` e vivem em `static/landing.css`, carregado só
+   nessa tela. Aqui ficam só os genéricos do SSR usados por outras telas. */
 
 /* --- app-only: saída da subnav ---
    As âncoras diretas seguem o protótipo: o estado ativo já vem do bloco
@@ -543,37 +397,6 @@ td .barra-share__trilho {
 }
 
 /* --- app-only: responsivo (só seletores desta seção) --- */
-@media (min-width: 48rem) {
-  .hero {
-    grid-template-columns: 1.1fr 0.9fr;
-    gap: 1.5rem 2.5rem;
-    align-items: center;
-  }
-
-  /* Pílula em dois blocos: campos, depois botões. */
-  .hero__busca {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 0.5rem 0.9rem;
-    padding: 0.9rem 2.5rem;
-    border-radius: 999px;
-  }
-
-  .hero__acoes {
-    grid-column: 1 / -1;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-
-  .hero__busca .dica {
-    display: none;
-  }
-
-  .encontra {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 40rem) {
   .lista-definicoes {
     grid-template-columns: 1fr;
