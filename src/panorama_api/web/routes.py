@@ -31,7 +31,13 @@ from panorama_api.contract import (
     UNIVERSO_ESCOLAS_MG,
 )
 from panorama_api.core import validation
-from panorama_api.core.errors import ErrorCode, ProblemError, ano_fora_do_contrato, invalid
+from panorama_api.core.errors import (
+    ErrorCode,
+    ProblemError,
+    UpstreamUnavailable,
+    ano_fora_do_contrato,
+    invalid,
+)
 from panorama_api.web import CAMINHO_INICIO, PREFIXO_WEB, dados
 from panorama_api.web.assets import CACHE_CONTROL_ASSET, AssetRegistry
 from panorama_api.web.conteudo import (
@@ -1105,6 +1111,136 @@ def mercado_atalho(
     )
 
 
+#: Motivo das células sem dado do índice quando o município não tem escola
+#: privada ativa (decisão P-V-1, variante A). Nunca vira `0` (AGENTS.md §6).
+MOTIVO_SEM_ESCOLA_PRIVADA = "sem escola privada ativa"
+#: Variação nula com matrícula no ano mas sem ano anterior: a base existe, só
+#: não há par para comparar (o SQL devolve NULL sem base no ano anterior).
+MOTIVO_SEM_ANO_ANTERIOR = "sem ano anterior"
+
+
+def _linhas_indice(
+    indice: Any, nomes: Mapping[str, str]
+) -> list[dict[str, Any]]:
+    """Linhas da tabela já na ordem do SQL (matrícula desc, nulos por último).
+
+    `indice` é o envelope de :func:`dados.indice_municipios` (o tipo mora no
+    `services`, que `routes.py` não importa — fronteira `test_web_fronteira`).
+    Cada linha carrega o texto pronto de variação (sinal tipográfico do
+    protótipo) e o motivo da ausência, para o template não decidir regra de
+    exibição. A largura da barra espelha o mock (`Math.max(2, …)`, 1 casa).
+    """
+    max_qt = max(
+        (
+            linha.qt_mat_privada
+            for linha in indice.linhas
+            if linha.qt_mat_privada is not None
+        ),
+        default=None,
+    )
+    prontas: list[dict[str, Any]] = []
+    for posicao, linha in enumerate(indice.linhas, start=1):
+        qt = linha.qt_mat_privada
+        anterior = linha.qt_mat_privada_anterior
+        variacao = linha.variacao_pct
+        #: Sem escola privada ativa = `n_escolas_privadas` 0 ou nulo (decisão
+        #: P-V-1, variante A; rodada 1 do review). Só aí o motivo "sem escola
+        #: privada ativa" pode sair — matrícula nula com escola ≥1 é ausência
+        #: de outro tipo e não leva esse título (`NULL ≠ 0`).
+        sem_escola = (
+            linha.n_escolas_privadas is None or linha.n_escolas_privadas == 0
+        )
+        if qt is None:
+            motivo_matricula: str | None = (
+                MOTIVO_SEM_ESCOLA_PRIVADA if sem_escola else None
+            )
+        else:
+            motivo_matricula = None
+        if variacao is None:
+            if qt is None:
+                motivo_variacao: str | None = (
+                    MOTIVO_SEM_ESCOLA_PRIVADA if sem_escola else None
+                )
+            elif anterior is None:
+                motivo_variacao = MOTIVO_SEM_ANO_ANTERIOR
+            else:
+                motivo_variacao = None
+        else:
+            motivo_variacao = None
+        prontas.append(
+            {
+                "posicao": posicao,
+                "co_municipio": linha.co_municipio,
+                "nome": nomes[linha.co_municipio],
+                "qt_mat_privada": qt,
+                "largura": (
+                    f"{max(2.0, qt / max_qt * 100):.1f}%"
+                    if qt is not None and max_qt
+                    else None
+                ),
+                "n_escolas": linha.n_escolas_privadas,
+                "motivo_escolas": (
+                    MOTIVO_SEM_ESCOLA_PRIVADA
+                    if linha.n_escolas_privadas is None and qt is None
+                    else None
+                ),
+                "variacao_pct": variacao,
+                "texto_variacao": texto_variacao(variacao),
+                "classe_variacao": (
+                    ""
+                    if variacao is None
+                    else ("var-pos" if variacao >= 0 else "var-neg")
+                ),
+                "motivo_variacao": motivo_variacao,
+                "share_lider_pct": linha.share_lider_pct,
+                "motivo_matricula": motivo_matricula,
+                "motivo_share": (
+                    MOTIVO_SEM_ESCOLA_PRIVADA
+                    if linha.share_lider_pct is None and qt is None and sem_escola
+                    else None
+                ),
+            }
+        )
+    return prontas
+
+
+def _kpis_indice(indice: Any) -> list[dict[str, Any]]:
+    """Os 4 KPIs do topo (plano §4.5): somas que ignoram `None`, nunca 0."""
+    totais = indice.kpis
+    variacao = totais.variacao_pct
+    return [
+        {
+            "rotulo": "Municípios no recorte",
+            "valor": fmt_contagem(totais.n_municipios),
+            "classe": "",
+            "nota": "mercados publicados no índice",
+        },
+        {
+            "rotulo": f"Matrícula privada {fmt_ano(indice.ano)}",
+            "valor": fmt_contagem(totais.qt_mat_privada_total),
+            "classe": "",
+            "nota": "soma dos municípios listados",
+        },
+        {
+            "rotulo": "Escolas privadas ativas",
+            "valor": fmt_contagem(totais.n_escolas_privadas_total),
+            "classe": "",
+            "nota": "no conjunto do recorte",
+        },
+        {
+            "rotulo": "Variação do recorte",
+            "valor": texto_variacao(variacao),
+            "classe": (
+                "" if variacao is None else ("var-pos" if variacao >= 0 else "var-neg")
+            ),
+            "nota": (
+                f"matrícula privada vs. {fmt_ano(indice.ano - 1)}, "
+                "só municípios com os dois anos"
+            ),
+        },
+    ]
+
+
 @router.get(
     "/mercados/",
     response_class=HTMLResponse,
@@ -1112,21 +1248,77 @@ def mercado_atalho(
     summary="Índice de municípios: escolher o mercado",
 )
 def mercados_indice(request: Request, co_municipio: str | None = None) -> Response:
-    """Índice de municípios (spec §1): a página que escolhe o mercado a abrir.
+    """Índice de municípios (4b, cards V4-I0/V4-I): a página que escolhe o mercado.
 
-    Sem ``co_municipio``, responde ``200`` com o formulário de escolha; com um
+    Sem ``co_municipio``, responde ``200`` com o índice no DOM do protótipo
+    (7 colunas, 853 linhas em matrícula desc): **1 consulta** BigQuery via
+    :func:`dados.indice_municipios` (ano = maior de `APP_ANOS_DISPONIVEIS`,
+    etapa `bas` fixa); com um
     código válido (``^31\\d{5}$``), **303** para ``/app/mercados/{co}``, para que
     recarregar não reenvie o formulário; com código inválido, ``422`` em HTML
     com a volta para este índice.
 
-    Nenhum caminho consulta o repositório: a lista sai de ``municipios_mg()``
-    (arquivo versionado de apoio de tela) e o código é só sintaxe de URL — quem
-    valida a existência do recorte é a tela de destino. Zero BigQuery.
+    Se o BigQuery falhar, a página **degrada para o 4a** (lista com 853
+    links, sem colunas numéricas nem KPIs) com um ``div.aviso``: status 200,
+    mas sem ``ETag`` e fora do LRU (o mesmo caminho dos erros —
+    ``Cache-Control: no-store``), para a falha não ficar pinada.
     """
     if co_municipio is None:
+        base = contexto_base(request, pagina="municipios")
+        migalhas = [
+            {"rotulo": "Início", "href": base["href_inicio"]},
+            {"rotulo": "Municípios", "href": None},
+        ]
+        subnav_indice = [
+            {
+                "rotulo": "Índice de mercados",
+                "href": "#indice-municipios",
+                "ativo": True,
+                "classe": "",
+            },
+            {
+                "rotulo": "Busca de escolas",
+                "href": f"{PREFIXO_WEB}/",
+                "ativo": False,
+                "classe": "",
+            },
+        ]
+        try:
+            anos = list(_settings(request).anos_disponiveis)
+            indice = dados.indice_municipios(request, ano=max(anos))
+        except UpstreamUnavailable:
+            contexto_degradado = {
+                **base,
+                "migalhas": migalhas,
+                "subnav_itens": subnav_indice,
+                "indisponivel": True,
+                "municipios": municipios_mg(),
+            }
+            return templates().TemplateResponse(
+                request,
+                "mercados_indice.html",
+                contexto_degradado,
+                headers={"Cache-Control": CACHE_CONTROL_ERRO},
+            )
+        nomes = {m.co_municipio: m.no_municipio for m in municipios_mg()}
+        ausentes = [
+            linha.co_municipio for linha in indice.linhas if linha.co_municipio not in nomes
+        ]
+        if ausentes:
+            raise ValueError(
+                "índice com co_municipio sem nome em municipios_mg.json: "
+                f"{ausentes!r}"
+            )
+        linhas = _linhas_indice(indice, nomes)
         contexto = {
-            **contexto_base(request, pagina="municipios"),
-            "municipios": municipios_mg(),
+            **base,
+            "migalhas": migalhas,
+            "subnav_itens": subnav_indice,
+            "indisponivel": False,
+            "linhas": linhas,
+            "kpis": _kpis_indice(indice),
+            "ano": indice.ano,
+            "total_linhas": len(linhas),
         }
         return templates().TemplateResponse(request, "mercados_indice.html", contexto)
 

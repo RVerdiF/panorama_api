@@ -82,9 +82,12 @@ APP_JS = DIRETORIO_WEB / "static" / "app.js"
 #: Orçamento do arquivo bruto, sem minificação (spec §3/§6). O gráfico da série
 #: (linha/área com dica, ponteiro e teclado, card V2 `t_cbd54a92`) exige ~18 KB;
 #: a combobox progressiva + validação da busca (card V3 `t_9f384f60`, D7),
-#: sem dependência e sob CSP estrita, soma ~9 KB. O teto é o tamanho real
-#: medido (`wc -c`, 27330) com folga para ajuste fino.
-ORCAMENTO_APP_JS = 30_720
+#: sem dependência e sob CSP estrita, soma ~9 KB. O índice 4b (card V4-I
+#: `t_5825770b`, rodada 1: botão literal no SSR + clique ligado no JS com
+#: a seta espelhada, copy do protótipo e estado vazio sem `style=`) soma
+#: ~2 KB. O teto é o tamanho real medido (`wc -c`, 32040) com folga para
+#: ajuste fino.
+ORCAMENTO_APP_JS = 33_792
 
 #: Construções proibidas num arquivo sob CSP estrita sem `'unsafe-eval'`.
 PROIBIDOS_APP_JS = ("eval(", "innerHTML", "new Function", "document.write")
@@ -361,7 +364,7 @@ def test_nenhum_template_tem_inline_ou_script_sem_src() -> None:
 # -- 6. orçamento e construções proibidas ------------------------------------
 
 
-def test_app_js_cabe_no_orcamento_de_30720_bytes() -> None:
+def test_app_js_cabe_no_orcamento_de_33792_bytes() -> None:
     tamanho = len(APP_JS.read_bytes())
 
     assert tamanho <= ORCAMENTO_APP_JS, f"app.js com {tamanho} bytes"

@@ -1,23 +1,59 @@
 {% extends "base.html" %}
-{% from "partials/macros.html" import rodape_final with context %}
+{% from "partials/macros.html" import trilha, rodape_final with context %}
+{% from "partials/subnav.html" import subnav with context %}
 
+{# Índice de municípios (V4-I): DOM do protótipo
+   `panorama-escola-municipios.html` com o dado do V4-I0 (etapa `bas`).
+
+   O que o protótipo é e o que não é, nesta tela:
+
+   * HTML literal do protótipo: `tela-topo`/`trilha`/`tela-sub`, `nav.subnav`
+     (só "Índice de mercados" e "Busca de escolas"; "Perfil de rede →" entra
+     com a R1, como na D1-c), `div.kpis#kpis-municipios`, painel com
+     `painel__nota` do protótipo, `barra-ferramentas` + filtro do 4a,
+     7 `th` (`#` · Município · Matrícula privada · Escolas ativas ·
+     Variação anual · Maior share · Ficha) com `th.ordenavel`, barras
+     `cela-barra` na coluna de matrícula, `div.nota-metodo` com a regra real,
+     `dl.rodape-meta#meta-municipios` (Ano · Universo · Fonte).
+   * Números do mock que NÃO entram: a nota "Por que só Belo Horizonte abre
+     ficha", o `tr[data-destaque]`, o `cela-barra__marca` "recorte completo",
+     o `sem-acao` e tudo que veio de `dados.js` ("recorte de demonstração",
+     "quatorze", "Belo Horizonte · 30").
+   * Nome do município é texto (decisão V4-d): só a Ficha linka, para não
+     dobrar as paradas de tabulação (853 → 1.706) para o mesmo destino.
+   * Ordenação e barras são as do app (`table[data-ordenavel]` + `ordenar`,
+     `aplicarBarras` via `data-largura`): o SSR já emite o `th.ordenavel`
+     literal do protótipo (`button` + `span` da seta, ↑ ↓ ↑ ↑ ↑) e já vem
+     em matrícula desc; o JS só liga o clique e move o `aria-sort`. Sem JS,
+     o cabeçalho é estático e a tabela continua completa. Nenhum atributo
+     de estilo inline (CSP `style-src 'self'`).
+   * `NULL ≠ 0`: município sem escola privada ativa (`n_escolas_privadas`
+     0 ou nulo) mostra "sem dado" com `title="sem escola privada ativa"`
+     na matrícula, na variação e no share — nunca 0. Matrícula nula com
+     escola ≥1 sai como "sem dado" sem esse título. `n_escolas = 0` é
+     medição real e sai como 0.
+   * Degradação (§4.6): se o BigQuery falha, a página cai para o 4a (lista
+     com 853 links, sem colunas numéricas nem KPIs) com um `div.aviso`, em
+     200, sem `ETag` e fora do LRU. #}
 {% block titulo %}Mercados municipais — Panorama Escola{% endblock %}
 
 {% block conteudo %}
   <div class="tela-topo">
-    <p class="trilha">
-      <a href="{{ href_inicio }}">Início</a>
-      <span aria-hidden="true">›</span>
-      <span>Municípios</span>
-    </p>
-    <h1>Municípios</h1>
+    {{ trilha(migalhas) }}
+    <h1>Mercados municipais de Minas Gerais</h1>
     <p class="tela-sub">
-      Escolha um município de Minas Gerais para ver o mercado da educação básica:
-      tamanho, composição, cobertura e movimento do setor privado.
+      Tamanho da matrícula privada, número de escolas ativas e variação anual de cada mercado do recorte. O índice serve para decidir onde olhar antes de abrir uma ficha.
     </p>
+    {{ subnav(subnav_itens, "Seções dos municípios") }}
   </div>
 
   <div id="indice-municipios">
+    {% if indisponivel %}
+    <div class="aviso">
+      <p>
+        Os números do índice estão indisponíveis agora; a lista continua navegável.
+      </p>
+    </div>
     <section class="painel" aria-labelledby="titulo-municipios">
       <div class="painel__cabecalho">
         <h2 id="titulo-municipios">Municípios de Minas Gerais</h2>
@@ -31,7 +67,7 @@
           <label for="filtro-municipio">Filtrar por município</label>
           <input id="filtro-municipio" type="search" autocomplete="off" placeholder="Ex.: Uberlândia, Contagem, Vale">
         </div>
-        <p class="resultado-contagem" id="retorno-municipios" role="status" aria-live="polite">São {{ municipios|length }} municípios de MG.</p>
+        <p class="resultado-contagem" id="retorno-municipios" role="status" aria-live="polite">{{ municipios|length }} municípios no recorte</p>
       </div>
 
       <div class="tabela-rolagem" role="region" aria-label="Municípios de Minas Gerais (tabela com rolagem)" tabindex="0">
@@ -53,7 +89,91 @@
 
       <p class="nota-metodo">A lista cobre os municípios de MG publicados nesta versão dos dados. Cada linha abre o mercado do município.</p>
     </section>
+    {% else %}
+    <div class="kpis" id="kpis-municipios">
+      {% for kpi in kpis %}
+      <div class="kpi">
+        <p class="kpi__rotulo">{{ kpi.rotulo }}</p>
+        <p class="kpi__valor{% if kpi.classe %} {{ kpi.classe }}{% endif %}">{{ kpi.valor }}</p>
+        <p class="kpi__nota">{{ kpi.nota }}</p>
+      </div>
+      {% endfor %}
+    </div>
 
-    {{ rodape_final(False) }}
+    <section class="painel" aria-labelledby="titulo-municipios">
+      <div class="painel__cabecalho">
+        <h2 id="titulo-municipios">Municípios por matrícula privada</h2>
+        <p class="painel__nota">
+          A posição à esquerda é o tamanho do mercado. A última coluna de número é a participação da escola líder daquele município.
+        </p>
+      </div>
+
+      <div class="barra-ferramentas">
+        <div class="campo">
+          <label for="filtro-municipio">Filtrar por município</label>
+          <input id="filtro-municipio" type="search" autocomplete="off" placeholder="Ex.: Uberlândia, Contagem, Vale">
+        </div>
+        <p class="resultado-contagem" id="retorno-municipios" role="status" aria-live="polite">{{ total_linhas }} municípios no recorte</p>
+      </div>
+
+      <div class="tabela-rolagem">
+        <table class="tabela" id="tabela-municipios" data-ordenavel>
+          <caption>Mercados privados de Minas Gerais — ano de referência {{ ano | fmt_ano }}</caption>
+          <thead>
+            <tr>
+              <th class="num" scope="col">#</th>
+              <th class="ordenavel" data-campo="nome" data-tipo="texto" scope="col"><button type="button">Município <span aria-hidden="true">↑</span></button></th>
+              <th class="ordenavel num" data-campo="matricula" data-tipo="numero" aria-sort="descending" scope="col"><button type="button">Matrícula privada <span aria-hidden="true">↓</span></button></th>
+              <th class="ordenavel num" data-campo="escolas" data-tipo="numero" scope="col"><button type="button">Escolas ativas <span aria-hidden="true">↑</span></button></th>
+              <th class="ordenavel num" data-campo="variacao" data-tipo="numero" scope="col"><button type="button">Variação anual <span aria-hidden="true">↑</span></button></th>
+              <th class="ordenavel num" data-campo="lider" data-tipo="numero" scope="col"><button type="button">Maior share <span aria-hidden="true">↑</span></button></th>
+              <th scope="col">Ficha</th>
+            </tr>
+          </thead>
+          <tbody id="corpo-municipios">
+            {% for linha in linhas %}
+            <tr>
+              <td class="num sec">{{ linha.posicao }}.</td>
+              <td data-valor="{{ linha.nome | fmt_bruto }}">{{ linha.nome }}</td>
+              {% if linha.qt_mat_privada is not none %}
+              <td class="num metrica" data-valor="{{ linha.qt_mat_privada | fmt_bruto }}"><span class="cela-barra">{{ linha.qt_mat_privada | fmt_contagem }}<span class="cela-barra__trilho" aria-hidden="true"><span class="cela-barra__preenche" data-largura="{{ linha.largura }}"></span></span></span></td>
+              {% else %}
+              <td class="num metrica" data-valor=""><span class="sem-dado"{% if linha.motivo_matricula %} title="{{ linha.motivo_matricula }}"{% endif %}>sem dado</span></td>
+              {% endif %}
+              {% if linha.n_escolas is not none %}
+              <td class="num metrica" data-valor="{{ linha.n_escolas | fmt_bruto }}">{{ linha.n_escolas | fmt_contagem }}</td>
+              {% else %}
+              <td class="num metrica" data-valor=""><span class="sem-dado"{% if linha.motivo_escolas %} title="{{ linha.motivo_escolas }}"{% endif %}>sem dado</span></td>
+              {% endif %}
+              {% if linha.variacao_pct is not none %}
+              <td class="num" data-valor="{{ linha.variacao_pct | fmt_bruto }}"><span class="{{ linha.classe_variacao }}">{{ linha.texto_variacao }}</span></td>
+              {% else %}
+              <td class="num" data-valor=""><span class="sem-dado"{% if linha.motivo_variacao %} title="{{ linha.motivo_variacao }}"{% endif %}>sem dado</span></td>
+              {% endif %}
+              {% if linha.share_lider_pct is not none %}
+              <td class="num metrica" data-valor="{{ linha.share_lider_pct | fmt_bruto }}">{{ linha.share_lider_pct | fmt_nulo }}%</td>
+              {% else %}
+              <td class="num metrica" data-valor=""><span class="sem-dado"{% if linha.motivo_share %} title="{{ linha.motivo_share }}"{% endif %}>sem dado</span></td>
+              {% endif %}
+              <td><a class="acao-tabela" href="{{ href_mercados }}{{ linha.co_municipio }}">Abrir mercado</a></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="nota-metodo">
+        <strong>Sem escola privada ativa não é zero.</strong> Municípios sem escola privada ativa aparecem com “sem dado” na matrícula, na variação e no share — ausência de dado, nunca zero.
+      </div>
+    </section>
+
+    <dl class="rodape-meta" id="meta-municipios">
+      <div><dt>Ano de referência</dt><dd>{{ ano | fmt_ano }}</dd></div>
+      <div><dt>Universo</dt><dd>{{ total_linhas }} municípios de MG</dd></div>
+      <div><dt>Fonte</dt><dd>Censo Escolar (INEP)</dd></div>
+    </dl>
+    {% endif %}
+
+    {{ rodape_final(not indisponivel) }}
   </div>
 {% endblock %}
