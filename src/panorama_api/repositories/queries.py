@@ -209,6 +209,40 @@ def market_share(
     return sql, params
 
 
+def indice_municipios(fq: TableRef, *, ano: int) -> tuple[str, Params]:
+    """Índice de municípios (V4-4b): 1 linha por município de MG, etapa `bas` fixa.
+
+    SQL idêntico a `q4b_final.sql`: tabelas via `fq`, ano via `@ano INT64`.
+    Os KPIs da página são somas feitas no Python sobre estas linhas.
+    """
+    sql = (
+        "WITH m AS (\n"
+        "  SELECT co_municipio, nu_ano_censo, qt_mat_privada, n_escolas_privadas\n"
+        f"  FROM {fq('mart_mercado')}\n"
+        "  WHERE etapa = 'bas' AND nu_ano_censo IN (@ano, @ano - 1)\n"
+        "),\n"
+        "c AS (\n"
+        "  SELECT co_municipio, share_lider_pct\n"
+        f"  FROM {fq('mart_concentracao')}\n"
+        "  WHERE etapa = 'bas' AND nu_ano_censo = @ano AND recorte = 'privado' AND nivel = 'escola'\n"
+        ")\n"
+        "SELECT\n"
+        "  a.co_municipio,\n"
+        "  a.qt_mat_privada,\n"
+        "  b.qt_mat_privada AS qt_mat_privada_anterior,\n"
+        "  a.n_escolas_privadas,\n"
+        "  SAFE_DIVIDE(a.qt_mat_privada - b.qt_mat_privada, b.qt_mat_privada) * 100 AS variacao_pct,\n"
+        "  c.share_lider_pct\n"
+        "FROM m AS a\n"
+        "LEFT JOIN m AS b\n"
+        "  ON b.co_municipio = a.co_municipio AND b.nu_ano_censo = a.nu_ano_censo - 1\n"
+        "LEFT JOIN c ON c.co_municipio = a.co_municipio\n"
+        "WHERE a.nu_ano_censo = @ano\n"
+        "ORDER BY (a.qt_mat_privada IS NULL), a.qt_mat_privada DESC, a.co_municipio"
+    )
+    return sql, [("ano", "INT64", ano)]
+
+
 INFORMATION_SCHEMA_SQL = """
 SELECT table_name, column_name, data_type
 FROM `{project}.{dataset}.INFORMATION_SCHEMA.COLUMNS`

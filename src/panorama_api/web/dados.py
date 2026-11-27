@@ -33,6 +33,8 @@ from panorama_api.schemas.markets import MarketsResponse, ShareResponse
 from panorama_api.schemas.schools import HistoryResponse, SchoolsResponse
 from panorama_api.services import markets as service_markets
 from panorama_api.services import schools as service_schools
+from panorama_api.services import indice as service_indice
+from panorama_api.services.indice import IndiceMunicipios
 from panorama_api.services.schools import DESCRICAO_COMPETIDORES
 
 #: Reexport (abaixo em `__all__`) do texto servido em `meta.definicoes.competidores`
@@ -210,6 +212,14 @@ def share_mercado(
     )
 
 
+def indice_municipios(request: Request, *, ano: int) -> IndiceMunicipios:
+    """Índice de municípios (= 1 linha por município de MG, etapa `bas`)."""
+    ano_ref = validation.ano(ano, required=True)
+
+    repository, settings = fonte(request)
+    return service_indice.indice_municipios(repository, settings, ano=ano_ref)
+
+
 __all__ = [
     "DESCRICAO_COMPETIDORES",
     "LIMITE_BUSCA_MAXIMO",
@@ -221,6 +231,7 @@ __all__ = [
     "fonte",
     "historico_escola",
     "indicadores_escola",
+    "indice_municipios",
     "mercado",
     "share_mercado",
 ]
