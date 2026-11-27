@@ -265,7 +265,7 @@
         role: "img",
         tabindex: "0",
         "aria-label": "Série de matrículas de " + anos[0] + " a " + anos[n - 1] +
-          ". Use as setas para percorrer os anos; a tabela abaixo traz os mesmos números."
+          ". Use as setas do teclado para ler ano a ano."
       });
       var grupoGrades = el("g");
       var passos = estreito ? 2 : 3;

@@ -45,7 +45,7 @@ POSICAO_MG = (
     "(1.º = maior crescimento ano a ano)"
 )
 #: Definição da concorrência (mesma unidade geográfica e mesmo ano).
-DEFINICAO = "no mesmo município e ano censitário"
+DEFINICAO = "escolas privadas ativas no mesmo município e ano."
 #: Motivo quando a escola É privada ativa mas a mart não tem a linha do ano.
 MOTIVO_SECAO_INDICADORES = (
     "Os indicadores só existem para escolas privadas ativas com matrícula da "
@@ -123,6 +123,52 @@ def _ficha_privada(client, repository, **competidor) -> str:
     repository.indicators = [indicator_row()]
     repository.competidores = [competidor_row(**competidor)]
     return _html(client.get(VISAO_GERAL_URL))
+
+
+def test_ficha_literal_ao_prototipo_ids_e_copy(client, repository):
+    """P3 (E1–E15): copy literal da ficha, ids-hook e ausência do texto antigo.
+
+    `#resumo` mantém o botão Comparar: decisão do dono (2026-11-27, desktop),
+    registrada como exceção à REGRA ZERO.
+    """
+    html = _ficha_privada(client, repository)
+
+    for id_ in (
+        "ficha-escola",
+        "kpis-escola",
+        "serie-svg",
+        "corpo-serie",
+        "oferta-grupos",
+        "corpo-rendimento",
+        "proxy-retencao",
+        "ranking-municipal",
+        "meta-escola",
+    ):
+        assert f'id="{id_}"' in html, id_
+
+    resumo = html[html.index('id="resumo"') : html.index('id="serie"')]
+    assert "Comparar com outra escola" in resumo
+
+    for trecho in (
+        '<p class="tela-sub">Como evoluíram as matrículas e a oferta por etapa, '
+        "qual o rendimento — e como a escola se posiciona no município.</p>",
+        "Educação básica, todos os anos publicados do Censo.",
+        "Série completa — equivalente textual do gráfico",
+        "Indicador de rendimento por ano",
+        '<span id="proxy-retencao" class="mono">',
+        "Proxy de retenção líquida (não é taxa de evasão):",
+        "Escolas privadas ativas de ",
+        "Total <small>educação básica — total oficial do Censo, não é a soma "
+        "das subetapas</small>",
+        "Etapas aditivas <small>somam ao total quando não há lacuna</small>",
+        "Modalidades e subconjuntos <small>não somam ao total — se sobrepõem às "
+        "etapas</small>",
+    ):
+        assert trecho in html, trecho
+
+    assert "censitário (MG)" not in html
+    assert "Taxas do Censo, em porcentagem" not in html
+    assert "de 11 escolas privadas ativas" in html
 
 
 def test_ficha_mostra_crescimento_definicao_e_rank(client, repository):

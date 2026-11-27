@@ -325,13 +325,19 @@ def test_serie_tem_svg_inline_e_tabela_equivalente(client, repository):
     svg = re.search(r"<svg[^>]*>.*?</svg>", html, flags=re.S)
     assert svg is not None, "gráfico SVG inline ausente"
     # O SVG não duplica a leitura: a tabela é o equivalente acessível.
-    assert 'aria-hidden="true"' in svg.group(0)
+    assert 'role="img"' in svg.group(0)
+    assert 'tabindex="0"' in svg.group(0)
+    assert "aria-hidden" not in svg.group(0)
+    assert (
+        'aria-label="Série de matrículas de 2023 a 2025. Use as setas do teclado '
+        'para ler ano a ano."'
+    ) in svg.group(0)
     # Uma barra por ano com matrícula observada (2025 usa o default do fixture).
     assert svg.group(0).count("<rect") == 3
     assert "serie__ausente" not in svg.group(0)
 
-    tabela = _tabela(html, "Série de matrículas por ano")
-    assert "<caption>Série de matrículas por ano censitário</caption>" in tabela
+    tabela = _tabela(html, "Série completa — equivalente textual do gráfico")
+    assert "<caption>Série completa — equivalente textual do gráfico</caption>" in tabela
     # Card V2: a tabela da série ganhou a coluna "Variação anual". No primeiro
     # ano observado não há ano anterior → "sem dado".
     for ano, valor, variacao in ((2023, "90", "sem dado"), (2024, "110", "+22,2%"), (2025, "120", "+9,1%")):
@@ -457,9 +463,9 @@ def _celulas_da_linha(tabela: str, rotulo: str) -> list[str]:
 
 #: Grupos exigidos pelo card, na ordem, com as linhas de cada um.
 GRUPOS_ESPERADOS = (
-    ("Total oficial", ["Educação básica (total)"]),
+    ("Total", ["Educação básica (total)"]),
     (
-        "Etapas que somam ao total",
+        "Etapas aditivas",
         [
             "Creche",
             "Pré-escola",
@@ -470,7 +476,7 @@ GRUPOS_ESPERADOS = (
         ],
     ),
     (
-        "Modalidades e subconjuntos que não somam ao total",
+        "Modalidades e subconjuntos",
         ["Educação profissional", "Educação especial"],
     ),
 )
@@ -547,9 +553,9 @@ def test_prof_e_esp_nao_sao_apresentados_como_etapa_aditiva(client, repository):
     grupos = {
         cabecalho.split(" — ")[0]: corpo for cabecalho, corpo in _grupos_da_oferta(html)
     }
-    etapas = _rotulos_do_grupo(grupos["Etapas que somam ao total"])
+    etapas = _rotulos_do_grupo(grupos["Etapas aditivas"])
     modalidades = _rotulos_do_grupo(
-        grupos["Modalidades e subconjuntos que não somam ao total"]
+        grupos["Modalidades e subconjuntos"]
     )
 
     for rotulo in ("Educação profissional", "Educação especial"):
@@ -608,3 +614,19 @@ def test_escola_inexistente_vira_404_html(client, repository):
     assert resposta.status_code == 404
     assert resposta.headers["cache-control"] == "no-store"
     assert "não encontrado" in _html(resposta, status=404).lower()
+
+
+def test_app_js_rotulo_do_svg_da_serie_e_literal_do_prototipo():
+    """E5: o SVG hidratado por `static/app.js` (`desenharSerie`) é o que o leitor
+    de tela recebe com JS ativo; o rótulo precisa ser o literal de
+    `app.js:660` do protótipo, não o texto antigo com "percorrer os anos"."""
+    from pathlib import Path
+
+    fonte = (
+        Path(__file__).resolve().parents[2]
+        / "src/panorama_api/web/static/app.js"
+    ).read_text(encoding="utf-8")
+
+    assert '". Use as setas do teclado para ler ano a ano."' in fonte
+    assert "percorrer os anos" not in fonte
+    assert "a tabela abaixo traz os mesmos números" not in fonte

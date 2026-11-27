@@ -556,8 +556,9 @@ def svg_serie(pontos: Sequence[dict[str, Any]]) -> Markup | None:
 
     Só anos com matrícula observada ganham barra; os demais ficam como lacuna
     marcada (a tabela ao lado informa "sem dado" e o motivo). O elemento é
-    decorativo (`aria-hidden`): o equivalente acessível é a tabela renderizada
-    junto. Só inteiros entram no markup — nenhuma string externa é interpolada.
+    `role="img"` focável com `aria-label` literal ao protótipo; a leitura ano a
+    ano por setas vem do `app.js`, e a tabela ao lado segue como equivalente.
+    Só inteiros entram no markup — nenhuma string externa é interpolada.
     """
     observados = [ponto for ponto in pontos if ponto["valor"] is not None]
     if not observados:
@@ -604,7 +605,9 @@ def svg_serie(pontos: Sequence[dict[str, Any]]) -> Markup | None:
 
     return Markup(
         f'<svg class="serie" viewBox="0 0 {LARGURA_SVG} {ALTURA_SVG}" '
-        f'aria-hidden="true" xmlns="http://www.w3.org/2000/svg">'
+        f'role="img" tabindex="0" aria-label="Série de matrículas de '
+        f'{int(pontos[0]["ano"])} a {int(pontos[-1]["ano"])}. Use as setas do '
+        f'teclado para ler ano a ano." xmlns="http://www.w3.org/2000/svg">'
         f'{"".join(partes)}</svg>'
     )
 

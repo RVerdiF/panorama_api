@@ -14,7 +14,8 @@
 {% macro cabecalho_escola(cabecalho, migalhas, sem_nome) -%}
 {{ trilha(migalhas) }}
 <h1>{% if cabecalho.no_entidade %}{{ cabecalho.no_entidade }}{% else %}{{ sem_nome }}{% endif %}</h1>
-<p class="tela-sub">
+<p class="tela-sub">Como evoluíram as matrículas e a oferta por etapa, qual o rendimento — e como a escola se posiciona no município.</p>
+<p>
   Escola <code>{{ cabecalho.co_entidade }}</code> ·
   {# Município em texto: o caminho ao mercado já está na trilha e no subnav
      (V4-L) — link aqui seria cru. #}

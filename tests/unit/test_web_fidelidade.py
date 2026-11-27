@@ -221,7 +221,7 @@ def test_ano_ausente_na_fonte_aparece_como_linha_sem_dado():
 
     html = _html(_client(repo).get(ESCOLA))
 
-    tabela = _tabela(html, "Série de matrículas por ano")
+    tabela = _tabela(html, "Série completa — equivalente textual do gráfico")
     # O ano que existe no intervalo mas não na fonte continua visível.
     assert _celulas_da_linha(tabela, "2021") == ["sem dado (ano ausente na fonte)", "sem dado"]
     # E os anos observados mantêm seu valor — a lacuna não desalinha a série.
@@ -243,7 +243,7 @@ def test_ano_ausente_nunca_vira_zero_na_serie():
 
     html = _html(_client(repo).get(ESCOLA))
 
-    tabela = _tabela(html, "Série de matrículas por ano")
+    tabela = _tabela(html, "Série completa — equivalente textual do gráfico")
     assert _celulas_da_linha(tabela, "2024") == ["sem dado (ano ausente na fonte)", "sem dado"]
     assert ">0<" not in tabela
 

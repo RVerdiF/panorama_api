@@ -190,21 +190,26 @@ def test_mercado_sem_share_nao_inventa_linha_nem_link(client_links, repo_links):
 
 
 def test_escola_municipio_e_texto_no_tela_sub_e_link_na_trilha(client_links):
-    """V4-L: `p.tela-sub` é texto (o protótipo não tem link ali); o caminho ao
-    mercado vive na trilha e no subnav (`a.subnav__saida`)."""
+    """V4-L: a identificação é texto (sem `<a>`); o caminho ao mercado vive na
+    trilha e no subnav (`a.subnav__saida`). P3: `p.tela-sub` volta ao literal
+    do protótipo e a identificação é linha própria, sem a classe `tela-sub`."""
     html = _html(client_links.get(ESCOLA))
 
     # Trilha linka o município para o mercado (critério 4 do card).
     assert f'<a href="{MERCADO}">BELO HORIZONTE</a>' in html
 
-    # `p.tela-sub` mantém o nome e o IBGE, mas sem `<a>` (link cru removido).
-    tela_sub = re.search(
-        r'<p class="tela-sub">(.*?)</p>', html, flags=re.S
-    )
+    tela_sub = re.search(r'<p class="tela-sub">(.*?)</p>', html, flags=re.S)
     assert tela_sub is not None, "ficha sem `p.tela-sub`"
-    assert "<a" not in tela_sub.group(1)
-    assert "BELO HORIZONTE" in tela_sub.group(1)
-    assert f"código IBGE <code>{MUNICIPIO}</code>" in tela_sub.group(1)
+    assert tela_sub.group(1) == (
+        "Como evoluíram as matrículas e a oferta por etapa, qual o rendimento "
+        "— e como a escola se posiciona no município."
+    )
+    # A identificação fica fora da `tela-sub`, sem link cru.
+    identificacao = re.search(r"<p>\s*(Escola <code>.*?</p>)", html, flags=re.S)
+    assert identificacao is not None, "identificação ausente"
+    assert "<a" not in identificacao.group(1)
+    assert "BELO HORIZONTE" in identificacao.group(1)
+    assert f"código IBGE <code>{MUNICIPIO}</code>" in identificacao.group(1)
 
 
 def test_escola_ver_todas_aponta_direto_para_a_ancora(client_links):

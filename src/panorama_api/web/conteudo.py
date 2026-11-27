@@ -43,9 +43,11 @@ ROTULO_POSICAO_CRESCIMENTO_MG = (
     "(1.º = maior crescimento ano a ano)"
 )
 
-#: Definição visível da comparação de concorrência: mesma unidade geográfica
-#: (município) e mesmo ano censitário.
-DEFINICAO_CONCORRENCIA = DESCRICAO_COMPETIDORES
+#: Definição visível da concorrência na ficha, literal ao protótipo
+#: (`panorama-escola-escola.html:114`): mesma unidade geográfica (município) e
+#: mesmo ano. A forma longa (`DESCRICAO_COMPETIDORES`, com "censitário (MG)")
+#: é a da metodologia/contrato e não aparece na ficha.
+DEFINICAO_CONCORRENCIA = "escolas privadas ativas no mesmo município e ano."
 
 #: Universo de cada resposta do contrato, traduzido para leitura humana
 #: (contrato 2b R1). Compartilhado entre a metodologia e as telas que exibem
@@ -227,26 +229,21 @@ ETAPAS_ROTULOS: dict[Etapa, str] = {
 #: 2.061 alunos numa escola de 680 (total oficial 680 + ensino médio 680 +
 #: educação profissional 680 + educação especial 21). Cada grupo diz, no
 #: próprio título e na nota, se soma ou não ao total.
-TITULO_GRUPO_TOTAL = "Total oficial"
+#: Títulos e `small` dos grupos de oferta, literais ao protótipo (`app.js`
+#: 684-692).
+TITULO_GRUPO_TOTAL = "Total"
 NOTA_GRUPO_TOTAL = (
-    "Educação básica é o total do Censo; não é a soma das linhas abaixo."
+    "educação básica — total oficial do Censo, não é a soma das subetapas"
 )
-TITULO_GRUPO_ETAPAS = "Etapas que somam ao total"
-NOTA_GRUPO_ETAPAS = (
-    "Somam quando não há lacuna (sem dado); a EJA entra como parcela própria "
-    "na contagem do Censo."
-)
-TITULO_GRUPO_MODALIDADES = "Modalidades e subconjuntos que não somam ao total"
-NOTA_GRUPO_MODALIDADES = (
-    "A educação profissional acompanha o ensino médio (o técnico integrado é "
-    "contado nas duas linhas) e a educação especial é modalidade transversal a "
-    "todas as etapas."
-)
+TITULO_GRUPO_ETAPAS = "Etapas aditivas"
+NOTA_GRUPO_ETAPAS = "somam ao total quando não há lacuna"
+TITULO_GRUPO_MODALIDADES = "Modalidades e subconjuntos"
+NOTA_GRUPO_MODALIDADES = "não somam ao total — se sobrepõem às etapas"
 
 #: Definições publicadas em `meta.definicoes` e reexibidas na metodologia.
 DEFINICOES: dict[str, str] = {
     "retencao_liquida_proxy_pct": DEFINICAO_RETENCAO,
-    "competidores": DEFINICAO_CONCORRENCIA,
+    "competidores": DESCRICAO_COMPETIDORES,
 }
 
 #: Tradução dos códigos de `meta.avisos` para texto de tela, em português.
