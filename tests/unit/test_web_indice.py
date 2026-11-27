@@ -324,6 +324,10 @@ def test_uma_consulta_por_abertura(
 
     assert indice_repo.calls == [("get_indice_municipios", {"ano": 2025})]
 
+    # *Hit* do LRU: a segunda abertura não toca no repositório (custo 0).
+    _html(indice_cliente)
+    assert indice_repo.calls == [("get_indice_municipios", {"ano": 2025})]
+
 
 def test_indice_vazio_responde_200_com_kpis_sem_dado():
     """Guarda do ``test_web_seguranca``: repositório vazio também é 200."""
