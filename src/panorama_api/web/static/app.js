@@ -449,15 +449,15 @@
     }
   }
 
-  /* Busca `/app/` (card V3 `t_9f384f60`): combobox progressiva de município
-     + validação no cliente, portadas do protótipo (`assets/js/app.js`:
-     `iniciarCombobox` e `avisar`). O SSR emite o `select#municipio`
-     funcionando sem JS; aqui ele é escondido (sem `name`, para não duplicar
-     o parâmetro) e vira `div.combo` — `input` visível sem `name`, `hidden`
-     com o código e a lista — alimentada pela ilha JSON `dados-municipios`
-     (`[nome, codigo]`). `q` com 1–2 caracteres e "Ver mercado do município"
-     sem município escolhido mostram a mensagem em `p.retorno` e não
-     submetem; o servidor continua validando (422 inalterado). */
+  /* Busca `/app/` (cards V3 `t_9f384f60` e V6-P4 `t_6a9f6b6f`): combobox
+     de município + validação no cliente, portadas do protótipo
+     (`assets/js/app.js`: `iniciarCombobox` e `avisar`). O SSR já emite o DOM
+     da combobox (`input#co_municipio`, `button#botao-municipio`,
+     `ul#lista-municipios`); aqui ela é ligada à ilha JSON `dados-municipios`
+     (`[nome, codigo]`) e o `hidden` com o código passa a valer. `q` com 1–2
+     caracteres e "Ver mercado do município" sem município escolhido mostram
+     a mensagem em `p.retorno` e não submetem; o servidor continua validando
+     (422 inalterado). */
   function normalizarBusca(texto) {
     return String(texto).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   }

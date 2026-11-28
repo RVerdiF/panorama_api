@@ -278,9 +278,10 @@ def test_rodape_final_traz_fonte_e_versoes(cliente: TestClient):
 
 def test_rodape_final_omite_a_nota_onde_nao_ha_valor(cliente: TestClient):
     # O índice (V4-I) exibe valores — KPIs e colunas numéricas — então leva a
-    # nota; a busca segue sem valor nenhum e sem nota (achado A3).
-    sem_nota = (BUSCA,)
-    com_nota = (ESCOLA, MERCADO, INDICE)
+    # nota; a busca também, desde que lista o recorte com matrícula, share e
+    # variação (card V6-P4 `t_6a9f6b6f`). Nenhuma tela de dado fica sem nota.
+    sem_nota: tuple[str, ...] = ()
+    com_nota = (BUSCA, ESCOLA, MERCADO, INDICE)
     nota = "Esta página nunca troca dado ausente por zero"
 
     for caminho in sem_nota:

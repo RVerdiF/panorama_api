@@ -31,6 +31,7 @@ from tests.unit.conftest import (
     indicator_row,
     market_row,
     municipio_row,
+    recorte_row,
     school_row,
     share_row,
 )
@@ -301,8 +302,8 @@ def test_composicao_por_etapa_nao_repete_a_contagem_de_escolas():
 )
 def test_rotulo_de_dependencia_usa_o_nome_do_codigo_inep(codigo, esperado):
     repo = _repo(
-        schools=[
-            school_row(tp_dependencia=codigo, tp_situacao_funcionamento="1")
+        recorte=[
+            recorte_row(tp_dependencia=codigo, tp_situacao_funcionamento="1")
         ]
     )
 
@@ -324,8 +325,8 @@ def test_rotulo_de_dependencia_usa_o_nome_do_codigo_inep(codigo, esperado):
 )
 def test_rotulo_de_situacao_usa_o_nome_do_codigo_inep(codigo, esperado):
     repo = _repo(
-        schools=[
-            school_row(tp_dependencia="3", tp_situacao_funcionamento=codigo)
+        recorte=[
+            recorte_row(tp_dependencia="3", tp_situacao_funcionamento=codigo)
         ]
     )
 
@@ -339,8 +340,8 @@ def test_rotulo_de_situacao_usa_o_nome_do_codigo_inep(codigo, esperado):
 
 def test_codigo_inep_ausente_nao_e_classificado_por_deducao():
     repo = _repo(
-        schools=[
-            school_row(tp_dependencia=None, tp_situacao_funcionamento=None)
+        recorte=[
+            recorte_row(tp_dependencia=None, tp_situacao_funcionamento=None)
         ]
     )
 
@@ -367,6 +368,7 @@ def _telas(repo: FakeRepository) -> dict[str, str]:
 def test_nenhuma_tela_exibe_jargao_interno_como_texto():
     repo = _repo(
         schools=[school_row(of_bas=None, is_oferta_desconhecida=True)],
+        recorte=[recorte_row()],
         history=_serie(
             2025,
             overrides={2025: {"is_oferta_desconhecida": True}},
@@ -445,6 +447,7 @@ def test_ficha_sem_ano_continua_200():
 def test_nenhuma_tela_vaza_none_ou_nan():
     repo = _repo(
         schools=[school_row(no_entidade=None, no_municipio=None, of_bas=None)],
+        recorte=[recorte_row(no_entidade=None, no_municipio=None)],
         history=_serie(
             2023,
             2025,

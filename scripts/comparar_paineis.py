@@ -66,8 +66,8 @@ FILHOS_KPIS = 4
 #: Esqueleto do DOM da busca (card V3 `t_9f384f60`, critério 1): filhos de
 #: `main`, de cada `section.painel` e do `form#form-busca`, exatamente como
 #: no esqueleto-alvo do spec. Ordem trocada, elemento faltando ou extra =
-#: falha. A chave usa `q=colegio` para que a página venha com linhas (sem
-#: critério não há consulta e a seção de resultados muda de forma).
+#: falha. A chave usa `q=colegio` para que a página venha com linhas (a
+#: abertura também lista o recorte desde o card V6-P4 `t_6a9f6b6f`).
 #:
 #: Esqueleto do DOM do mercado (card D1-E3, critério 1): filhos de `main`,
 #: do `div#mercado`, de cada `section.painel` (seletor, composição, movimento,
@@ -95,8 +95,11 @@ ESQUELETO = {
         "resultados": [
             "div.painel__cabecalho",
             "div.tabela-rolagem",
-            "nav.paginacao",
-            "dl.rodape-meta",
+            # Protótipo `:143-151` (card V6-P4 `t_6a9f6b6f`): estado vazio
+            # único (oculto com linhas), paginação e meta com os ids do design.
+            "div.estado-vazio#estado-vazio",
+            "nav.paginacao#paginacao",
+            "dl.rodape-meta#meta-busca",
         ],
     },
     "/app/mercados/3106200": {
@@ -409,6 +412,7 @@ def _fixture() -> tuple[Settings, FakeRepository]:
         indicator_row,
         market_row,
         municipio_row,
+        recorte_row,
         school_row,
         share_row,
     )
@@ -428,6 +432,12 @@ def _fixture() -> tuple[Settings, FakeRepository]:
             school_row(co_entidade=COTEMIG, no_entidade="COL COTEMIG BARROCA"),
             # Casa `q=colegio` do ESQUELETO (critério 1 do card da busca).
             school_row(co_entidade="31009999", no_entidade="COLEGIO EXEMPLO"),
+        ],
+        # Recorte da busca web (card V6-P4 `t_6a9f6b6f`): `/app/?q=colegio`
+        # lista pelo `buscar_escolas_recorte`, não por `schools`.
+        recorte=[
+            recorte_row(co_entidade=COTEMIG, no_entidade="COL COTEMIG BARROCA"),
+            recorte_row(co_entidade="31009999", no_entidade="COLEGIO EXEMPLO"),
         ],
         history=[
             history_row(

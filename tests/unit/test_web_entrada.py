@@ -275,21 +275,26 @@ def test_busca_sem_consulta_orienta_sobre_o_produto(cliente: TestClient):
 
     # Card V2: o bloco "O que é o Panorama Escola" saiu da busca; a orientação
     # de produto mora na landing e no rodapé final, que ainda declara o recorte
-    # (Minas Gerais) e a fonte (INEP).
-    assert "<h1>Busca de escolas</h1>" in html
+    # (Minas Gerais) e a fonte (INEP). O `h1` é o literal do protótipo (V6-P4).
+    assert "<h1>Busca de escolas na rede privada</h1>" in html
     assert "Minas Gerais" in html
     assert "INEP" in html
-    # Os alvos do formulário continuam no lugar, para os fluxos que os usam.
+    # Os alvos do formulário continuam no lugar, para os fluxos que os usam:
+    # a combobox do protótipo (`input#co_municipio`) e a ilha de municípios.
     assert 'id="form-busca"' in html
-    assert 'id="municipio"' in html
+    assert 'id="co_municipio"' in html
     assert 'id="dados-municipios"' in html
 
 
-def test_busca_sem_consulta_nao_mostra_sem_dado(cliente: TestClient):
+def test_busca_sem_consulta_lista_o_recorte_com_uma_consulta(
+    cliente: TestClient, entrada_repo: FakeRepository
+):
+    """Card V6-P4: a abertura lista o recorte (1 consulta), sem pré-busca."""
     html = _get(cliente, BUSCA).text
 
-    assert "sem dado" not in html.lower()
-    # O bloco de recorte só faz sentido depois de uma consulta.
+    chamadas = [n for n in entrada_repo.methods_called() if n != "get_table_columns"]
+    assert chamadas == ["list_escolas_recorte"]
+    assert "Nenhuma escola listada ainda" not in html
     assert "Recorte da busca" not in html
 
 
@@ -297,8 +302,8 @@ def test_busca_com_consulta_volta_a_mostrar_o_recorte(cliente: TestClient):
     html = _get(cliente, BUSCA, params={"co_municipio": MUNICIPIO}).text
 
     # Card V2: o recorte da consulta virou a lista `rodape-meta` abaixo da
-    # tabela (o painel "Recorte da busca" saiu).
-    assert "Origem dos números da consulta" in html
+    # tabela; desde o V6-P4 ela é o `dl#meta-busca` do protótipo.
+    assert '<dl class="rodape-meta" id="meta-busca">' in html
     assert "Ano de referência" in html
     assert "Recorte da busca" not in html
 

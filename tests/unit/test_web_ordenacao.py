@@ -340,7 +340,12 @@ def test_so_as_tabelas_do_card_ordenam(paginas: dict[str, str]) -> None:
 
 
 def test_servidor_nao_renderiza_botao_dentro_de_th(paginas: dict[str, str]) -> None:
+    # A busca é exceção deliberada (card V6-P4 `t_6a9f6b6f`): a ordenação dela
+    # é do servidor (GET `ordem`/`direcao`), então o `th.ordenavel > button`
+    # literal do protótipo vem no SSR — travado em `test_web_busca.py`.
     for nome, html in paginas.items():
+        if nome == "busca":
+            continue
         for celula in re.finditer(r"<th\b[^>]*>(.*?)</th>", html, re.S):
             assert "<button" not in celula.group(1), f"{nome}: botão no <th> do servidor"
 
