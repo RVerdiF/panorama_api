@@ -124,6 +124,33 @@ class BigQueryServingRepository:
         )
         return rows[0] if rows else None
 
+    def list_escolas_recorte(
+        self,
+        *,
+        ano: int,
+        q: str | None,
+        co_municipio: str | None,
+        etapa: str | None,
+        situacao: str | None,
+        ordem: str,
+        direcao: str,
+        limit: int,
+        offset: int,
+    ) -> list[dict[str, Any]]:
+        sql, params = queries.escolas_recorte(
+            self._fq,
+            ano=ano,
+            q=q,
+            co_municipio=co_municipio,
+            etapa=etapa,
+            situacao=situacao,
+            ordem=ordem,
+            direcao=direcao,
+            limit=limit,
+            offset=offset,
+        )
+        return self._run(sql, params, endpoint="escolas_recorte")
+
     def get_school_history(
         self, *, co_entidade: str, ano_inicio: int | None, ano_fim: int | None
     ) -> list[dict[str, Any]]:

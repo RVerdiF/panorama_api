@@ -4,18 +4,17 @@
 {% block titulo %}Busca de escolas — Panorama Escola{% endblock %}
 
 {#
-  Busca de escolas (card V3 `t_9f384f60`): DOM do protótipo
-  `panorama-escola-busca.html` com dados SSR. Só entram os filtros que a
-  rota aceita (`q`, `co_municipio`, `apenas_ativas`); etapa, ano e situação
-  não têm parâmetro e ficam fora (D6). A tabela é paginada no servidor, por
-  isso os `th` são simples, sem ordenação (D5). Matrícula, share municipal e
-  variação anual não vêm no schema de busca (`School`): as células saem como
-  `sem dado`, nunca 0 nem número inventado.
+  Busca de escolas (card V6-P4 `t_6a9f6b6f`): DOM literal do protótipo
+  `panorama-escola-busca.html:40-164` com dados SSR. A abertura lista o
+  recorte inteiro (matrícula desc, `NULLS LAST`); nome, município, etapa, ano
+  e situação combinam, e a ordenação por coluna é feita no servidor via GET
+  (`ordem`, `direcao`) — o `app.js` só liga o clique dos `th.ordenavel button`
+  à URL. Métrica ausente sai `sem dado`, nunca 0 (AGENTS.md §6).
 
-  O município é progressivo: o SSR emite o `select` com as 853 opções (vale
-  sem JS) e o `app.js` o troca pela combobox do protótipo no load, lendo a
-  ilha JSON `dados-municipios` ([nome, codigo]). O `input` visível não tem
-  `name`; quem é enviado é o `hidden`, preenchido pela escolha (D7).
+  Município: a combobox do protótipo (`input#co_municipio` + `button#botao-
+  municipio` + `ul#lista-municipios`) já vem no SSR; o código vai no `hidden`
+  (desabilitado até o `app.js` ligar a combobox) e, sem JS, o `select` do
+  `noscript` envia o código.
 #}
 {% block conteudo %}
   <div class="tela-topo">
@@ -24,59 +23,77 @@
       <span aria-hidden="true">›</span>
       <span>Escolas</span>
     </p>
-    <h1>Busca de escolas</h1>
-    <p class="tela-sub">
-      Cruze nome, município e situação de funcionamento. Matrícula, share
-      municipal e variação anual aparecem na mesma linha.
-    </p>
+    <h1>Busca de escolas na rede privada</h1>
+    <p class="tela-sub">Cruze nome, município, etapa e situação de funcionamento. Matrícula, participação municipal e variação anual aparecem na mesma linha.</p>
   </div>
 
   <section class="painel painel--inicial" aria-labelledby="titulo-filtros">
     <div class="painel__cabecalho">
       <h2 id="titulo-filtros">Filtros de busca</h2>
-      <p class="painel__nota">
-        Nome <em>ou</em> município. Os dois vazios listam o recorte inteiro.
-      </p>
+      <p class="painel__nota">Nome <em>ou</em> município. Os dois vazios listam o recorte inteiro.</p>
     </div>
 
     <form id="form-busca" method="get" action="{{ app_prefix }}/" novalidate>
       <div class="filtros">
         <div class="campo">
           <label for="q">Nome da escola</label>
-          <input
-            type="search"
-            id="q"
-            name="q"
-            value="{{ filtros.q }}"
-            minlength="3"
-            maxlength="100"
-            autocomplete="off"
-            aria-describedby="q-dica">
+          <input type="search" id="q" name="q" value="{{ filtros.q }}" placeholder="Ex.: Colégio Horizonte" minlength="3" maxlength="100" autocomplete="off" aria-describedby="q-dica">
           <p class="campo__dica" id="q-dica">Trecho do nome, de 3 a 100 caracteres.</p>
         </div>
 
         <div class="campo">
-          <label for="municipio">Município</label>
-          <select id="municipio" name="co_municipio">
-            <option value="">Todos os municípios de MG</option>
-            {% for municipio in municipios %}
-            <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == filtros.co_municipio %} selected{% endif %}>{{ municipio.no_municipio }}</option>
-            {% endfor %}
-          </select>
+          <label for="co_municipio">Município</label>
+          <div class="combo">
+            <input type="text" id="co_municipio" value="{{ nome_municipio }}" placeholder="Todos os municípios" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="lista-municipios" aria-autocomplete="list">
+            <button type="button" class="combo__seta" id="botao-municipio" aria-label="Abrir lista de municípios">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
+            <ul class="combo__lista" id="lista-municipios" role="listbox" aria-label="Municípios de Minas Gerais" data-aberta="false"></ul>
+          </div>
+          <input type="hidden" name="co_municipio" value="{{ filtros.co_municipio }}" disabled data-combo-codigo>
+          <noscript>
+            <select name="co_municipio" aria-label="Município">
+              <option value="">Todos os municípios</option>
+              {% for municipio in municipios %}
+              <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == filtros.co_municipio %} selected{% endif %}>{{ municipio.no_municipio }}</option>
+              {% endfor %}
+            </select>
+          </noscript>
           <p class="campo__dica">{{ municipios | length }} municípios de MG — digite para filtrar.</p>
           <script type="application/json" id="dados-municipios">{{ ilha_municipios | safe }}</script>
+        </div>
+
+        <div class="campo">
+          <label for="etapa">Etapa ofertada</label>
+          <select id="etapa" name="etapa">
+            <option value="">Todas as etapas</option>
+            {% for codigo, rotulo in opcoes_etapa %}
+            <option value="{{ codigo }}"{% if codigo == filtros.etapa %} selected{% endif %}>{{ rotulo }}</option>
+            {% endfor %}
+          </select>
+          <p class="campo__dica">Só escolas que ofertam a etapa.</p>
+        </div>
+
+        <div class="campo">
+          <label for="ano">Ano de referência</label>
+          <select id="ano" name="ano">
+            {% for ano in anos_disponiveis %}
+            <option value="{{ ano }}"{% if ano == filtros.ano %} selected{% endif %}>{{ ano }}</option>
+            {% endfor %}
+          </select>
+          <p class="campo__dica">Ano do Censo exibido na matrícula.</p>
         </div>
       </div>
 
       <div class="filtros filtros--3">
-        <div class="campo campo--check">
-          <input
-            type="checkbox"
-            id="apenas-ativas"
-            name="apenas_ativas"
-            value="true"
-            {% if filtros.apenas_ativas %}checked{% endif %}>
-          <label for="apenas-ativas">Apenas escolas em atividade</label>
+        <div class="campo">
+          <label for="situacao">Situação de funcionamento</label>
+          <select id="situacao" name="situacao">
+            <option value="">Qualquer situação</option>
+            {% for codigo, rotulo in opcoes_situacao %}
+            <option value="{{ codigo }}"{% if codigo == filtros.situacao %} selected{% endif %}>{{ rotulo }}</option>
+            {% endfor %}
+          </select>
         </div>
       </div>
 
@@ -90,15 +107,18 @@
 
       <p class="retorno" id="retorno" role="status" aria-live="polite" hidden></p>
       <div class="chips" id="chips">
-        {% if filtros.q or filtros.co_municipio or filtros.apenas_ativas %}
+        {% if filtro_ativo %}
         {% if filtros.q %}
         <span class="chip">nome: <strong>{{ filtros.q }}</strong></span>
         {% endif %}
         {% if filtros.co_municipio %}
         <span class="chip">município: <strong>{{ nome_municipio or filtros.co_municipio }}</strong></span>
         {% endif %}
-        {% if filtros.apenas_ativas %}
-        <span class="chip">só ativas</span>
+        {% if rotulo_etapa_filtro %}
+        <span class="chip">etapa: <strong>{{ rotulo_etapa_filtro }}</strong></span>
+        {% endif %}
+        {% if rotulo_situacao_filtro %}
+        <span class="chip">situação: <strong>{{ rotulo_situacao_filtro }}</strong></span>
         {% endif %}
         <a class="botao botao--secundario botao--mini" href="{{ app_prefix }}/">Limpar</a>
         {% endif %}
@@ -109,59 +129,56 @@
   <section class="painel" aria-labelledby="titulo-resultados">
     <div class="painel__cabecalho">
       <h2 id="titulo-resultados">Resultados</h2>
-      <p class="painel__nota">
-        Nenhum total é exibido: a paginação usa apenas "tem mais".
-      </p>
+      <p class="painel__nota">Ordenável por qualquer coluna. Nenhum total é exibido: a paginação usa apenas “tem mais”.</p>
     </div>
 
-    {% if resposta and escolas %}
     <div class="tabela-rolagem">
       <table class="tabela" id="tabela-resultados">
-        <caption id="caption-resultados">Escolas encontradas nesta página</caption>
+        <caption id="caption-resultados">{% if linhas %}Mostrando {{ paginacao.mostrando }} do recorte · matrícula em {{ filtros.ano }}{% else %}Nenhuma escola para o recorte selecionado.{% endif %}</caption>
         <thead>
           <tr>
-            <th scope="col">Escola</th>
-            <th scope="col">Município</th>
-            <th scope="col">Dependência</th>
-            <th scope="col" class="num">Matrícula</th>
-            <th scope="col" class="num">Share municipal</th>
-            <th scope="col" class="num">Variação anual</th>
-            <th scope="col">Situação</th>
+            {% for coluna in colunas %}
+            <th class="ordenavel{% if coluna.num %} num{% endif %}" data-campo="{{ coluna.campo }}" scope="col"{% if coluna.aria_sort %} aria-sort="{{ coluna.aria_sort }}"{% endif %}><button type="button">{{ coluna.rotulo }} <span>{% if coluna.aria_sort == "ascending" %}▲{% elif coluna.aria_sort == "descending" %}▼{% endif %}</span></button></th>
+            {% endfor %}
           </tr>
         </thead>
-        <tbody>
-          {% for escola in escolas %}
+        <tbody id="corpo-resultados">
+          {% for linha in linhas %}
           <tr>
-            {# O nome é o link da ficha; sem o código INEP ao lado (D5). #}
-            <td><a class="nome-escola" href="{{ app_prefix }}/escolas/{{ escola.co_entidade }}">{{ escola.no_entidade | fmt_nulo }}</a></td>
-            {# Município é texto, sem link e sem código; dependência e situação
-               saem só com o rótulo, sem o código INEP (D5). #}
-            <td>{{ escola.no_municipio | fmt_nulo }}</td>
-            <td>{{ rotulo_dependencia(escola.tp_dependencia) }}</td>
-            {#- `School` não traz matrícula, share nem variação: `sem dado` na
-                mesma célula com as classes do protótipo, nunca 0 (AGENTS.md §6). -#}
+            <td><a class="nome-escola" href="{{ app_prefix }}/escolas/{{ linha.co_entidade }}">{{ linha.nome | fmt_nulo }}</a></td>
+            <td class="sec">{{ linha.municipio | fmt_nulo }}</td>
+            <td class="sec">{{ linha.dependencia }}</td>
+            {% if linha.matricula is not none %}
+            <td class="num metrica">{{ linha.matricula | fmt_contagem }}</td>
+            {% else %}
             <td class="num metrica"><span class="sem-dado">sem dado</span></td>
+            {% endif %}
+            {% if linha.share is not none %}
+            <td class="num metrica">{{ linha.share | fmt_nulo }}%</td>
+            {% else %}
             <td class="num metrica"><span class="sem-dado">sem dado</span></td>
-            <td class="num metrica"><span class="sem-dado">sem dado</span></td>
-            <td>{{ rotulo_situacao(escola.tp_situacao_funcionamento) }}</td>
+            {% endif %}
+            {% if linha.variacao is not none %}
+            <td class="num"><span class="{{ linha.classe_variacao }}">{{ linha.texto_variacao }}</span></td>
+            {% else %}
+            <td class="num"><span class="sem-dado">sem dado</span></td>
+            {% endif %}
+            <td class="sec">{{ linha.situacao }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
 
-    {% if paginacao.refinar %}
-    <div class="aviso">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 9v5"/><circle cx="12" cy="17" r="1" fill="currentColor" stroke="none"/></svg>
-      <p>
-        Limite de paginação atingido. Refine a busca — nome mais específico ou um
-        município — para ver outras escolas.
-      </p>
+    <div id="estado-vazio" class="estado-vazio"{% if linhas %} hidden{% endif %}>
+      <svg class="estado-vazio__icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <h3>Nenhuma escola para este recorte</h3>
+      <p>Ajuste o nome, o município ou a etapa.</p>
     </div>
-    {% endif %}
 
-    <nav class="paginacao" aria-label="Paginação dos resultados">
-      <p class="paginacao__estado">Mostrando {{ paginacao.mostrando }}</p>
+    <nav class="paginacao" id="paginacao" aria-label="Paginação dos resultados"{% if not linhas %} hidden{% endif %}>
+      {% if linhas %}
+      <p class="paginacao__estado">{% if paginacao.refinar %}Teto de 1.000 registros alcançado — refine a busca.{% else %}Mostrando {{ paginacao.mostrando }}{% endif %}</p>
       <div class="paginacao__botoes">
         {% if paginacao.url_anterior %}
         <a class="botao botao--secundario" href="{{ paginacao.url_anterior }}" rel="prev">Anterior</a>
@@ -174,62 +191,16 @@
         <span class="botao botao--secundario" aria-disabled="true">Próxima</span>
         {% endif %}
       </div>
+      {% endif %}
     </nav>
 
-    {# Origem de cada número da tabela (autor e consulta). Só existe depois de
-       uma consulta: sem consulta não há números a contextualizar. #}
-    {% if houve_consulta %}
-    <dl class="rodape-meta" aria-label="Origem dos números da consulta">
-      <div>
-        <dt>Ano de referência</dt>
-        <dd>{{ meta.ano_referencia | fmt_ano }}</dd>
-      </div>
-      <div>
-        <dt>Etapa</dt>
-        <dd>{{ etapa_rotulo }}</dd>
-      </div>
-      <div>
-        <dt>Universo</dt>
-        <dd><code>{{ meta.universo }}</code>{% if universo_descricao %} — {{ universo_descricao }}{% endif %}</dd>
-      </div>
-      <div>
-        <dt>Fonte</dt>
-        <dd>{{ meta.fonte.orgao }} · {{ meta.fonte.base }} · <code>{{ meta.fonte.tabela }}</code></dd>
-      </div>
-      {% if filtros.apenas_ativas %}
-      <div>
-        <dt>Filtro de situação</dt>
-        <dd>somente escolas ativas (<code>situacao_funcionamento = '1'</code>)</dd>
-      </div>
-      {% endif %}
-      <div>
-        <dt>Avisos</dt>
-        <dd>
-          {% if avisos %}
-          {{ avisos | join("; ") }}
-          {% else %}
-          nenhum aviso para esta consulta
-          {% endif %}
-        </dd>
-      </div>
+    <dl class="rodape-meta" id="meta-busca">
+      <div><dt>Ano de referência</dt><dd>{{ meta.ano_referencia | fmt_ano }}</dd></div>
+      <div><dt>Etapa</dt><dd>{{ rotulo_etapa_filtro or "todas as etapas" }}</dd></div>
+      <div><dt>Universo</dt><dd><code>{{ meta.universo }}</code>{% if universo_descricao %} — {{ universo_descricao }}{% endif %}</dd></div>
+      <div><dt>Fonte</dt><dd>{{ meta.fonte.orgao }} · {{ meta.fonte.base }} · <code>{{ meta.fonte.tabela }}</code></dd></div>
     </dl>
-    {% endif %}
-
-    {% elif resposta %}
-    {#- Estado vazio do protótipo com critério e sem linha (lupa + título). -#}
-    <div class="estado-vazio">
-      <svg class="estado-vazio__icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
-      <h3>Nenhuma escola para este recorte</h3>
-      <p>Ajuste o nome, o município ou os filtros e tente novamente.</p>
-    </div>
-    {% else %}
-    <div class="estado-vazio">
-      <svg class="estado-vazio__icone" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
-      <h3>Nenhuma escola listada ainda</h3>
-      <p>Informe o nome da escola ou escolha um município para começar a busca.</p>
-    </div>
-    {% endif %}
   </section>
 
-  {{ rodape_final(houve_consulta) }}
+  {{ rodape_final() }}
 {% endblock %}

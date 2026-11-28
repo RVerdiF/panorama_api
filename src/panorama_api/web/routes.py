@@ -28,7 +28,6 @@ from panorama_api.contract import (
     CONTRACT,
     FONTE_BASE,
     FONTE_ORGAO,
-    UNIVERSO_ESCOLAS_MG,
 )
 from panorama_api.core import validation
 from panorama_api.core.errors import (
@@ -49,12 +48,13 @@ from panorama_api.web.conteudo import (
     EXPLICACAO_OFERTA_DESCONHECIDA,
     MARQUISE_MUNICIPIOS,
     MOTIVO_SECAO_INDICADORES,
+    OPCOES_ETAPA_BUSCA,
+    OPCOES_SITUACAO_BUSCA,
     ROTULO_COMPARAR_COM_ESTA,
     ROTULO_RETENCAO,
     UNIVERSOS,
     anos_publicados,
     rotulo_etapa,
-    traduzir_avisos,
 )
 from panorama_api.web.escola import (
     AVISO_ABAIXO_PORTE,
@@ -92,15 +92,17 @@ DIRETORIO = Path(__file__).resolve().parent
 TEMPLATES_DIR = DIRETORIO / "templates"
 STATIC_DIR = DIRETORIO / "static"
 
-#: Recorte fixo da tela de busca — o mesmo de `GET /v1/schools` (`dim_escola`,
-#: MG, etapa BAS). Usado quando ainda não houve consulta: a tela declara de onde
-#: virão ano, etapa, universo, fonte e avisos em vez de omitir o recorte.
-META_BUSCA: Mapping[str, Any] = {
-    "ano_referencia": None,
-    "etapa": "bas",
-    "universo": UNIVERSO_ESCOLAS_MG,
-    "fonte": {"orgao": FONTE_ORGAO, "base": FONTE_BASE, "tabela": "dim_escola"},
-}
+#: Colunas da tabela de resultados da busca (protótipo `:130-136`):
+#: (`data-campo` = chave de `ordem`, rótulo literal, coluna numérica).
+COLUNAS_BUSCA: tuple[tuple[str, str, bool], ...] = (
+    ("nome", "Escola", False),
+    ("municipio", "Município", False),
+    ("dependencia", "Dependência", False),
+    ("matricula", "Matrícula", True),
+    ("share", "Share municipal", True),
+    ("variacao", "Variação anual", True),
+    ("situacao", "Situação", False),
+)
 
 #: Metadados de página para cada `ErrorCode`: (título da página, ação sugerida).
 _PAGINAS_ERRO: Mapping[ErrorCode, tuple[str, str | None]] = {
@@ -684,102 +686,136 @@ def busca(
     request: Request,
     q: str | None = None,
     co_municipio: str | None = None,
-    apenas_ativas: bool = False,
+    etapa: str | None = None,
+    ano: int | None = None,
+    situacao: str | None = None,
+    ordem: str | None = None,
+    direcao: str | None = None,
     offset: int | None = None,
 ) -> Response:
-    """Busca de escolas (= ``GET /v1/schools``) por nome, município ou ambos.
+    """Busca de escolas `/app/`: o recorte do protótipo, sempre listado.
 
-    Regras do card F3:
+    Card `t_6a9f6b6f` (decisões V6-P4): a abertura lista o recorte inteiro,
+    ordenado por matrícula desc (`NULLS LAST`), e nome, município, etapa,
+    ano e situação **combinam** como no protótipo (`filtrar()` do design).
+    Toda listagem é **uma** consulta via `dados.buscar_escolas_recorte` —
+    função distinta de `buscar_escolas`, que espelha o `/v1/schools` e
+    continua exigindo critério.
 
-    * sem critério não há consulta: a página responde ``200`` com a mensagem de
-      "nenhuma escola" e o repositório **não** é chamado;
-    * parâmetro inválido (`q` com menos de 3 caracteres, município fora de
-      ``^31\\d{5}$``, `offset` fora de ``0..1000``) vira ``422`` **antes** de
-      qualquer acesso ao repositório — a validação é a mesma do `/v1`;
-    * paginação é decidida só por ``page.has_more`` (o contrato não tem
-      `total`) e o offset nunca passa do teto do contrato.
-
-    O `offset` é validado **antes** do atalho de busca vazia: com critério e sem
-    critério, o mesmo valor fora de ``0..1000`` responde ``422`` (achado C7 do
-    card `t_3ea9454f` — antes `?offset=2000` sozinho devolvia ``200``).
+    * parâmetro inválido (`q` com 1–2 caracteres, município fora de
+      ``^31\\\\d{5}$``, etapa/situação/ordem/direção fora da allowlist, ano
+      fora de `APP_ANOS_DISPONIVEIS`, `offset` fora de ``0..1000``) vira erro
+      **antes** de qualquer acesso ao repositório;
+    * paginação é decidida só por ``page.has_more`` (sem `total`) e o offset
+      nunca passa do teto do contrato — no teto, ``paginacao__estado`` traz o
+      texto do protótipo.
     """
-    termo = (q or "").strip()
-    municipio = (co_municipio or "").strip()
-    deslocamento = validation.offset(offset)
-    # Filtros preservados nos links de paginação; vazio não entra na URL.
+    def _limpo(valor: str | None) -> str:
+        return (valor or "").strip()
+
+    termo = _limpo(q)
+    municipio = _limpo(co_municipio)
+    etapa_ref = _limpo(etapa)
+    situacao_ref = _limpo(situacao)
+    ordem_ref = _limpo(ordem) or dados.ORDEM_PADRAO_RECORTE
+    direcao_ref = _limpo(direcao) or dados.DIRECAO_PADRAO_RECORTE
+
+    recorte = dados.buscar_escolas_recorte(
+        request,
+        q=termo or None,
+        co_municipio=municipio or None,
+        etapa=etapa_ref or None,
+        ano=ano,
+        situacao=situacao_ref or None,
+        ordem=ordem_ref,
+        direcao=direcao_ref,
+        limit=dados.LIMITE_BUSCA_PADRAO,
+        offset=offset,
+    )
+    anos_disponiveis = sorted(_settings(request).anos_disponiveis, reverse=True)
+    # Filtros preservados nos links de paginação; vazio (e o padrão de ano e
+    # ordem) não entra na URL — a abertura continua sendo `/app/`.
     filtros_pagina = {
         "q": termo,
         "co_municipio": municipio,
-        "apenas_ativas": "true" if apenas_ativas else "",
+        "etapa": etapa_ref,
+        "ano": "" if recorte.ano == anos_disponiveis[0] else str(recorte.ano),
+        "situacao": situacao_ref,
+        "ordem": "" if ordem_ref == dados.ORDEM_PADRAO_RECORTE else ordem_ref,
+        "direcao": "" if direcao_ref == dados.DIRECAO_PADRAO_RECORTE else direcao_ref,
     }
+    paginacao = montar_paginacao(
+        recorte.page, caminho=f"{PREFIXO_WEB}/", filtros=filtros_pagina
+    )
 
-    # Lista IBGE versionada: alimenta o `select` do SSR e a ilha JSON
-    # `dados-municipios` ([nome, codigo]) que a combobox do `app.js` filtra.
+    # Lista IBGE versionada: alimenta a combobox (ilha JSON `[nome, codigo]`)
+    # e o `select` do `noscript` (sem JS).
     municipios = municipios_mg()
+    rotulos_etapa = dict(OPCOES_ETAPA_BUSCA)
+    rotulos_situacao = dict(OPCOES_SITUACAO_BUSCA)
     contexto: dict[str, Any] = {
         **contexto_base(request, pagina="escolas"),
         "filtros": {
             "q": termo,
             "co_municipio": municipio,
-            "apenas_ativas": apenas_ativas,
+            "etapa": etapa_ref,
+            "ano": recorte.ano,
+            "situacao": situacao_ref,
         },
+        "filtro_ativo": bool(termo or municipio or etapa_ref or situacao_ref),
+        "rotulo_etapa_filtro": rotulos_etapa.get(etapa_ref, ""),
+        "rotulo_situacao_filtro": rotulos_situacao.get(situacao_ref, ""),
+        "opcoes_etapa": OPCOES_ETAPA_BUSCA,
+        "opcoes_situacao": OPCOES_SITUACAO_BUSCA,
+        "anos_disponiveis": anos_disponiveis,
         "municipios": municipios,
         "ilha_municipios": json.dumps(
             [[m.no_municipio, m.co_municipio] for m in municipios],
             ensure_ascii=False,
             separators=(",", ":"),
         ),
-        # Nome do município escolhido, para o chip e para a combobox
-        # reabrir com o texto visível (o `hidden` leva o código).
+        # Nome do município escolhido: a combobox reabre com o texto visível
+        # (o `hidden` leva o código).
         "nome_municipio": next(
             (m.no_municipio for m in municipios if m.co_municipio == municipio),
             "",
         ),
-        "resposta": None,
-        "escolas": [],
-        "paginacao": None,
-        "meta": META_BUSCA,
-        "etapa_rotulo": rotulo_etapa(META_BUSCA["etapa"]),
-        "universo_descricao": UNIVERSOS[UNIVERSO_ESCOLAS_MG],
-        "avisos": None,
-        # Anos publicados do front (o mesmo `APP_ANOS_DISPONIVEIS` do seletor do
-        # mercado): o bloco de orientação anuncia o recorte real, nunca literal.
-        "anos_disponiveis": list(_settings(request).anos_disponiveis),
-        # Sem consulta o bloco "Recorte da busca" não tem o que declarar — em
-        # especial `ano_referencia`, que sairia como "sem dado" e passaria a
-        # impressão de base faltando (achado A3).
-        "houve_consulta": bool(termo or municipio),
-        # Rótulos dos códigos INEP por linha: a busca mostra só a leitura
-        # ("Privada"), sem o código cru (D5).
-        "rotulo_dependencia": rotulo_dependencia,
-        "rotulo_situacao": rotulo_situacao,
+        "colunas": [
+            {
+                "campo": campo,
+                "rotulo": rotulo,
+                "num": num,
+                "aria_sort": (
+                    ("ascending" if direcao_ref == "asc" else "descending")
+                    if campo == ordem_ref
+                    else None
+                ),
+            }
+            for campo, rotulo, num in COLUNAS_BUSCA
+        ],
+        "linhas": [
+            {
+                "co_entidade": linha.co_entidade,
+                "nome": linha.no_entidade,
+                "municipio": linha.no_municipio,
+                "dependencia": rotulo_dependencia(linha.tp_dependencia),
+                "situacao": rotulo_situacao(linha.tp_situacao_funcionamento),
+                "matricula": linha.qt_mat_bas,
+                "share": linha.share_privado_pct,
+                "variacao": linha.crescimento_yoy_pct,
+                "texto_variacao": texto_variacao(linha.crescimento_yoy_pct),
+                "classe_variacao": (
+                    ""
+                    if linha.crescimento_yoy_pct is None
+                    else ("var-pos" if linha.crescimento_yoy_pct >= 0 else "var-neg")
+                ),
+            }
+            for linha in recorte.linhas
+        ],
+        "paginacao": paginacao,
+        "meta": recorte.meta,
+        "universo_descricao": UNIVERSOS.get(recorte.meta.universo, ""),
     }
-
-    if not termo and not municipio:
-        # Busca vazia: nada de scan da mart (o `/v1` responderia 400). A tela
-        # apenas anuncia que ainda não há escola listada.
-        return templates().TemplateResponse(request, "busca.html", contexto)
-
-    resposta = dados.buscar_escolas(
-        request,
-        q=termo or None,
-        co_municipio=municipio or None,
-        apenas_ativas=apenas_ativas,
-        limit=dados.LIMITE_BUSCA_PADRAO,
-        offset=deslocamento,
-    )
-    meta = resposta.meta
-    contexto.update(
-        resposta=resposta,
-        escolas=resposta.data,
-        meta=meta,
-        etapa_rotulo=rotulo_etapa(meta.etapa),
-        universo_descricao=UNIVERSOS.get(meta.universo, ""),
-        avisos=traduzir_avisos(meta.avisos),
-        paginacao=montar_paginacao(
-            resposta.page, caminho=f"{PREFIXO_WEB}/", filtros=filtros_pagina
-        ),
-    )
     return templates().TemplateResponse(request, "busca.html", contexto)
 
 
@@ -1619,7 +1655,6 @@ def asset(caminho: str, request: Request) -> Response:
 
 __all__ = [
     "CACHE_CONTROL_ERRO",
-    "META_BUSCA",
     "RETRY_AFTER_SEGUNDOS",
     "SUGESTAO_PAGINA_INEXISTENTE",
     "TEMPLATES_DIR",

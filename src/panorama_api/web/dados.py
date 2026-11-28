@@ -34,8 +34,17 @@ from panorama_api.schemas.schools import HistoryResponse, SchoolsResponse
 from panorama_api.services import markets as service_markets
 from panorama_api.services import schools as service_schools
 from panorama_api.services import indice as service_indice
+from panorama_api.services import recorte as service_recorte
 from panorama_api.services.indice import IndiceMunicipios
+from panorama_api.services.recorte import LinhaRecorte, RecorteEscolas
 from panorama_api.services.schools import DESCRICAO_COMPETIDORES
+from panorama_api.core.http_cache import LruCache
+
+#: Allowlists da busca web (reexport: `routes.py` não importa `services`).
+ORDEM_PADRAO_RECORTE = service_recorte.ORDEM_PADRAO
+DIRECAO_PADRAO_RECORTE = service_recorte.DIRECAO_PADRAO
+#: LRU do recorte da busca (decisão a do V6-P4: pelo menos 64 entradas).
+CAPACIDADE_CACHE_RECORTE = 256
 
 #: Reexport (abaixo em `__all__`) do texto servido em `meta.definicoes.competidores`
 #: pelo `/v1`: as telas (rótulos em `conteudo.py`) não importam `services` direto.
@@ -107,6 +116,113 @@ def buscar_escolas(
         limit=limite,
         offset=deslocamento,
     )
+
+
+def _cache_recorte(request: Request) -> LruCache[RecorteEscolas]:
+    """LRU do recorte, um por app (decisão a do V6-P4: ≥ 64 entradas).
+
+    O cache de páginas já evita refazer a mesma URL, mas o vaivém de
+    paginação/ordenação gera URLs novas que caem nele frias; este LRU guarda a
+    **resposta de dados** por recorte para que a mesma página nunca refaça a
+    consulta de ~71 MB. A chave leva a `DATA_VERSION`: dado novo, chave nova.
+    """
+    cache = getattr(request.app.state, "cache_recorte", None)
+    if not isinstance(cache, LruCache):
+        cache = LruCache(max_entries=CAPACIDADE_CACHE_RECORTE)
+        request.app.state.cache_recorte = cache
+    return cache
+
+
+def buscar_escolas_recorte(
+    request: Request,
+    *,
+    q: str | None = None,
+    co_municipio: str | None = None,
+    etapa: str | None = None,
+    ano: int | None = None,
+    situacao: str | None = None,
+    ordem: str | None = None,
+    direcao: str | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> RecorteEscolas:
+    """Recorte da busca web `/app/` — **não** espelha o `/v1/schools`.
+
+    Função distinta de :func:`buscar_escolas` (decisão c do V6-P4): lista o
+    recorte mesmo sem critério, com filtros de etapa/ano/situação e ordenação
+    por coluna no servidor. O `/v1/schools` continua respondendo 400 sem
+    critério. Toda entrada é validada aqui, antes de qualquer consulta; valor
+    fora da allowlist é 422, nunca ignorado.
+    """
+    termo = validation.search_term(q)
+    municipio = (
+        validation.co_municipio(co_municipio, loc="query")
+        if co_municipio is not None
+        else None
+    )
+    if etapa is not None and etapa not in service_recorte.ETAPAS:
+        raise invalid(
+            f"etapa {etapa!r} não pertence a {{{','.join(sorted(service_recorte.ETAPAS))}}}",
+            loc=("query", "etapa"),
+        )
+    if situacao is not None and situacao not in service_recorte.SITUACOES:
+        raise invalid(
+            f"situacao {situacao!r} não pertence a {{{','.join(sorted(service_recorte.SITUACOES))}}}",
+            loc=("query", "situacao"),
+        )
+    campo = ordem if ordem is not None else service_recorte.ORDEM_PADRAO
+    if campo not in service_recorte.ORDENS:
+        raise invalid(
+            f"ordem {campo!r} não pertence a {{{','.join(sorted(service_recorte.ORDENS))}}}",
+            loc=("query", "ordem"),
+        )
+    sentido = direcao if direcao is not None else service_recorte.DIRECAO_PADRAO
+    if sentido not in service_recorte.DIRECOES:
+        raise invalid(
+            f"direcao {sentido!r} não pertence a {{asc,desc}}",
+            loc=("query", "direcao"),
+        )
+    limite = validation.limit(limit, default=LIMITE_BUSCA_PADRAO, maximum=LIMITE_BUSCA_MAXIMO)
+    deslocamento = validation.offset(offset)
+
+    repository, settings = fonte(request)
+    ano_ref = validation.ano(ano)
+    if ano_ref is None:
+        ano_ref = max(settings.anos_disponiveis)
+
+    chave = repr(
+        (
+            settings.data_version,
+            ano_ref,
+            termo,
+            municipio,
+            etapa,
+            situacao,
+            campo,
+            sentido,
+            limite,
+            deslocamento,
+        )
+    )
+    cache = _cache_recorte(request)
+    guardado = cache.get(chave)
+    if guardado is not None:
+        return guardado
+    resposta = service_recorte.escolas_recorte(
+        repository,
+        settings,
+        ano=ano_ref,
+        q=termo,
+        co_municipio=municipio,
+        etapa=etapa,
+        situacao=situacao,
+        ordem=campo,
+        direcao=sentido,
+        limit=limite,
+        offset=deslocamento,
+    )
+    cache.put(chave, resposta)
+    return resposta
 
 
 def historico_escola(
@@ -221,12 +337,18 @@ def indice_municipios(request: Request, *, ano: int) -> IndiceMunicipios:
 
 
 __all__ = [
+    "CAPACIDADE_CACHE_RECORTE",
     "DESCRICAO_COMPETIDORES",
+    "DIRECAO_PADRAO_RECORTE",
     "LIMITE_BUSCA_MAXIMO",
     "LIMITE_BUSCA_PADRAO",
     "LIMITE_SHARE_MAXIMO",
     "LIMITE_SHARE_PADRAO",
+    "LinhaRecorte",
+    "ORDEM_PADRAO_RECORTE",
+    "RecorteEscolas",
     "buscar_escolas",
+    "buscar_escolas_recorte",
     "concorrentes_escola",
     "fonte",
     "historico_escola",
