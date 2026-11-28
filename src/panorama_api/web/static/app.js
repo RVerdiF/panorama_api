@@ -574,14 +574,12 @@
   function montarComboBusca(form) {
     // A combobox do protótipo já vem no SSR (`input#co_municipio`,
     // `button#botao-municipio`, `ul#lista-municipios`); o `hidden` com o
-    // código chega desabilitado (sem JS quem envia é o `select` do
-    // `noscript`) e só passa a valer aqui, quando a lista está ligada.
+    // código é o que o formulário envia, preenchido pela escolha na lista.
     var campo = form.querySelector("input#co_municipio");
     var lista = form.querySelector("ul#lista-municipios");
     var seta = form.querySelector("button#botao-municipio");
     var oculto = form.querySelector("input[data-combo-codigo]");
     if (!campo || !lista || !oculto) return null;
-    oculto.disabled = false;
     ligarCombobox(campo, lista, seta, lerIlhaMunicipios(), oculto);
     return oculto;
   }

@@ -334,25 +334,42 @@ def test_combobox_do_ssr_segue_o_dom_do_prototipo(client, repository):
     assert 'data-aberta="false"' in _bloco(html, '<ul class="combo__lista"', ">")
 
 
-def test_codigo_do_municipio_vai_no_hidden_desabilitado_ate_o_js(client, repository):
+def test_codigo_do_municipio_vai_no_hidden_da_combobox(client, repository):
     html = _get(client, params={"co_municipio": "3106200"}).text
 
     assert (
-        '<input type="hidden" name="co_municipio" value="3106200" disabled data-combo-codigo>'
+        '<input type="hidden" name="co_municipio" value="3106200" data-combo-codigo>'
     ) in html
     # A combobox reabre com o nome visível do município escolhido.
     assert 'value="Belo Horizonte"' in _bloco(html, '<input type="text" id="co_municipio"', ">")
 
 
-def test_sem_js_o_select_do_noscript_envia_o_codigo(client, repository):
+def test_sem_select_inventado_de_municipio(client, repository):
+    """B13: o `select#municipio` não existe no protótipo (e custava 64 KB)."""
     html = _get(client, params={"co_municipio": "3106200"}).text
-    bloco = _bloco(html, "<noscript>", "</noscript>")
 
-    assert '<select name="co_municipio" aria-label="Município">' in bloco
-    assert bloco.count('<option value="31') == 853
-    assert bloco.count(" selected>") == 1
-    assert '<option value="3106200" selected>Belo Horizonte</option>' in bloco
-    assert '<option value="">Todos os municípios</option>' in bloco
+    assert 'id="municipio"' not in html
+    assert "<noscript>" not in html
+    assert '<option value="3106200"' not in html
+
+
+def test_orcamento_da_abertura_1_consulta_e_html_ate_40_kb(client, repository):
+    """`navegacao.md` §6 (linha V6-P4): 1 consulta e ≤ 40 KB com 21 linhas."""
+    repository.recorte = [
+        recorte_row(
+            co_entidade=f"31{i:06d}",
+            no_entidade=f"COLEGIO EXEMPLO DE NOME LONGO {i:03d}",
+            qt_mat_bas=5000 - i,
+        )
+        for i in range(1, 22)
+    ]
+
+    resposta = _get(client)
+
+    assert [nome for nome, _ in _consultas_de_escola(repository)] == [
+        "list_escolas_recorte"
+    ]
+    assert len(resposta.content) <= 40 * 1024
 
 
 def test_ilha_de_municipios_tem_853_pares_nome_codigo(client):

@@ -748,8 +748,7 @@ def busca(
         recorte.page, caminho=f"{PREFIXO_WEB}/", filtros=filtros_pagina
     )
 
-    # Lista IBGE versionada: alimenta a combobox (ilha JSON `[nome, codigo]`)
-    # e o `select` do `noscript` (sem JS).
+    # Lista IBGE versionada: alimenta a combobox (ilha JSON `[nome, codigo]`).
     municipios = municipios_mg()
     rotulos_etapa = dict(OPCOES_ETAPA_BUSCA)
     rotulos_situacao = dict(OPCOES_SITUACAO_BUSCA)

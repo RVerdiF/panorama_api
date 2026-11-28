@@ -12,9 +12,10 @@
   à URL. Métrica ausente sai `sem dado`, nunca 0 (AGENTS.md §6).
 
   Município: a combobox do protótipo (`input#co_municipio` + `button#botao-
-  municipio` + `ul#lista-municipios`) já vem no SSR; o código vai no `hidden`
-  (desabilitado até o `app.js` ligar a combobox) e, sem JS, o `select` do
-  `noscript` envia o código.
+  municipio` + `ul#lista-municipios`) já vem no SSR, sem `name`; o código vai
+  no `hidden`, que o `app.js` preenche pela escolha na lista. Não há `select`
+  de fallback: o protótipo não tem, e as 853 opções custavam 64 KB por página
+  (orçamento de `navegacao.md` §6).
 #}
 {% block conteudo %}
   <div class="tela-topo">
@@ -50,15 +51,7 @@
             </button>
             <ul class="combo__lista" id="lista-municipios" role="listbox" aria-label="Municípios de Minas Gerais" data-aberta="false"></ul>
           </div>
-          <input type="hidden" name="co_municipio" value="{{ filtros.co_municipio }}" disabled data-combo-codigo>
-          <noscript>
-            <select name="co_municipio" aria-label="Município">
-              <option value="">Todos os municípios</option>
-              {% for municipio in municipios %}
-              <option value="{{ municipio.co_municipio }}"{% if municipio.co_municipio == filtros.co_municipio %} selected{% endif %}>{{ municipio.no_municipio }}</option>
-              {% endfor %}
-            </select>
-          </noscript>
+          <input type="hidden" name="co_municipio" value="{{ filtros.co_municipio }}" data-combo-codigo>
           <p class="campo__dica">{{ municipios | length }} municípios de MG — digite para filtrar.</p>
           <script type="application/json" id="dados-municipios">{{ ilha_municipios | safe }}</script>
         </div>
@@ -143,28 +136,10 @@
           </tr>
         </thead>
         <tbody id="corpo-resultados">
+          {#- Uma linha por `<tr>`: o whitespace das tags de bloco, ×20 linhas,
+              custava ~2 KB do orçamento de HTML (`navegacao.md` §6). -#}
           {% for linha in linhas %}
-          <tr>
-            <td><a class="nome-escola" href="{{ app_prefix }}/escolas/{{ linha.co_entidade }}">{{ linha.nome | fmt_nulo }}</a></td>
-            <td class="sec">{{ linha.municipio | fmt_nulo }}</td>
-            <td class="sec">{{ linha.dependencia }}</td>
-            {% if linha.matricula is not none %}
-            <td class="num metrica">{{ linha.matricula | fmt_contagem }}</td>
-            {% else %}
-            <td class="num metrica"><span class="sem-dado">sem dado</span></td>
-            {% endif %}
-            {% if linha.share is not none %}
-            <td class="num metrica">{{ linha.share | fmt_nulo }}%</td>
-            {% else %}
-            <td class="num metrica"><span class="sem-dado">sem dado</span></td>
-            {% endif %}
-            {% if linha.variacao is not none %}
-            <td class="num"><span class="{{ linha.classe_variacao }}">{{ linha.texto_variacao }}</span></td>
-            {% else %}
-            <td class="num"><span class="sem-dado">sem dado</span></td>
-            {% endif %}
-            <td class="sec">{{ linha.situacao }}</td>
-          </tr>
+          <tr><td><a class="nome-escola" href="{{ app_prefix }}/escolas/{{ linha.co_entidade }}">{{ linha.nome | fmt_nulo }}</a></td><td class="sec">{{ linha.municipio | fmt_nulo }}</td><td class="sec">{{ linha.dependencia }}</td><td class="num metrica">{% if linha.matricula is not none %}{{ linha.matricula | fmt_contagem }}{% else %}<span class="sem-dado">sem dado</span>{% endif %}</td><td class="num metrica">{% if linha.share is not none %}{{ linha.share | fmt_nulo }}%{% else %}<span class="sem-dado">sem dado</span>{% endif %}</td><td class="num">{% if linha.variacao is not none %}<span class="{{ linha.classe_variacao }}">{{ linha.texto_variacao }}</span>{% else %}<span class="sem-dado">sem dado</span>{% endif %}</td><td class="sec">{{ linha.situacao }}</td></tr>
           {% endfor %}
         </tbody>
       </table>
