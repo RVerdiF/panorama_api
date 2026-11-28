@@ -30,6 +30,7 @@ from tests.unit.conftest import (
     indicator_row,
     market_row,
     municipio_row,
+    recorte_row,
     school_row,
     share_row,
 )
@@ -80,6 +81,7 @@ def repo_links():
     ]
     return FakeRepository(
         schools=[school_row()],
+        recorte=[recorte_row()],
         history=serie,
         indicators=[indicator_row()],
         competidores=[competidor_row()],
@@ -126,7 +128,7 @@ def test_busca_mostra_o_municipio_como_texto_sem_link(client_links):
 
 
 def test_busca_com_nome_nulo_mostra_sem_dado_dentro_do_link(client_links, repo_links):
-    repo_links.schools = [school_row(no_entidade=None)]
+    repo_links.recorte = [recorte_row(no_entidade=None)]
 
     # Filtra por município: `q` casaria com o nome, que aqui é nulo.
     html = _html(client_links.get(BUSCA, params={"co_municipio": MUNICIPIO}))
@@ -137,7 +139,7 @@ def test_busca_com_nome_nulo_mostra_sem_dado_dentro_do_link(client_links, repo_l
 def test_busca_com_municipio_nulo_mostra_sem_dado_sem_link_de_mercado(
     client_links, repo_links
 ):
-    repo_links.schools = [school_row(co_municipio=None, no_municipio=None)]
+    repo_links.recorte = [recorte_row(co_municipio=None, no_municipio=None)]
 
     html = _html(client_links.get(BUSCA, params={"q": "modelo"}))
 

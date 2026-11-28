@@ -449,15 +449,15 @@
     }
   }
 
-  /* Busca `/app/` (card V3 `t_9f384f60`): combobox progressiva de município
-     + validação no cliente, portadas do protótipo (`assets/js/app.js`:
-     `iniciarCombobox` e `avisar`). O SSR emite o `select#municipio`
-     funcionando sem JS; aqui ele é escondido (sem `name`, para não duplicar
-     o parâmetro) e vira `div.combo` — `input` visível sem `name`, `hidden`
-     com o código e a lista — alimentada pela ilha JSON `dados-municipios`
-     (`[nome, codigo]`). `q` com 1–2 caracteres e "Ver mercado do município"
-     sem município escolhido mostram a mensagem em `p.retorno` e não
-     submetem; o servidor continua validando (422 inalterado). */
+  /* Busca `/app/` (cards V3 `t_9f384f60` e V6-P4 `t_6a9f6b6f`): combobox
+     de município + validação no cliente, portadas do protótipo
+     (`assets/js/app.js`: `iniciarCombobox` e `avisar`). O SSR já emite o DOM
+     da combobox (`input#co_municipio`, `button#botao-municipio`,
+     `ul#lista-municipios`); aqui ela é ligada à ilha JSON `dados-municipios`
+     (`[nome, codigo]`) e o `hidden` com o código passa a valer. `q` com 1–2
+     caracteres e "Ver mercado do município" sem município escolhido mostram
+     a mensagem em `p.retorno` e não submetem; o servidor continua validando
+     (422 inalterado). */
   function normalizarBusca(texto) {
     return String(texto).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   }
@@ -572,64 +572,38 @@
     });
   }
   function montarComboBusca(form) {
-    var select = form.querySelector("select#municipio");
-    if (!select) return null;
-    var pares = lerIlhaMunicipios();
-    var codigoInicial = select.value;
-    var textoInicial = "";
-    if (codigoInicial && select.selectedIndex > -1) {
-      textoInicial = select.options[select.selectedIndex].text;
-    }
-    select.removeAttribute("name");
-    select.hidden = true;
-    var rotulo = form.querySelector('label[for="municipio"]');
-    var combo = documento.createElement("div");
-    combo.setAttribute("class", "combo");
-    var campo = documento.createElement("input");
-    campo.type = "text";
-    campo.id = "co_municipio";
-    campo.setAttribute("placeholder", "Todos os municípios");
-    campo.setAttribute("autocomplete", "off");
-    campo.setAttribute("role", "combobox");
-    campo.setAttribute("aria-expanded", "false");
-    campo.setAttribute("aria-controls", "lista-municipios");
-    campo.setAttribute("aria-autocomplete", "list");
-    if (textoInicial) campo.value = textoInicial;
-    var seta = documento.createElement("button");
-    seta.type = "button";
-    seta.setAttribute("class", "combo__seta");
-    seta.id = "botao-municipio";
-    seta.setAttribute("aria-label", "Abrir lista de municípios");
-    var svg = documento.createElementNS(SVG_NS, "svg");
-    svg.setAttribute("width", "15");
-    svg.setAttribute("height", "15");
-    svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("fill", "none");
-    svg.setAttribute("stroke", "currentColor");
-    svg.setAttribute("stroke-width", "2");
-    svg.setAttribute("aria-hidden", "true");
-    var traco = documento.createElementNS(SVG_NS, "path");
-    traco.setAttribute("d", "m6 9 6 6 6-6");
-    svg.appendChild(traco);
-    seta.appendChild(svg);
-    var lista = documento.createElement("ul");
-    lista.setAttribute("class", "combo__lista");
-    lista.id = "lista-municipios";
-    lista.setAttribute("role", "listbox");
-    lista.setAttribute("aria-label", "Municípios de Minas Gerais");
-    lista.dataset.aberta = "false";
-    var oculto = documento.createElement("input");
-    oculto.type = "hidden";
-    oculto.name = "co_municipio";
-    oculto.value = codigoInicial;
-    combo.appendChild(campo);
-    combo.appendChild(seta);
-    combo.appendChild(lista);
-    select.parentNode.insertBefore(combo, select);
-    select.parentNode.insertBefore(oculto, select);
-    if (rotulo) rotulo.htmlFor = "co_municipio";
-    ligarCombobox(campo, lista, seta, pares, oculto);
+    // A combobox do protótipo já vem no SSR (`input#co_municipio`,
+    // `button#botao-municipio`, `ul#lista-municipios`); o `hidden` com o
+    // código é o que o formulário envia, preenchido pela escolha na lista.
+    var campo = form.querySelector("input#co_municipio");
+    var lista = form.querySelector("ul#lista-municipios");
+    var seta = form.querySelector("button#botao-municipio");
+    var oculto = form.querySelector("input[data-combo-codigo]");
+    if (!campo || !lista || !oculto) return null;
+    ligarCombobox(campo, lista, seta, lerIlhaMunicipios(), oculto);
     return oculto;
+  }
+  /* Ordenação da busca no servidor (card `t_6a9f6b6f`): o clique no
+     `th.ordenavel button` segue a regra do protótipo (`ligarOrdenacao`:
+     coluna em `ascending` vira `descending`, qualquer outra vira
+     `ascending`) e navega para a mesma URL com `ordem`/`direcao`, voltando à
+     1ª página. A ordem é aplicada pelo SQL, não reordenando a página. */
+  function ligarOrdenacaoBusca(tabela) {
+    if (!tabela || tabela.getAttribute("data-ordenacao-pronta") === "true") return;
+    tabela.setAttribute("data-ordenacao-pronta", "true");
+    var botoes = tabela.querySelectorAll("th.ordenavel button");
+    for (var b = 0; b < botoes.length; b += 1) {
+      botoes[b].addEventListener("click", function (ev) {
+        var th = ev.currentTarget.closest("th");
+        if (!th || !th.dataset.campo) return;
+        var direcao = th.getAttribute("aria-sort") === "ascending" ? "desc" : "asc";
+        var destino = new URL(window.location.href);
+        destino.searchParams.set("ordem", th.dataset.campo);
+        destino.searchParams.set("direcao", direcao);
+        destino.searchParams.delete("offset");
+        window.location.assign(destino.toString());
+      });
+    }
   }
   function prepararBusca(form) {
     if (!form || form.getAttribute("data-busca-pronta") === "true") return;
@@ -658,6 +632,8 @@
     for (var f = 0; f < formularios.length; f += 1) {
       prepararBusca(formularios[f]);
     }
+    var tabelaBusca = raiz.querySelector ? raiz.querySelector("table#tabela-resultados") : null;
+    if (tabelaBusca && documento.getElementById("form-busca")) ligarOrdenacaoBusca(tabelaBusca);
   });
 
   /* Índice de municípios (`#indice-municipios`): filtro progressivo por nome

@@ -23,6 +23,22 @@ class ServingRepository(Protocol):
 
     def get_school(self, co_entidade: str) -> dict[str, Any] | None: ...
 
+    def list_escolas_recorte(
+        self,
+        *,
+        ano: int,
+        q: str | None,
+        co_municipio: str | None,
+        etapa: str | None,
+        situacao: str | None,
+        ordem: str,
+        direcao: str,
+        limit: int,
+        offset: int,
+    ) -> list[dict[str, Any]]:
+        """Recorte da busca web: `dim_escola` LEFT JOIN indicadores do ano."""
+        ...
+
     def get_school_history(
         self, *, co_entidade: str, ano_inicio: int | None, ano_fim: int | None
     ) -> list[dict[str, Any]]: ...

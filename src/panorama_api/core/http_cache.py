@@ -30,7 +30,7 @@ import logging
 from collections import OrderedDict
 from dataclasses import dataclass
 from threading import Lock
-from typing import Callable, Iterable, cast
+from typing import Callable, Generic, Iterable, TypeVar, cast
 
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
@@ -46,6 +46,9 @@ CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=604800"
 #: de usar". `private` porque a resposta é por usuário/piloto (IAP), não CDN.
 CACHE_CONTROL_PAGINA = "private, no-cache"
 DEFAULT_MAX_ENTRIES = 1000
+#: Tipo do valor guardado no `LruCache` (respostas HTTP no middleware; outros
+#: caches em memória do processo, como o do recorte da busca, reusam a classe).
+V = TypeVar("V")
 
 _CACHEABLE_METHOD = "GET"
 _CACHEABLE_PATH_PREFIX = "/v1/"
@@ -71,7 +74,7 @@ class CachedResponse:
     media_type: str
 
 
-class LruCache:
+class LruCache(Generic[V]):
     """LRU de tamanho fixo, seguro para uso concorrente.
 
     A ordenação é a de inserção/uso (`OrderedDict.move_to_end`); ao passar do
@@ -86,14 +89,14 @@ class LruCache:
         if max_entries <= 0:
             raise ValueError("max_entries deve ser positivo")
         self._max_entries = max_entries
-        self._entries: OrderedDict[str, CachedResponse] = OrderedDict()
+        self._entries: OrderedDict[str, V] = OrderedDict()
         self._lock = Lock()
 
     @property
     def max_entries(self) -> int:
         return self._max_entries
 
-    def get(self, key: str) -> CachedResponse | None:
+    def get(self, key: str) -> V | None:
         with self._lock:
             entry = self._entries.get(key)
             if entry is None:
@@ -101,7 +104,7 @@ class LruCache:
             self._entries.move_to_end(key)
             return entry
 
-    def put(self, key: str, entry: CachedResponse) -> None:
+    def put(self, key: str, entry: V) -> None:
         with self._lock:
             self._entries[key] = entry
             self._entries.move_to_end(key)
@@ -196,7 +199,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         self,
         app,  # type: ignore[no-untyped-def]
         *,
-        cache: LruCache | None = None,
+        cache: "LruCache[CachedResponse] | None" = None,
         cache_control: str = CACHE_CONTROL,
         prefix: str = _CACHEABLE_PATH_PREFIX,
         pagina: bool = False,
@@ -205,7 +208,7 @@ class HttpCacheMiddleware(BaseHTTPMiddleware):
         predicado: Callable[[str], bool] | None = None,
     ) -> None:
         super().__init__(app)
-        self.cache = cache if cache is not None else LruCache()
+        self.cache: LruCache[CachedResponse] = cache if cache is not None else LruCache()
         self.cache_control = cache_control
         self.prefix = prefix
         self.pagina = pagina

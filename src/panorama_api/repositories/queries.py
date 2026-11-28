@@ -74,6 +74,87 @@ def search_schools(
     return sql, params
 
 
+#: Listagem do recorte da busca web (card `t_6a9f6b6f`, decisões V6-P4).
+#: Allowlists fixas: o cliente escolhe a **chave**, nunca a coluna/direção SQL.
+#: Coluna de ordenação → expressão SQL (aliases `e` = dim_escola, `i` = indicadores).
+ORDENACAO_RECORTE: Final[dict[str, str]] = {
+    "nome": "e.no_entidade",
+    "municipio": "e.no_municipio",
+    "dependencia": "e.tp_dependencia",
+    "matricula": "i.qt_mat_bas",
+    "share": "i.share_privado_pct",
+    "variacao": "i.crescimento_yoy_pct",
+    "situacao": "e.tp_situacao_funcionamento",
+}
+DIRECOES_RECORTE: Final[dict[str, str]] = {"asc": "ASC", "desc": "DESC"}
+#: Etapa ofertada → coluna de oferta de `dim_escola` (1 = oferta a etapa).
+ETAPAS_RECORTE: Final[dict[str, str]] = {
+    "creche": "of_creche",
+    "pre": "of_pre",
+    "fund_ai": "of_fund_ai",
+    "fund_af": "of_fund_af",
+    "med": "of_med",
+}
+#: Situação de funcionamento (código INEP): 1 Em atividade, 2 Paralisada.
+SITUACOES_RECORTE: Final = frozenset({"1", "2"})
+RECORTE_SELECT: Final = (
+    "e.co_entidade, e.no_entidade, e.co_municipio, e.no_municipio, "
+    "e.tp_dependencia, e.tp_situacao_funcionamento, "
+    "i.qt_mat_bas, i.is_qt_mat_bas_missing, i.share_privado_pct, i.crescimento_yoy_pct"
+)
+
+
+def escolas_recorte(
+    fq: TableRef,
+    *,
+    ano: int,
+    q: str | None,
+    co_municipio: str | None,
+    etapa: str | None,
+    situacao: str | None,
+    ordem: str,
+    direcao: str,
+    limit: int,
+    offset: int,
+) -> tuple[str, Params]:
+    """Recorte da busca web: `dim_escola` LEFT JOIN indicadores do ano.
+
+    LEFT JOIN (decisão b): o universo é o de `dim_escola` inteiro — escola
+    pública ou paralisada continua listada, com as métricas NULL (`sem dado`).
+    Toda ordenação usa ``NULLS LAST`` (decisão d) e desempata por
+    `co_entidade`, para a paginação por offset ser determinística.
+    """
+    coluna = ORDENACAO_RECORTE[ordem]
+    sentido = DIRECOES_RECORTE[direcao]
+    clauses = ["e.sg_uf = 'MG'"]
+    params: Params = [("ano", "INT64", ano)]
+
+    if q is not None:
+        clauses.append("STRPOS(LOWER(e.no_entidade), @q) > 0")
+        params.append(("q", "STRING", q.lower()))
+    if co_municipio is not None:
+        clauses.append("e.co_municipio = @co_municipio")
+        params.append(("co_municipio", "STRING", co_municipio))
+    if etapa is not None:
+        clauses.append(f"e.{ETAPAS_RECORTE[etapa]} = 1")
+    if situacao is not None:
+        if situacao not in SITUACOES_RECORTE:
+            raise ValueError(f"situação fora da allowlist: {situacao!r}")
+        clauses.append("e.tp_situacao_funcionamento = @situacao")
+        params.append(("situacao", "STRING", situacao))
+
+    sql = (
+        f"SELECT {RECORTE_SELECT}\n"
+        f"FROM {fq('dim_escola')} AS e\n"
+        f"LEFT JOIN {fq('mart_escola_indicadores')} AS i\n"
+        "  ON i.co_entidade = e.co_entidade AND i.nu_ano_censo = @ano\n"
+        f"WHERE {' AND '.join(clauses)}\n"
+        f"ORDER BY {coluna} {sentido} NULLS LAST, e.co_entidade ASC\n"
+        f"LIMIT {limit + 1} OFFSET {offset}"
+    )
+    return sql, params
+
+
 def school_history(
     fq: TableRef,
     *,

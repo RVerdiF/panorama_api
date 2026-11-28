@@ -103,6 +103,30 @@ def school_row(**overrides: Any) -> dict[str, Any]:
     return row
 
 
+def recorte_row(**overrides: Any) -> dict[str, Any]:
+    """Linha do recorte da busca web: `dim_escola` + métricas do ano.
+
+    As colunas de oferta (`of_*`) ficam na linha só para o fake filtrar por
+    etapa — o SQL as usa no `WHERE`, não no `SELECT`.
+    """
+    row: dict[str, Any] = {
+        "co_entidade": "31000001",
+        "no_entidade": "ESCOLA MODELO",
+        "co_municipio": "3106200",
+        "no_municipio": "BELO HORIZONTE",
+        "tp_dependencia": "4",
+        "tp_situacao_funcionamento": "1",
+        "qt_mat_bas": 680,
+        "is_qt_mat_bas_missing": False,
+        "share_privado_pct": 12.5,
+        "crescimento_yoy_pct": 3.2,
+    }
+    for etapa in OFERTA_ETAPAS:
+        row[f"of_{etapa}"] = 1
+    row.update(overrides)
+    return row
+
+
 def history_row(**overrides: Any) -> dict[str, Any]:
     row = null_row(
         "mart_escola",
@@ -270,6 +294,7 @@ class FakeRepository:
         concentracao: list[dict[str, Any]] | None = None,
         share: list[dict[str, Any]] | None = None,
         indice: list[dict[str, Any]] | None = None,
+        recorte: list[dict[str, Any]] | None = None,
     ) -> None:
         self.schema = schema if schema is not None else full_schema()
         self.schools = schools or []
@@ -281,6 +306,8 @@ class FakeRepository:
         self.concentracao = concentracao or []
         self.share = share or []
         self.indice = indice if indice is not None else []
+        #: Linhas do recorte da busca web (`dim_escola` ⟕ indicadores do ano).
+        self.recorte = recorte or []
         self.calls: list[tuple[str, dict[str, Any]]] = []
         self.errors: dict[str, Exception] = {}
 
@@ -321,6 +348,35 @@ class FakeRepository:
             if row["co_entidade"] == co_entidade:
                 return row
         return None
+
+    def list_escolas_recorte(self, **kwargs: Any) -> list[dict[str, Any]]:
+        """Espelha `queries.escolas_recorte`: filtros, `NULLS LAST` e LIMIT L+1."""
+        self._record("list_escolas_recorte", kwargs)
+        rows = [r for r in self.recorte if r.get("nu_ano_censo", kwargs["ano"]) == kwargs["ano"]]
+        if kwargs.get("q") is not None:
+            termo = kwargs["q"].lower()
+            rows = [r for r in rows if termo in (r.get("no_entidade") or "").lower()]
+        if kwargs.get("co_municipio") is not None:
+            rows = [r for r in rows if r.get("co_municipio") == kwargs["co_municipio"]]
+        if kwargs.get("etapa") is not None:
+            rows = [r for r in rows if r.get(f"of_{kwargs['etapa']}") == 1]
+        if kwargs.get("situacao") is not None:
+            rows = [r for r in rows if r.get("tp_situacao_funcionamento") == kwargs["situacao"]]
+        campo = {
+            "nome": "no_entidade",
+            "municipio": "no_municipio",
+            "dependencia": "tp_dependencia",
+            "matricula": "qt_mat_bas",
+            "share": "share_privado_pct",
+            "variacao": "crescimento_yoy_pct",
+            "situacao": "tp_situacao_funcionamento",
+        }[kwargs["ordem"]]
+        com_valor = [r for r in rows if r.get(campo) is not None]
+        sem_valor = [r for r in rows if r.get(campo) is None]
+        com_valor.sort(key=lambda r: r["co_entidade"])
+        com_valor.sort(key=lambda r: r[campo], reverse=kwargs["direcao"] == "desc")
+        sem_valor.sort(key=lambda r: r["co_entidade"])
+        return self._page(com_valor + sem_valor, kwargs["limit"], kwargs["offset"])
 
     def get_school_history(self, **kwargs: Any) -> list[dict[str, Any]]:
         self._record("get_school_history", kwargs)

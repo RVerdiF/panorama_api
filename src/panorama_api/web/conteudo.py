@@ -224,6 +224,22 @@ ETAPAS_ROTULOS: dict[Etapa, str] = {
     "esp": "Educação especial",
 }
 
+#: Filtros da busca `/app/` (card `t_6a9f6b6f`): rótulos literais do protótipo
+#: (`panorama-escola-busca.html:71-99`) e o código que a rota aceita. A
+#: allowlist que vale é a do SQL (`queries.ETAPAS_RECORTE`/`SITUACOES_RECORTE`);
+#: um teste trava as duas listas juntas.
+OPCOES_ETAPA_BUSCA: tuple[tuple[str, str], ...] = (
+    ("creche", "Creche"),
+    ("pre", "Pré-escola"),
+    ("fund_ai", "Ensino fundamental I"),
+    ("fund_af", "Ensino fundamental II"),
+    ("med", "Ensino médio"),
+)
+OPCOES_SITUACAO_BUSCA: tuple[tuple[str, str], ...] = (
+    ("1", "Em atividade"),
+    ("2", "Paralisada"),
+)
+
 #: Grupos semânticos da tabela "Oferta e matrícula por etapa" (card F11). As
 #: nove linhas têm naturezas diferentes: listadas como etapas irmãs, somavam
 #: 2.061 alunos numa escola de 680 (total oficial 680 + ensino médio 680 +
@@ -306,6 +322,8 @@ AVISOS_METODOLOGIA: tuple[tuple[str, str], ...] = (
 
 
 __all__ = [
+    "OPCOES_ETAPA_BUSCA",
+    "OPCOES_SITUACAO_BUSCA",
     "AVISOS_METODOLOGIA",
     "AVISO_METODOLOGIA_CODIGO",
     "DEFINICAO_CONCORRENCIA",
